@@ -1,9 +1,35 @@
-﻿"use client";
-import { useEffect, useRef } from "react";
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-export default function Page(){
+const FAQ = [
+  { q: "How does pricing work?", a: "Every build costs credits. Starter and Agency are monthly plans with a set number of builds; Flex packs are pay-as-you-go with no subscription." },
+  { q: "What can I actually build?", a: "Describe any web app — a storefront, a booking page, a dashboard, a landing page — and GYSM generates a working, styled preview you can iterate on." },
+  { q: "Can I export the code?", a: "Yes. Every generated build can be copied as code or deployed directly from the builder." },
+  { q: "Do I need a credit card to try it?", a: "You need an account and an active plan to generate — there's no free tier right now. Pick the smallest Flex pack if you just want to try it out." },
+];
+
+export default function Page() {
   const audioRef = useRef<HTMLAudioElement>(null);
-  
+  const router = useRouter();
+  const [prompt, setPrompt] = useState("");
+  const [starting, setStarting] = useState(false);
+
+  async function startBuilding(promptText?: string) {
+    const p = (promptText ?? prompt).trim();
+    setStarting(true);
+    if (p) {
+      window.localStorage.setItem("gysm_pending_prompt", p);
+    }
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      router.push("/builder");
+    } else {
+      router.push(`/auth?redirect=${encodeURIComponent("/builder")}`);
+    }
+  }
+
   return(
     <div style={{fontFamily:"Inter,sans-serif"}} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-violet-600 selection:text-white">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style>
@@ -13,8 +39,8 @@ export default function Page(){
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <div className="flex items-center gap-2"><div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div><span className="font-black tracking-tighter text-[16px]">GYSM.IO</span></div>
           <div className="flex items-center gap-2">
-            <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
-            <a href="/builder" className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">Start Building</a>
+            <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
+            <button onClick={() => startBuilding()} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">Start Building</button>
           </div>
         </div>
       </nav>
@@ -26,9 +52,25 @@ export default function Page(){
           Build apps<br/>10x faster<br/>than <span className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent">coding</span>
         </h1>
         <p className="mx-auto mt-4 max-w-[480px] text-[15px] md:text-[18px] leading-[1.5] text-black/60 font-medium">Turn your idea into a real app that makes money. No code. Just ship.</p>
-        <div className="mt-7 flex flex-col items-center gap-3">
-          <a href="/builder" className="h-[48px] w-full md:w-auto px-8 rounded-full bg-black text-white font-bold grid place-items-center text-[15px] shadow-[0_8px_24px_rgba(0,0,0,0.15)]">Start Building Free →</a>
-          <div className="text-[12px] text-black/40 font-medium">No credit card • Live in 5 seconds</div>
+
+        <div className="mt-7 mx-auto max-w-[560px]">
+          <div className="flex flex-col sm:flex-row gap-2 rounded-[20px] sm:rounded-full border border-black/10 bg-white p-2 shadow-sm">
+            <input
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && startBuilding()}
+              placeholder="Describe the app you want to build…"
+              className="flex-1 h-[44px] px-4 rounded-full outline-none text-[14px]"
+            />
+            <button
+              onClick={() => startBuilding()}
+              disabled={starting}
+              className="h-[44px] px-6 rounded-full bg-black text-white font-bold text-[14px] shrink-0 disabled:opacity-50"
+            >
+              {starting ? "One sec…" : "Generate my website"}
+            </button>
+          </div>
+          <div className="mt-3 text-[12px] text-black/40 font-medium">Live in 5 seconds • credits used per build</div>
         </div>
       </section>
 
@@ -80,7 +122,7 @@ export default function Page(){
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-24">
         <div className="flex items-end justify-between">
           <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Apps built<br/>on GYSM</h2>
-          <a href="/builder" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
+          <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
         </div>
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[
@@ -101,11 +143,27 @@ export default function Page(){
         </div>
       </section>
 
-      {/* TINY PRICING TEASER - not big */}
+      {/* PRICING TEASER */}
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
         <div className="rounded-[24px] border border-black/5 bg-white p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">Start free, upgrade when you make money</div><div className="text-[12px] opacity-50">Free forever • $49/mo Pro when you scale • See full pricing in builder →</div></div></div>
-          <a href="/builder" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">See Pricing →</a>
+          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">Pay only for the builds you ship</div><div className="text-[12px] opacity-50">Plans from €10 • credit packs or monthly, your call</div></div></div>
+          <a href="/pricing" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">See Pricing →</a>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
+        <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9] text-center mb-8">FAQ</h2>
+        <div className="max-w-[720px] mx-auto grid gap-3">
+          {FAQ.map((item) => (
+            <details key={item.q} className="group rounded-[16px] border border-black/5 bg-white p-4 md:p-5">
+              <summary className="cursor-pointer list-none flex items-center justify-between font-bold text-[14px] md:text-[15px]">
+                {item.q}
+                <span className="opacity-30 group-open:rotate-45 transition-transform">+</span>
+              </summary>
+              <p className="mt-3 text-[13.5px] leading-[1.6] opacity-60">{item.a}</p>
+            </details>
+          ))}
         </div>
       </section>
 
@@ -120,8 +178,8 @@ export default function Page(){
                 <span className="block bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent" style={{fontSize:"clamp(36px,8vw,72px)"}}>your empire?</span>
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">Your competitors are shipping. You're still reading. Start now.</p>
-              <a href="/builder" className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building Free →</a>
-              <div className="mt-3 text-[11px] text-white/30">No credit card • Cancel anytime</div>
+              <button onClick={() => startBuilding()} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
+              <div className="mt-3 text-[11px] text-white/30">Credits from €10 • cancel monthly plans anytime</div>
             </div>
           </div>
           <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM.IO — Built for founders who ship</div>
