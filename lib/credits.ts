@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+﻿import { supabaseAdmin } from "@/lib/supabase";
 
 /**
  * Source of truth for the credits/paywall system.
@@ -10,7 +10,7 @@ export const LIMITS = { starter: 30, agency: 300 } as const;
 export const CREDITS_PER_PLAN = { starter: 15000, agency: 150000 } as const;
 
 /** Current credit balance for a user. Returns 0 (never throws) so a transient
- *  read error fails CLOSED — i.e. blocks generation rather than granting it. */
+ *  read error fails CLOSED -- i.e. blocks generation rather than granting it. */
 export async function getCreditBalance(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from("credits")
@@ -40,7 +40,7 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
 /**
  * Gate for the /builder PAGE (not the generate call itself). A subscriber
  * with an active plan can open the builder even if this instant shows 0
- * credits (e.g. brief lag right after a renewal webhook) — the actual
+ * credits (e.g. brief lag right after a renewal webhook) -- the actual
  * /api/generate call below still enforces the real balance at build time.
  */
 export async function canAccessBuilder(userId: string): Promise<boolean> {
@@ -54,7 +54,7 @@ export async function canAccessBuilder(userId: string): Promise<boolean> {
 /**
  * Atomically deducts credits via a Postgres function (see migration SQL) so
  * two concurrent /api/generate requests can't both read balance=500 and both
- * proceed. Returns false if the balance was insufficient — no partial charge.
+ * proceed. Returns false if the balance was insufficient -- no partial charge.
  */
 export async function deductCredit(
   userId: string,
@@ -71,7 +71,7 @@ export async function deductCredit(
   return Boolean(data);
 }
 
-/** Adds credits — called from the Stripe webhook on payment. */
+/** Adds credits -- called from the Stripe webhook on payment. */
 export async function addCredits(userId: string, amount: number): Promise<void> {
   const { error } = await supabaseAdmin.rpc("add_credits", {
     p_user_id: userId,
@@ -79,6 +79,6 @@ export async function addCredits(userId: string, amount: number): Promise<void> 
   });
   if (error) {
     console.error("[credits] addCredits failed:", error.message);
-    throw error; // let the webhook handler decide how to respond to Stripe
+    throw error;
   }
 }
