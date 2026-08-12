@@ -1,0 +1,1 @@
+﻿export async function GET(){ return Response.json({ templates: [{ slug:'clinic', name:'Medicare Clinic', category:'health' },{ slug:'food', name:'Lagos Eats', category:'food' },{ slug:'ride', name:'Uber Clone', category:'ride' }] }) }

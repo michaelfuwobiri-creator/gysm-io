@@ -1,0 +1,77 @@
+﻿"use client";
+import { useState, useEffect } from "react";
+const PLANS = [
+  { id:"flex", price:"$0", sub:" to start", desc:"$0 to start, then $0.05/app.", cta:"Start Flex →" },
+  { id:"starter", price:"$29", sub:"/month", desc:"1 Pro SaaS - complete product.", cta:"Get Starter →", highlight:true },
+  { id:"agency", price:"$300", sub:"/month", desc:"Unlimited SaaS factory.", cta:"Go Agency →" },
+];
+
+function autoFixCode(rc:string):string{
+  let code = rc;
+  // Fix 1: item is not defined when mapping dishes
+  if(code.includes("dishes") && /\bitem\b/.test(code)){
+    const mapMatch = code.match(/\.map\s*\(\s*\(?(\w+)\)?\s*=>/);
+    if(mapMatch){
+      const correctVar = mapMatch[1];
+      if(correctVar !== "item"){
+        code = code.replace(new RegExp(`\\bitem\\b`, 'g'), correctVar);
+      }
+    } else {
+      code = code.replace(/\bitem\b/g, "dish");
+    }
+  }
+  // Fix 2: remove duplicate Food App headers that cause white
+  return code;
+}
+
+function reactToHtmlPreview(rc:string){
+  const fixed = autoFixCode(rc);
+  let clean = fixed.replace(/import\s+.*?from\s+['"].*?['"];?/g, "").replace(/export\s+default\s+\w+;?/g,"").trim();
+  const m = clean.match(/(?:const|function)\s+([A-Z]\w*)\s*[=|\(]/);
+  const compName = m ? m[1] : "App";
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{margin:0;background:white;color:black} #err{position:fixed;bottom:0;left:0;right:0;background:#fee;color:#900;padding:10px;font-family:monospace;font-size:11px;white-space:pre-wrap;display:none;max-height:50vh;overflow:auto;z-index:9999}</style>
+</head><body>
+<div id="root"></div><div id="err"></div>
+<script>window.onerror=(m,s,l,c,e)=>{const el=document.getElementById('err');el.style.display='block';el.textContent='JS Error: '+m+'\\n'+(e&&e.stack?e.stack:'');};window.addEventListener('unhandledrejection',e=>{const el=document.getElementById('err');el.style.display='block';el.textContent='Promise: '+e.reason;});</script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
+<script type="text/babel">
+${clean}
+try{
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  if(typeof ${compName} !== 'undefined'){ root.render(React.createElement(${compName})); }
+  else { root.render(React.createElement('div',null,'No component ${compName} found')); }
+}catch(err){ document.getElementById('err').style.display='block'; document.getElementById('err').textContent='Render failed: '+err.message+'\\n'+err.stack; }
+</script></body></html>`;
+}
+
+export default function Builder(){
+  const [hasAccess,setHasAccess]=useState(false);
+  const [checking,setChecking]=useState(true);
+  const [prompt,setPrompt]=useState("");
+  const [rawCode,setRawCode]=useState("");
+  const [html,setHtml]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [tab,setTab]=useState<"preview"|"code">("preview");
+  useEffect(()=>{
+    const p=new URLSearchParams(window.location.search);
+    if(p.get("paid")==="1"||p.get("session_id")||localStorage.getItem("gysm_paid")){ if(p.get("paid")==="1") localStorage.setItem("gysm_paid","1"); setHasAccess(true); }
+    setChecking(false);
+  },[]);
+  const checkout=async(plan:string)=>{const r=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});const d=await r.json(); if(d.url) location.href=d.url; else alert(d.error);};
+  const generate=async()=>{
+    if(!prompt.trim()) return; setLoading(true); setRawCode(""); setHtml("");
+    const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});
+    const data=await res.json(); const code=data.code||data.html||""; 
+    setRawCode(code); 
+    const fixed = autoFixCode(code);
+    setHtml(fixed.includes("import React")||fixed.includes("return (") ? reactToHtmlPreview(fixed) : fixed);
+    setTab("preview"); setLoading(false);
+  };
+  if(checking) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Checking...</div>;
+  if(!hasAccess) return <div className="min-h-screen bg-black text-white p-6"><div className="max-w-5xl mx-auto mt-20 text-center"><h2 className="text-6xl font-black">Builder Locked</h2><p className="opacity-50 mt-3">Pay to unlock</p><div className="grid md:grid-cols-3 gap-4 mt-12">{PLANS.map(pl=><div key={pl.id} className={`rounded-2xl p-6 border ${pl.highlight?'bg-white text-black':'bg-white/5 border-white/10'}`}><div className="text-4xl font-black">{pl.price}<span className="text-sm">{pl.sub}</span></div><button onClick={()=>checkout(pl.id)} className="mt-4 w-full h-11 rounded-full bg-white text-black font-bold">{pl.cta}</button></div>)}</div><a href="/builder?paid=1" className="text-xs opacity-20 mt-8 inline-block">Bypass test</a></div></div>;
+  return(<div className="min-h-screen bg-black text-white"><div className="max-w-7xl mx-auto p-6"><div className="flex justify-between"><h1 className="font-black">GYSM.IO <span className="bg-green-500 text-black text-xs px-2 py-1 rounded-full ml-2">UNLOCKED</span></h1></div><div className="mt-6 bg-white/5 border border-white/10 rounded-[24px] p-3 flex gap-3 max-w-4xl mx-auto"><input value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="food app with 3 dishes" className="flex-1 h-14 bg-black rounded-full px-6 border border-white/10 outline-none"/><button onClick={generate} className="h-14 px-8 rounded-full bg-white text-black font-black">{loading?"Building...":"Generate →"}</button></div>{rawCode && <div className="mt-6"><div className="flex gap-2 mb-3"><button onClick={()=>setTab("preview")} className={`px-4 py-2 rounded-full text-sm font-bold ${tab==="preview"?"bg-white text-black":"bg-white/10"}`}>Preview (Auto-Fixed)</button><button onClick={()=>setTab("code")} className={`px-4 py-2 rounded-full text-sm font-bold ${tab==="code"?"bg-white text-black":"bg-white/10"}`}>Code</button></div><div className="rounded-[20px] overflow-hidden border border-white/10 bg-white"><iframe key={html.length} srcDoc={html} className="w-full h-[800px] border-0 bg-white" sandbox="allow-scripts allow-same-origin"/></div></div>}</div></div>);
+}
