@@ -56,3 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
   }
 }
+
+export const dynamic = 'force-dynamic'
+

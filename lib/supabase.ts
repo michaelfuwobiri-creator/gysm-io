@@ -1,17 +1,17 @@
 ﻿import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-
-if (!supabaseUrl && typeof window !== 'undefined') {
-  console.error("NEXT_PUBLIC_SUPABASE_URL is missing in Vercel env vars")
+function getSupabaseEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://lhtagndikscbmzwjwfae.supabase.co"
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy"
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || anon
+  // Ensure valid URL - never throw Invalid supabaseUrl during build
+  const validUrl = url.startsWith('http') ? url : "https://lhtagndikscbmzwjwfae.supabase.co"
+  return { url: validUrl, anon, service }
 }
 
-const url = supabaseUrl || "https://lhtagndikscbmzwjwfae.supabase.co"
-const anon = supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder"
+const { url, anon, service } = getSupabaseEnv()
 
 export const supabase = createClient(url, anon)
-export const supabaseAdmin = createClient(url, serviceKey || anon, {
+export const supabaseAdmin = createClient(url, service, {
   auth: { autoRefreshToken: false, persistSession: false }
 })

@@ -72,3 +72,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ html: result.html, projectId: project?.id ?? null });
 }
+
+export const dynamic = 'force-dynamic'
+
