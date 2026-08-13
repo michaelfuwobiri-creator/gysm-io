@@ -1,27 +1,22 @@
-﻿import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+﻿import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
-const protectedPaths = ['/builder', '/dashboard']
+const isPublicRoute = createRouteMatcher(['/', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/gang(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
+const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/dashboard(.*)'])
 
-export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
-  const isProtected = protectedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))
-
-  // public pages -> let through
-  if (!isProtected) {
+export default clerkMiddleware(async (auth, req) => {
+  if (isBuilderRoute(req)) {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.redirect(new URL('/pricing', req.url))
+    }
     return NextResponse.next()
   }
-
-  // protected pages -> check auth, if no auth go to pricing (not login)
-  const hasAuth = request.cookies.get('sb-access-token') || request.cookies.get('supabase-auth-token') || request.cookies.get('sb-lhtagndikscbmzwjwfae-auth-token')
-
-  if (!hasAuth) {
-    return NextResponse.redirect(new URL('/pricing', request.url))
+  if (!isPublicRoute(req)) {
+    await auth.protect()
   }
-
-  return NextResponse.next()
-}
+})
 
 export const config = {
-  matcher: ['/builder/:path*', '/dashboard/:path*']
+  matcher: ['/((?!.*\\.).*)', '/(api|trpc)(.*)'],
 }
