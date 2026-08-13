@@ -1,26 +1,41 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
-import { neon } from '@neondatabase/serverless'
+﻿import { neon } from '@neondatabase/serverless'
+import { Webhook } from 'svix'
+import { headers } from 'next/headers'
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET!
+  const h = headers()
+  const svix_id = h.get("svix-id")!
+  const svix_timestamp = h.get("svix-timestamp")!
+  const svix_signature = h.get("svix-signature")!
+
   const payload = await req.json()
-  const { type, data } = payload
+  const wh = new Webhook(WEBHOOK_SECRET)
 
-  if (type === 'user.created' || type === 'user.updated') {
-    const sql = neon(process.env.DATABASE_URL!)
-    const email = data.email_addresses?.[0]?.email_address || ''
-    const name = `${data.first_name || ''} ${data.last_name || ''}`.trim() || email
-    const avatar = data.image_url || ''
+  let evt: any
+  try {
+    evt = wh.verify(JSON.stringify(payload), {
+      "svix-id": svix_id,
+      "svix-timestamp": svix_timestamp,
+      "svix-signature": svix_signature,
+    })
+  } catch { return new Response('Invalid', { status: 400 }) }
 
-    await sql`
-      INSERT INTO users (clerk_id, email, name, avatar_url)
-      VALUES (${data.id}, ${email}, ${name}, ${avatar})
-      ON CONFLICT (clerk_id) DO UPDATE SET
-        email = EXCLUDED.email,
-        name = EXCLUDED.name,
-        avatar_url = EXCLUDED.avatar_url,
-        updated_at = NOW()
-    `
+  const sql = neon(process.env.DATABASE_URL!)
+  const { id, email_addresses, first_name, last_name, image_url } = evt.data
+  const email = email_addresses?.[0]?.email_address || ''
+  const name = `${first_name || ''} ${last_name || ''}`.trim() || email
+
+  if (evt.type === 'user.created') {
+    await sql`INSERT INTO users (clerk_id, email, name, image_url) VALUES (${id}, ${email}, ${name}, ${image_url}) ON CONFLICT (clerk_id) DO UPDATE SET email=${email}, name=${name}, image_url=${image_url}, updated_at=NOW()`
   }
-  return NextResponse.json({ ok: true })
+  if (evt.type === 'user.updated') {
+    await sql`UPDATE users SET email=${email}, name=${name}, image_url=${image_url}, updated_at=NOW() WHERE clerk_id=${id}`
+  }
+  if (evt.type === 'user.deleted') {
+    await sql`DELETE FROM users WHERE clerk_id=${id}`
+  }
+
+  return new Response('OK', { status: 200 })
 }
 export const dynamic = 'force-dynamic'
