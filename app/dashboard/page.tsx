@@ -1,29 +1,28 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { sql } from "@/lib/db";
 import { UserButton } from "@clerk/nextjs";
 
-// Reads straight from Supabase. Every project generated through
-// /api/generate is saved there, keyed by the Clerk user id (see
-// lib/auth.ts and supabase/migrations/0001_init.sql).
+// Reads straight from Neon. Every project generated through /api/generate
+// is saved there, keyed by the Clerk user id (see lib/auth.ts and
+// db/migrations/0001_init.sql).
 export default async function DashboardPage() {
   const user = await getUser();
   if (!user) {
     redirect("/sign-in?redirect_url=/dashboard");
   }
 
-  const { data: projects, error } = await supabaseAdmin
-    .from("projects")
-    .select("id, prompt, html, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
+  let list: any[] = [];
+  try {
+    list = await sql`
+      select id, prompt, html, created_at from projects
+      where user_id = ${user.id}
+      order by created_at desc
+      limit 50
+    `;
+  } catch (error: any) {
     console.error("[dashboard] failed to load projects:", error.message);
   }
-
-  const list = projects ?? [];
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
@@ -47,7 +46,7 @@ export default async function DashboardPage() {
             {list.map((p) => (
               <div key={p.id} className="bg-white/[0.05] border border-white/10 rounded-xl p-4 flex flex-col gap-3">
                 <div className="text-xs text-white/40">
-                  {new Date(p.created_at).toLocaleString()} • {p.id.slice(0, 8)}
+                  {new Date(p.created_at).toLocaleString()} • {String(p.id).slice(0, 8)}
                 </div>
                 <div className="font-medium line-clamp-2">{p.prompt}</div>
                 <div className="bg-white rounded-lg h-[200px] overflow-hidden pointer-events-none">

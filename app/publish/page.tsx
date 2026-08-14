@@ -5,7 +5,7 @@
 // API route is gone (see app/gang/page.tsx for why), so this could never
 // resolve real content anyway. Left as a safe placeholder rather than wired
 // back up -- if you want public share links back, the right shape is a
-// Supabase lookup by project id feeding a sandboxed iframe, same pattern as
+// Neon lookup by project id feeding a sandboxed iframe, same pattern as
 // the dashboard, not a direct HTML injection into the parent page.
 export default function PublishPage() {
   return (

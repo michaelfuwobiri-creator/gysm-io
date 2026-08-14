@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe, getPlanById, getPriceId } from "@/lib/stripe";
+import { getStripe, getPlanById, getPriceId } from "@/lib/stripe";
 import { getUser } from "@/lib/auth";
 
 // This route did not exist at all in the repo -- app/pricing/page.tsx was
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: plan.interval === "month" ? "subscription" : "payment",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],

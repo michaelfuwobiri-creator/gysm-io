@@ -1,25 +1,21 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { sql } from "@/lib/db";
 
-// Previously /api/templates returned a hardcoded 3-item array (clinic/food/ride)
-// that didn't even match the slugs of the actual template pages in this folder
-// (agency/clinic/stripe/zodiac) -- and no page anywhere rendered that array,
-// so it had no way to reach a user. This queries real projects flagged
-// is_template = true in Supabase, per the migration in supabase/migrations.
+// Queries real projects flagged is_template = true in Neon, per
+// db/migrations/0001_init.sql.
 export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage() {
-  const { data: templates, error } = await supabaseAdmin
-    .from("projects")
-    .select("id, prompt, html, created_at")
-    .eq("is_template", true)
-    .order("created_at", { ascending: false })
-    .limit(24);
-
-  if (error) {
+  let list: any[] = [];
+  try {
+    list = await sql`
+      select id, prompt, html, created_at from projects
+      where is_template = true
+      order by created_at desc
+      limit 24
+    `;
+  } catch (error: any) {
     console.error("[templates] failed to load:", error.message);
   }
-
-  const list = templates ?? [];
 
   return (
     <div className="min-h-screen bg-black text-white p-6">

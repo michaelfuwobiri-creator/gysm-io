@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { sql } from "@/lib/db";
 import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/credits";
 import { generateWebsite } from "@/lib/ai/orchestrator";
 
@@ -61,16 +61,19 @@ export async function POST(req: NextRequest) {
 
   // 5. Save. Best-effort: a save failure shouldn't take away a build the
   //    user already paid a credit for, but it is logged loudly so it's caught.
-  const { data: project, error: saveError } = await supabaseAdmin
-    .from("projects")
-    .insert({ user_id: user.id, prompt, html: result.html })
-    .select("id")
-    .single();
-  if (saveError) {
-    console.error("[generate] failed to save project:", saveError.message);
+  let projectId: string | null = null;
+  try {
+    const rows = await sql`
+      insert into projects (user_id, prompt, html)
+      values (${user.id}, ${prompt}, ${result.html})
+      returning id
+    `;
+    projectId = (rows[0] as any)?.id ?? null;
+  } catch (error: any) {
+    console.error("[generate] failed to save project:", error.message);
   }
 
-  return NextResponse.json({ html: result.html, projectId: project?.id ?? null });
+  return NextResponse.json({ html: result.html, projectId });
 }
 
 export const dynamic = 'force-dynamic'
