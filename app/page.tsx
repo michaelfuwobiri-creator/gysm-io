@@ -10,12 +10,6 @@ const FEATURES = [
   { icon: "▲", title: "Ship in one click", body: "Every build gets a live preview instantly — deploy it or keep iterating." },
 ];
 
-const STEPS = [
-  { n: "01", title: "Describe", body: "Tell GYSM what you're building, in plain English." },
-  { n: "02", title: "Preview", body: "Watch your app take shape in a live browser preview." },
-  { n: "03", title: "Ship", body: "Export the code or deploy straight from the builder." },
-];
-
 // avatar: DiceBear-generated illustrated portraits, not photos of real people --
 // these are fictional example testimonials, so we don't attach real strangers'
 // likenesses to fabricated quotes. Swap `avatar` for a real photo URL for any
@@ -143,20 +137,6 @@ export default function Page() {
               <div className="h-9 w-9 rounded-[10px] bg-violet-100 text-violet-700 grid place-items-center font-bold">{f.icon}</div>
               <div className="mt-4 text-[14px] font-bold">{f.title}</div>
               <div className="mt-1 text-[12.5px] leading-[1.5] opacity-60">{f.body}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
-        <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9] mb-8">Three steps to live</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {STEPS.map((s) => (
-            <div key={s.n}>
-              <div className="text-[13px] font-black text-violet-600">{s.n}</div>
-              <div className="mt-2 text-[17px] font-bold">{s.title}</div>
-              <div className="mt-1 text-[13.5px] opacity-60">{s.body}</div>
             </div>
           ))}
         </div>
