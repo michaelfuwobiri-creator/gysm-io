@@ -23,16 +23,61 @@ const TESTIMONIALS = [
   { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Alex-R" },
 ];
 
+// Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
+// (below) instead of a stock emoji, so the grid reads like an actual app
+// showcase/portfolio rather than a placeholder tile set.
 const APPS = [
-  { name: "PawsWalk", tag: "Live", color: "from-orange-100 to-amber-100", icon: "🐾" },
-  { name: "FitTrack AI", tag: "Live", color: "from-violet-100 to-fuchsia-100", icon: "💪" },
-  { name: "InvoiceFlow", tag: "Live", color: "from-emerald-100 to-teal-100", icon: "🧾" },
-  { name: "DateMate", tag: "Trending", color: "from-pink-100 to-rose-100", icon: "❤️" },
-  { name: "ShopLite", tag: "Live", color: "from-blue-100 to-cyan-100", icon: "🛒" },
-  { name: "StudySnap", tag: "Live", color: "from-yellow-100 to-orange-100", icon: "📚" },
-  { name: "FoodDash", tag: "Live", color: "from-red-100 to-orange-100", icon: "🍔" },
-  { name: "MindSpace", tag: "Trending", color: "from-indigo-100 to-violet-100", icon: "🧘" },
+  { name: "ZodiacMoonMatch", tag: "Live", color: "from-violet-100 to-fuchsia-100", ink: "text-violet-700" },
+  { name: "ModernClinic", tag: "Live", color: "from-sky-100 to-teal-100", ink: "text-teal-700" },
+  { name: "Radar", tag: "Trending", color: "from-emerald-100 to-lime-100", ink: "text-emerald-700" },
+  { name: "CutRoom", tag: "Live", color: "from-orange-100 to-red-100", ink: "text-orange-700" },
+  { name: "MemoryCloud", tag: "Live", color: "from-blue-100 to-cyan-100", ink: "text-blue-700" },
 ];
+
+function AppLogo({ name, className }: { name: string; className?: string }) {
+  switch (name) {
+    case "ZodiacMoonMatch":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className}>
+          <path d="M14.8 3.6a8.2 8.2 0 1 0 5.9 13.1A9.1 9.1 0 0 1 14.8 3.6Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" />
+          <path d="M18.6 5.3l.55 1.35L20.5 7.2l-1.35.55-.55 1.35-.55-1.35L16.7 7.2l1.35-.55.55-1.35Z" fill="currentColor" />
+        </svg>
+      );
+    case "ModernClinic":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className}>
+          <path d="M12 4v4.2M9.9 6.1h4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M4 13c1.7-2.4 3-2.4 4.3-.4S10.6 15 12 12.6 14.3 10.6 15.7 12.6 18.3 15.4 20 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="4" y="16.6" width="16" height="3.6" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
+        </svg>
+      );
+    case "Radar":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className}>
+          <circle cx="12" cy="12" r="8.3" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+          <circle cx="12" cy="12" r="5.1" stroke="currentColor" strokeWidth="1.5" opacity="0.55" />
+          <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+          <path d="M12 12L17.8 6.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      );
+    case "CutRoom":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className}>
+          <path d="M4.3 5.8l15.2 3.9-1 3.9-15.2-3.9 1-3.9Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <path d="M4.3 9.7h15.2v8.7a1 1 0 0 1-1 1H5.3a1 1 0 0 1-1-1V9.7Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        </svg>
+      );
+    case "MemoryCloud":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className}>
+          <path d="M7.3 17.3a3.9 3.9 0 0 1-.5-7.77 4.9 4.9 0 0 1 9.4-1.86A4.4 4.4 0 0 1 17.3 17.3H7.3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+          <circle cx="12" cy="13" r="2" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 const FAQ = [
   { q: "How does pricing work?", a: "Every build costs credits. Starter and Agency are monthly plans with a set number of builds; credit packs are pay-as-you-go with no subscription." },
@@ -148,10 +193,10 @@ export default function Page() {
           <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Apps built<br />on GYSM</h2>
           <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
         </div>
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
           {APPS.map((app) => (
             <div key={app.name} className="group rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg transition">
-              <div className={`h-[88px] md:h-[110px] rounded-[14px] bg-gradient-to-br ${app.color} grid place-items-center text-[28px]`}>{app.icon}</div>
+              <div className={`h-[88px] md:h-[110px] rounded-[14px] bg-gradient-to-br ${app.color} grid place-items-center`}><AppLogo name={app.name} className={`h-9 w-9 md:h-11 md:w-11 ${app.ink}`} /></div>
               <div className="mt-3 flex items-center justify-between"><div className="text-[13px] font-bold">{app.name}</div><div className="text-[10px] font-bold px-2 py-1 rounded-full bg-black text-white">{app.tag}</div></div>
             </div>
           ))}
