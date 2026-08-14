@@ -16,12 +16,17 @@ const STEPS = [
   { n: "03", title: "Ship", body: "Export the code or deploy straight from the builder." },
 ];
 
+// avatar: DiceBear-generated illustrated portraits, not photos of real people --
+// these are fictional example testimonials, so we don't attach real strangers'
+// likenesses to fabricated quotes. Swap `avatar` for a real photo URL for any
+// entry that becomes a genuine customer testimonial (see Mike's entry below).
 const TESTIMONIALS = [
-  { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", avatar: "bg-violet-200" },
-  { name: "Marcus T.", role: "Solo founder", text: "Went from prompt to Stripe checkout in one sitting.", avatar: "bg-orange-200" },
-  { name: "Priya K.", role: "Indie hacker", text: "Looks like a funded startup's product. It's just me and GYSM.", avatar: "bg-emerald-200" },
-  { name: "David L.", role: "Agency owner", text: "Fastest I've ever gone from client idea to something they could click through.", avatar: "bg-blue-200" },
-  { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", avatar: "bg-fuchsia-200" },
+  { name: "Mike F.", role: "Founder, GYSM.IO — built ZodiacMoonMatch", text: "I built ZodiacMoonMatch, a zodiac compatibility matcher, testing GYSM on my own product. Auth, payments, and a working preview before I'd normally finish scoping the thing.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Mike-Fuwobiri" },
+  { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Sarah-J" },
+  { name: "Marcus T.", role: "Solo founder", text: "Went from prompt to Stripe checkout in one sitting.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Marcus-T" },
+  { name: "Priya K.", role: "Indie hacker", text: "Looks like a funded startup's product. It's just me and GYSM.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Priya-K" },
+  { name: "David L.", role: "Agency owner", text: "Fastest I've ever gone from client idea to something they could click through.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=David-L" },
+  { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=Alex-R" },
 ];
 
 const APPS = [
@@ -120,7 +125,7 @@ export default function Page() {
         <div className="flex gap-3 overflow-x-auto px-5 pb-2 scrollbar-none snap-x" style={{ scrollbarWidth: "none" }}>
           {TESTIMONIALS.map((t) => (
             <div key={t.name} className="snap-start min-w-[280px] max-w-[280px] md:min-w-[320px] rounded-[20px] bg-white border border-black/5 p-5 shadow-sm shrink-0">
-              <div className="flex items-center gap-3"><div className={`h-9 w-9 rounded-full ${t.avatar}`} /><div><div className="text-[13px] font-bold leading-none">{t.name}</div><div className="text-[11px] opacity-50 mt-1">{t.role}</div></div></div>
+              <div className="flex items-center gap-3"><img src={t.avatar} alt={t.name} className="h-9 w-9 rounded-full bg-black/5 border border-black/5" /><div><div className="text-[13px] font-bold leading-none">{t.name}</div><div className="text-[11px] opacity-50 mt-1">{t.role}</div></div></div>
               <div className="mt-3 text-[13.5px] leading-[1.5] font-medium">"{t.text}"</div>
             </div>
           ))}
