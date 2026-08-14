@@ -1,8 +1,22 @@
 import { sql } from "@/lib/db";
 
 export const CREDIT_COST_PER_BUILD = 500;
-export const LIMITS = { starter: 30, agency: 300 } as const;
-export const CREDITS_PER_PLAN = { starter: 15000, agency: 150000 } as const;
+
+// Builds included per plan per month, and the credit equivalent
+// (builds * CREDIT_COST_PER_BUILD). Single source of truth for
+// lib/stripe.ts PRICING_PLANS -- change build counts here.
+export const BUILDS_PER_PLAN = {
+  credits_starter: 5,
+  credits_popular: 20,
+  credits_bulk: 50,
+  plan_builder: 40,
+  plan_pro: 150,
+  plan_studio: 600,
+} as const;
+
+export const CREDITS_PER_PLAN = Object.fromEntries(
+  Object.entries(BUILDS_PER_PLAN).map(([id, builds]) => [id, builds * CREDIT_COST_PER_BUILD])
+) as Record<keyof typeof BUILDS_PER_PLAN, number>;
 
 export async function getCreditBalance(userId: string): Promise<number> {
   try {
