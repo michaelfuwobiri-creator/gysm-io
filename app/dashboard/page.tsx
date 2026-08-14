@@ -1,17 +1,15 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { UserButton } from "@clerk/nextjs";
 
-// Rewritten as a Server Component reading straight from Supabase. The old
-// version fetched /api/projects, which queried a separate Neon Postgres DB
-// via Prisma (its own copy said "My Builds -- Neon DB" / "saved forever in
-// Neon") -- a second database with no relationship to the Supabase user IDs
-// this app otherwise uses. That data layer has been removed; every project
-// generated through /api/generate is now saved straight to Supabase.
+// Reads straight from Supabase. Every project generated through
+// /api/generate is saved there, keyed by the Clerk user id (see
+// lib/auth.ts and supabase/migrations/0001_init.sql).
 export default async function DashboardPage() {
   const user = await getUser();
   if (!user) {
-    redirect("/auth?redirect=/dashboard");
+    redirect("/sign-in?redirect_url=/dashboard");
   }
 
   const { data: projects, error } = await supabaseAdmin
@@ -32,9 +30,12 @@ export default async function DashboardPage() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">My Builds</h1>
-          <a href="/builder" className="px-4 py-2 bg-white text-black rounded-lg font-semibold">
-            + New Build
-          </a>
+          <div className="flex items-center gap-4">
+            <a href="/builder" className="px-4 py-2 bg-white text-black rounded-lg font-semibold">
+              + New Build
+            </a>
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
 
         {list.length === 0 ? (

@@ -27,7 +27,7 @@ export default function CheckoutButton({
       });
 
       if (res.status === 401) {
-        router.push(`/auth?redirect=${encodeURIComponent("/pricing")}`);
+        router.push(`/sign-in?redirect_url=${encodeURIComponent("/pricing")}`);
         return;
       }
 

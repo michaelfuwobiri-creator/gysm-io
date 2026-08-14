@@ -1,32 +1,9 @@
-﻿import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { NextResponse } from "next/server";
 
+// Legacy Supabase OAuth callback. Clerk handles its own OAuth callbacks
+// internally (no custom route needed), so this just forwards anyone who
+// still hits the old URL to sign-in instead of 404ing.
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
-
-  if (code) {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-            } catch {}
-          },
-        },
-      }
-    )
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(origin + next)
-    }
-  }
-  return NextResponse.redirect(origin + '/auth?error=auth_failed')
+  const { origin } = new URL(request.url);
+  return NextResponse.redirect(origin + "/sign-in");
 }
