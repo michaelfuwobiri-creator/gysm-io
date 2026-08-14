@@ -176,7 +176,7 @@ export default function Page() {
       {/* PRICING TEASER */}
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
         <div className="rounded-[24px] border border-black/5 bg-white p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">Pay only for the builds you ship</div><div className="text-[12px] opacity-50">Credit packs from €10, or monthly plans — your call</div></div></div>
+          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">Pay only for the builds you ship</div><div className="text-[12px] opacity-50">Credit packs from $9, or monthly plans from $29 — your call</div></div></div>
           <a href="/pricing" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">See Pricing →</a>
         </div>
       </section>
@@ -209,7 +209,7 @@ export default function Page() {
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">Stop planning. Describe it and watch it build.</p>
               <button onClick={() => startBuilding()} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
-              <div className="mt-3 text-[11px] text-white/30">Credit packs from €10 • cancel monthly plans anytime</div>
+              <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
             </div>
           </div>
           <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM.IO — built for founders who ship</div>

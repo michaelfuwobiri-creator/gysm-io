@@ -4,19 +4,21 @@ import CheckoutButton from "./CheckoutButton";
 
 export const metadata: Metadata = {
   title: "Pricing | GYSM.IO",
-  description: "Simple credit-based pricing for the GYSM.IO AI website builder.",
+  description: "Simple, transparent pricing for the GYSM.IO AI website builder — pay as you go or subscribe monthly.",
 };
 
-// Server Component now reading straight from lib/stripe.ts PRICING_PLANS --
-// previously this page's data source wasn't traced to that file at all; the
-// nearest thing was a hardcoded array in app/api/billing/plans/route.ts with
-// prices mixed between EUR and USD. Checkout now actually exists (see
-// app/api/billing/checkout/route.ts), which it did not before this pass.
+// Server Component reading straight from lib/stripe.ts PRICING_PLANS.
+// Split into "pay as you go" (one_time) and "monthly" (month) sections to
+// match the tiering in lib/stripe.ts, plus a hardcoded Enterprise card since
+// Enterprise is a custom quote, not a purchasable Stripe Price.
 export default function PricingPage({
   searchParams,
 }: {
   searchParams: { reason?: string; canceled?: string };
 }) {
+  const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time");
+  const monthly = PRICING_PLANS.filter((p) => p.interval === "month");
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="max-w-6xl mx-auto p-6">
@@ -43,10 +45,14 @@ export default function PricingPage({
         <h1 className="text-4xl md:text-6xl font-black text-center tracking-tighter mb-3">
           Simple pricing
         </h1>
-        <p className="text-center opacity-50 mb-12">Start free, upgrade when you're shipping for real.</p>
+        <p className="text-center opacity-50 mb-16">No subscription required. Pay per pack, or subscribe monthly and save.</p>
 
-        <div className="grid md:grid-cols-4 gap-4">
-          {PRICING_PLANS.map((plan) => (
+        <div className="mb-4 flex items-baseline justify-between">
+          <h2 className="text-sm uppercase tracking-widest opacity-50">Pay as you go</h2>
+          <span className="text-xs opacity-40">Credits never expire</span>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 mb-16">
+          {payAsYouGo.map((plan) => (
             <div
               key={plan.id}
               className={`rounded-3xl p-6 border ${
@@ -55,14 +61,52 @@ export default function PricingPage({
             >
               <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
               <div className="flex gap-1 items-baseline mt-2">
-                <span className="text-4xl font-black">€{plan.price}</span>
-                <span className="text-sm opacity-60">{plan.interval === "month" ? "/mo" : ""}</span>
+                <span className="text-4xl font-black">${plan.price}</span>
               </div>
               <p className="mt-3 text-sm opacity-80">{plan.description}</p>
-              <p className="mt-1 text-xs opacity-50">{plan.builds} builds</p>
+              <p className="mt-1 text-xs opacity-50">{plan.builds} builds · ${(plan.price / plan.builds).toFixed(2)}/build</p>
               <CheckoutButton planId={plan.id} label={`Get ${plan.name}`} highlight={plan.highlight} />
             </div>
           ))}
+        </div>
+
+        <div className="mb-4 flex items-baseline justify-between">
+          <h2 className="text-sm uppercase tracking-widest opacity-50">Monthly subscriptions</h2>
+          <span className="text-xs opacity-40">Cancel anytime</span>
+        </div>
+        <div className="grid md:grid-cols-4 gap-4">
+          {monthly.map((plan) => (
+            <div
+              key={plan.id}
+              className={`rounded-3xl p-6 border ${
+                plan.highlight ? "bg-white text-black border-white" : "bg-white/5 border-white/10"
+              }`}
+            >
+              <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
+              <div className="flex gap-1 items-baseline mt-2">
+                <span className="text-4xl font-black">${plan.price}</span>
+                <span className="text-sm opacity-60">/mo</span>
+              </div>
+              <p className="mt-3 text-sm opacity-80">{plan.description}</p>
+              <p className="mt-1 text-xs opacity-50">{plan.builds} builds/mo · ${(plan.price / plan.builds).toFixed(2)}/build</p>
+              <CheckoutButton planId={plan.id} label={`Get ${plan.name}`} highlight={plan.highlight} />
+            </div>
+          ))}
+
+          <div className="rounded-3xl p-6 border border-white/10 bg-white/5">
+            <div className="text-xs opacity-50 uppercase tracking-widest">Enterprise</div>
+            <div className="flex gap-1 items-baseline mt-2">
+              <span className="text-4xl font-black">Custom</span>
+            </div>
+            <p className="mt-3 text-sm opacity-80">Unlimited builds, priority generation, SSO, and a dedicated account manager.</p>
+            <p className="mt-1 text-xs opacity-50">Starting around $999/mo</p>
+            <a
+              href="mailto:sales@gysm.io?subject=Enterprise%20plan"
+              className="mt-4 block w-full rounded-full py-2.5 text-center text-sm font-semibold border border-white/20 hover:bg-white hover:text-black transition"
+            >
+              Contact sales
+            </a>
+          </div>
         </div>
 
         <div className="h-24" />
