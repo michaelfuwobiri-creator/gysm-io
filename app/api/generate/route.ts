@@ -1,80 +1,122 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/credits";
-import { generateWebsite } from "@/lib/ai/orchestrator";
+import { generateWebsite, editWebsite, BuildStage } from "@/lib/ai/orchestrator";
+import { buildSuggestions } from "@/lib/suggestions";
 
+// Streams newline-delimited JSON events so the client can show a live,
+// step-by-step build log instead of a single opaque spinner:
+//   {"type":"stage","stage":"structure"}
+//   {"type":"stage","stage":"structure_done"}
+//   {"type":"stage","stage":"design"}
+//   {"type":"stage","stage":"design_done"}
+//   {"type":"stage","stage":"saving"}
+//   {"type":"done","html":"...","projectId":"...","suggestions":[...]}
+// or, at any point instead of "done":
+//   {"type":"error","error":"...","code":"NO_CREDITS"}
+//
+// Auth and the up-front credit check still happen before the stream opens,
+// so 401/402 remain real HTTP status codes for BuilderClient's existing
+// redirect logic. Once streaming starts the response is always 200; a
+// failure past that point comes through as a NDJSON "error" event instead.
 export async function POST(req: NextRequest) {
-  // 1. Auth -- must be signed in. This is the check that was completely
-  //    absent before: anyone, logged in or not, could call this route.
   const user = await getUser();
   if (!user) {
-    return NextResponse.json(
+    return Response.json(
       { error: "Sign in to generate a website.", code: "UNAUTHENTICATED" },
       { status: 401 }
     );
   }
 
   let prompt = "";
+  let previousHtml: string | null = null;
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
+    previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
   } catch {
-    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
   if (!prompt) {
-    return NextResponse.json({ error: "Describe what you want to build." }, { status: 400 });
+    return Response.json({ error: "Describe what you want to build." }, { status: 400 });
   }
 
-  // 2. Credits -- the actual paywall enforcement. lib/credits.ts is the only
-  //    place that reads/writes balances; nothing here trusts the client.
   const balance = await getCreditBalance(user.id);
   if (balance < CREDIT_COST_PER_BUILD) {
-    return NextResponse.json(
+    return Response.json(
       { error: "You're out of credits.", code: "NO_CREDITS" },
       { status: 402 }
     );
   }
 
-  // 3. Generate.
-  const result = await generateWebsite(prompt);
-  if (!result.ok) {
-    // Explicit narrowing here (rather than relying on result.ok to narrow
-    // the union automatically) because this repo's tsconfig has
-    // "strict": false, which turns off strictNullChecks -- and without it,
-    // TS doesn't reliably narrow discriminated unions across an if/else.
-    // Runtime behavior is identical; this just satisfies the type checker.
-    const failure = result as Extract<typeof result, { ok: false }>;
-    return NextResponse.json({ error: failure.error }, { status: failure.status });
-  }
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (obj: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      };
+      const onStage = (stage: BuildStage) => send({ type: "stage", stage });
 
-  // 4. Deduct -- atomic, after a successful generation. If the balance
-  //    changed between step 2 and now (a second concurrent request from the
-  //    same user, for example) this fails safe and we don't ship a free build.
-  const deducted = await deductCredit(user.id);
-  if (!deducted) {
-    return NextResponse.json(
-      { error: "You're out of credits.", code: "NO_CREDITS" },
-      { status: 402 }
-    );
-  }
+      try {
+        const result = previousHtml
+          ? await editWebsite(previousHtml, prompt, onStage)
+          : await generateWebsite(prompt, onStage);
 
-  // 5. Save. Best-effort: a save failure shouldn't take away a build the
-  //    user already paid a credit for, but it is logged loudly so it's caught.
-  let projectId: string | null = null;
-  try {
-    const rows = await sql`
-      insert into projects (user_id, prompt, html)
-      values (${user.id}, ${prompt}, ${result.html})
-      returning id
-    `;
-    projectId = (rows[0] as any)?.id ?? null;
-  } catch (error: any) {
-    console.error("[generate] failed to save project:", error.message);
-  }
+        if (!result.ok) {
+          const failure = result as Extract<typeof result, { ok: false }>;
+          send({ type: "error", error: failure.error });
+          controller.close();
+          return;
+        }
 
-  return NextResponse.json({ html: result.html, projectId });
+        // Deduct only after a successful generation -- atomic, so a
+        // concurrent request from the same user can't both pass the
+        // earlier balance check and both ship a free build.
+        const deducted = await deductCredit(user.id);
+        if (!deducted) {
+          send({ type: "error", error: "You're out of credits.", code: "NO_CREDITS" });
+          controller.close();
+          return;
+        }
+
+        send({ type: "stage", stage: "saving" });
+
+        // Best-effort: a save failure shouldn't take away a build the user
+        // already paid a credit for, but it's logged loudly so it's caught.
+        let projectId: string | null = null;
+        try {
+          const rows = await sql`
+            insert into projects (user_id, prompt, html)
+            values (${user.id}, ${prompt}, ${result.html})
+            returning id
+          `;
+          projectId = (rows[0] as any)?.id ?? null;
+        } catch (error: any) {
+          console.error("[generate] failed to save project:", error.message);
+        }
+
+        send({
+          type: "done",
+          html: result.html,
+          projectId,
+          suggestions: buildSuggestions(prompt),
+        });
+      } catch (err: any) {
+        console.error("[generate] stream failed:", err?.message || err);
+        send({ type: "error", error: "Something went wrong. Please try again." });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
-export const dynamic = 'force-dynamic'
-
+export const dynamic = "force-dynamic";

@@ -42,6 +42,19 @@ DESIGN TARGET -- push the document toward this house style (the same system GYSM
 - Rhythm: even out section spacing and center content in a consistent max-width container; tighten anything cramped, loosen anything crowded.
 - If the page sells or lists something and doesn't already end with one, add a closing high-contrast CTA moment (a dark rounded band with a subtle radial gradient glow works well) -- but only if you can do this without touching any element the script depends on.`;
 
+const EDIT_SYSTEM_PROMPT = `You are the GYSM.IO builder, now editing an app you already built. You'll get the app's complete current HTML and one specific change to make. Apply exactly that change and return the complete updated document -- don't rewrite parts that weren't asked for.
+
+HARD RULES:
+- Output ONLY the complete HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
+- Preserve everything unrelated to the requested change: existing content, structure, styling, and all working JavaScript (ids, variable names, event handlers) stay intact unless the change specifically requires touching them.
+- If the change asks for new interactive behavior, wire it up the same way the existing inline <script> already does things -- vanilla JS only, naming consistent with what's already there.
+- Keep the same Tailwind CDN + Inter font setup already in <head>.
+- Match the existing visual style (colors, type scale, button and card shapes) for anything you add or change, so it looks like it was designed alongside the rest, not bolted on.
+- If the requested change is ambiguous, make the most reasonable, tasteful interpretation rather than leaving it half-done -- there's no way to ask a follow-up here.`;
+
+export type BuildStage = "structure" | "structure_done" | "design" | "design_done";
+export type StageCallback = (stage: BuildStage) => void;
+
 export type GenerateResult =
   | { ok: true; html: string }
   | { ok: false; error: string; status: number };
@@ -61,12 +74,69 @@ export type GenerateResult =
  * app/api/generate/route.ts stays a thin auth/credits wrapper around this
  * function -- it doesn't know or care that two models are involved.
  */
-export async function generateWebsite(prompt: string): Promise<GenerateResult> {
+export async function generateWebsite(prompt: string, onStage?: StageCallback): Promise<GenerateResult> {
+  onStage?.("structure");
   const structure = await generateStructure(prompt);
   if (!structure.ok) return structure;
+  onStage?.("structure_done");
 
+  onStage?.("design");
   const html = await applyDesignPass(structure.html);
+  onStage?.("design_done");
   return { ok: true, html };
+}
+
+/**
+ * Iterative edit pass: takes an existing generated app + a plain-English
+ * change request (e.g. "add a shopping cart") and returns the whole app
+ * again with just that change applied. Used when a user clicks a
+ * post-build suggestion or types a follow-up instead of starting over --
+ * cheaper and far more precise than regenerating from the original prompt.
+ */
+export async function editWebsite(
+  existingHtml: string,
+  instruction: string,
+  onStage?: StageCallback
+): Promise<GenerateResult> {
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("[orchestrator] OPENAI_API_KEY is not set");
+    return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
+  }
+
+  onStage?.("structure");
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  let raw: string;
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: EDIT_SYSTEM_PROMPT },
+        { role: "user", content: `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}` },
+      ],
+      temperature: 0.5,
+      max_tokens: 8000,
+    });
+    raw = completion.choices[0]?.message?.content || "";
+  } catch (err: any) {
+    console.error("[orchestrator] OpenAI edit request failed:", err?.message || err);
+    return { ok: false, error: "That edit failed. Please try again.", status: 502 };
+  }
+
+  const html = cleanHtml(raw);
+  if (!isCompleteHtmlDocument(html)) {
+    console.error("[orchestrator] edit did not return a complete HTML document", {
+      instructionPreview: instruction.slice(0, 80),
+      outputLength: raw.length,
+    });
+    return { ok: false, error: "Couldn't apply that change. Try rephrasing it.", status: 502 };
+  }
+  onStage?.("structure_done");
+
+  onStage?.("design");
+  const polished = await applyDesignPass(html);
+  onStage?.("design_done");
+  return { ok: true, html: polished };
 }
 
 async function generateStructure(prompt: string): Promise<GenerateResult> {

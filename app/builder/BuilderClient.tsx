@@ -5,16 +5,42 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 
 type Status = "idle" | "loading" | "error";
+type View = "preview" | "code";
 
-export default function BuilderClient() {
+const STAGE_LABELS: Record<string, string> = {
+  structure: "Reading your prompt and planning the build",
+  structure_done: "Structure, content, and interactivity written",
+  design: "Applying a visual design pass",
+  design_done: "Design polish complete",
+  saving: "Saving your build",
+};
+
+const STAGE_ORDER = ["structure", "structure_done", "design", "design_done", "saving"];
+
+type Props = {
+  initialHtml?: string | null;
+  initialPrompt?: string;
+  initialProjectId?: string | null;
+};
+
+export default function BuilderClient({
+  initialHtml = null,
+  initialPrompt = "",
+  initialProjectId = null,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [prompt, setPrompt] = useState("");
-  const [html, setHtml] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState(initialPrompt);
+  const [html, setHtml] = useState<string | null>(initialHtml);
+  const [projectId, setProjectId] = useState<string | null>(initialProjectId);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [showToast, setShowToast] = useState(false);
+  const [view, setView] = useState<View>("preview");
+  const [log, setLog] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -32,27 +58,38 @@ export default function BuilderClient() {
   }, [searchParams, router]);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
-  // localStorage (see app/page.tsx).
+  // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
   useEffect(() => {
+    if (initialHtml) return;
     const pending = window.localStorage.getItem("gysm_pending_prompt");
     if (pending) {
       setPrompt(pending);
       window.localStorage.removeItem("gysm_pending_prompt");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generate = useCallback(
-    async (promptOverride?: string) => {
+    async (promptOverride?: string, opts?: { asEdit?: boolean }) => {
       const p = (promptOverride ?? prompt).trim();
       if (!p) return;
       lastPromptRef.current = p;
       setStatus("loading");
       setErrorMsg("");
+      setLog([]);
+      setSuggestions([]);
+      if (!opts?.asEdit) {
+        setPrompt(p);
+      }
+
       try {
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: p }),
+          body: JSON.stringify({
+            prompt: p,
+            previousHtml: opts?.asEdit ? html : undefined,
+          }),
         });
 
         if (res.status === 401) {
@@ -63,28 +100,87 @@ export default function BuilderClient() {
           router.push("/pricing?reason=no_credits");
           return;
         }
-        if (!res.ok) {
+        if (!res.ok || !res.body) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `Something went wrong (${res.status}).`);
         }
 
-        const data = await res.json();
-        if (!data.html) throw new Error("No preview came back. Try again.");
-        setHtml(data.html);
+        // Read the NDJSON stream: one JSON object per line, updating the
+        // live build log as each stage lands instead of one opaque spinner.
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finished = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const evt = JSON.parse(line);
+
+            if (evt.type === "stage") {
+              const label = STAGE_LABELS[evt.stage] ?? evt.stage;
+              setLog((prev) => [...prev, label]);
+            } else if (evt.type === "error") {
+              if (evt.code === "NO_CREDITS") {
+                router.push("/pricing?reason=no_credits");
+                return;
+              }
+              throw new Error(evt.error || "Something went wrong.");
+            } else if (evt.type === "done") {
+              setHtml(evt.html);
+              setProjectId(evt.projectId ?? null);
+              setSuggestions(Array.isArray(evt.suggestions) ? evt.suggestions : []);
+              setView("preview");
+              finished = true;
+            }
+          }
+        }
+
+        if (!finished) throw new Error("No preview came back. Try again.");
         setStatus("idle");
       } catch (e: any) {
         setErrorMsg(e?.message || "Something went wrong.");
         setStatus("error");
       }
     },
-    [prompt, router]
+    [prompt, html, router]
   );
+
+  // Fire the initial generate automatically only if a pending prompt was
+  // carried over from the landing page and nothing's loaded yet.
+  useEffect(() => {
+    if (!initialHtml && prompt && status === "idle" && !html) {
+      // no-op: user still has to hit Generate. Auto-firing here would
+      // surprise someone who edited the carried-over prompt first.
+    }
+  }, [initialHtml, prompt, status, html]);
+
+  function copyCode() {
+    if (!html) return;
+    navigator.clipboard.writeText(html).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+
+  const isLoading = status === "loading";
 
   return (
     <div className="min-h-screen bg-black text-white">
       {showToast && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
           Payment successful — you're unlocked
+        </div>
+      )}
+      {copied && (
+        <div className="fixed top-4 right-4 z-50 bg-white text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
+          Copied code to clipboard
         </div>
       )}
 
@@ -94,6 +190,21 @@ export default function BuilderClient() {
             GYSM<span className="opacity-30">.IO</span>
           </h1>
           <div className="flex items-center gap-5">
+            {html && !isLoading && (
+              <button
+                onClick={() => {
+                  setHtml(null);
+                  setProjectId(null);
+                  setPrompt("");
+                  setSuggestions([]);
+                  setLog([]);
+                  setView("preview");
+                }}
+                className="text-[11px] opacity-50 hover:opacity-100"
+              >
+                New build
+              </button>
+            )}
             <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
               My Builds
             </a>
@@ -108,13 +219,14 @@ export default function BuilderClient() {
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
             placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
             className="flex-1 h-[56px] bg-black rounded-full px-6 outline-none border border-white/10"
+            disabled={isLoading}
           />
           <button
             onClick={() => generate()}
-            disabled={status === "loading" || !prompt.trim()}
-            className="h-[56px] px-8 rounded-full bg-white text-black font-black disabled:opacity-40"
+            disabled={isLoading || !prompt.trim()}
+            className="h-[56px] px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0"
           >
-            {status === "loading" ? "Building…" : "Generate →"}
+            {isLoading ? "Building…" : html ? "Rebuild →" : "Generate →"}
           </button>
         </div>
 
@@ -130,28 +242,124 @@ export default function BuilderClient() {
           </div>
         )}
 
+        {/* Live build log -- shown while generating, replaces the old plain spinner */}
+        {isLoading && (
+          <div className="mt-6 rounded-[20px] border border-white/10 bg-zinc-950 p-5 font-mono text-[13px]">
+            <ul className="space-y-2">
+              {STAGE_ORDER.map((key) => {
+                const label = STAGE_LABELS[key];
+                const idx = log.indexOf(label);
+                const isDone = idx !== -1 && idx < log.length - 1;
+                const isActive = idx === log.length - 1 && idx !== -1;
+                const isPending = idx === -1;
+                return (
+                  <li
+                    key={key}
+                    className={
+                      isPending
+                        ? "text-white/25"
+                        : isActive
+                        ? "text-white"
+                        : "text-white/50"
+                    }
+                  >
+                    <span className="inline-block w-5">
+                      {isDone ? "✓" : isActive ? "…" : "·"}
+                    </span>
+                    {label}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-6 rounded-[20px] overflow-hidden border border-white/10 bg-white min-h-[600px]">
-          {status === "loading" && (
-            <div className="h-[750px] flex items-center justify-center bg-zinc-900">
-              <div className="text-white/50 text-sm animate-pulse">Building your preview…</div>
-            </div>
+          {!isLoading && html && (
+            <>
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-100 border-b border-black/10">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setView("preview")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                      view === "preview" ? "bg-black text-white" : "text-black/50"
+                    }`}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => setView("code")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                      view === "code" ? "bg-black text-white" : "text-black/50"
+                    }`}
+                  >
+                    Code
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  {view === "code" && (
+                    <button
+                      onClick={copyCode}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-black text-white"
+                    >
+                      Copy code
+                    </button>
+                  )}
+                  {projectId && (
+                    <a
+                      href={`/publish/${projectId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-violet-600 text-white"
+                    >
+                      Publish / view live →
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {view === "preview" ? (
+                <iframe
+                  srcDoc={html}
+                  sandbox="allow-scripts allow-same-origin"
+                  className="w-full h-[700px] border-0 bg-white"
+                  title="Generated app preview"
+                />
+              ) : (
+                <pre className="w-full h-[700px] overflow-auto bg-zinc-950 text-zinc-200 text-[12px] leading-[1.6] p-5 m-0">
+                  <code>{html}</code>
+                </pre>
+              )}
+            </>
           )}
 
-          {status !== "loading" && html && (
-            <iframe
-              srcDoc={html}
-              sandbox="allow-scripts allow-same-origin"
-              className="w-full h-[750px] border-0 bg-white"
-              title="Generated app preview"
-            />
-          )}
-
-          {status === "idle" && !html && (
+          {!isLoading && !html && (
             <div className="h-[750px] flex items-center justify-center text-black/30 text-sm px-8 text-center">
               Your preview shows up here once you generate something.
             </div>
           )}
         </div>
+
+        {/* Post-build "what's next" suggestions -- click one to iterate on
+            this exact build (edit pass) instead of starting from scratch. */}
+        {!isLoading && html && suggestions.length > 0 && (
+          <div className="mt-6">
+            <div className="text-[11px] font-bold uppercase tracking-wider opacity-40 mb-3">
+              What do you want to add next?
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => generate(s, { asEdit: true })}
+                  className="px-4 py-2 rounded-full border border-white/15 bg-white/[0.04] hover:bg-white/10 text-[13px] font-medium transition"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="h-20" />
       </div>
