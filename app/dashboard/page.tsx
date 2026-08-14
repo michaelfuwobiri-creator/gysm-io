@@ -5,7 +5,10 @@ import { UserButton } from "@clerk/nextjs";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
-// db/migrations/0001_init.sql).
+// db/migrations/0001_init.sql). A stale foreign key on projects.user_id
+// (left over from an earlier schema, pointed at the wrong column) was
+// silently failing every save until it was dropped -- this list should now
+// actually fill up as builds happen.
 export default async function DashboardPage() {
   const user = await getUser();
   if (!user) {
@@ -51,6 +54,22 @@ export default async function DashboardPage() {
                 <div className="font-medium line-clamp-2">{p.prompt}</div>
                 <div className="bg-white rounded-lg h-[200px] overflow-hidden pointer-events-none">
                   <iframe srcDoc={p.html} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} />
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`/builder?projectId=${p.id}`}
+                    className="flex-1 text-center px-3 py-2 rounded-lg bg-white text-black text-xs font-bold"
+                  >
+                    Open in builder
+                  </a>
+                  <a
+                    href={`/publish/${p.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold"
+                  >
+                    View live
+                  </a>
                 </div>
               </div>
             ))}
