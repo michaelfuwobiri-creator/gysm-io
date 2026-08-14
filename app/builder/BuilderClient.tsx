@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 
 type Status = "idle" | "loading" | "error";
 
@@ -30,8 +31,8 @@ export default function BuilderClient() {
     }
   }, [searchParams, router]);
 
-  // Prompt typed on the logged-out landing page, carried across /auth via
-  // localStorage (see app/page.tsx and app/auth/page.tsx).
+  // Prompt typed on the logged-out landing page, carried across sign-up via
+  // localStorage (see app/page.tsx).
   useEffect(() => {
     const pending = window.localStorage.getItem("gysm_pending_prompt");
     if (pending) {
@@ -55,7 +56,7 @@ export default function BuilderClient() {
         });
 
         if (res.status === 401) {
-          router.push("/auth?redirect=/builder");
+          router.push("/sign-in?redirect_url=/builder");
           return;
         }
         if (res.status === 402) {
@@ -83,7 +84,7 @@ export default function BuilderClient() {
     <div className="min-h-screen bg-black text-white">
       {showToast && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-          Payment successful — you're unlocked 🎉
+          Payment successful — you're unlocked
         </div>
       )}
 
@@ -92,9 +93,12 @@ export default function BuilderClient() {
           <h1 className="text-2xl font-black">
             GYSM<span className="opacity-30">.IO</span>
           </h1>
-          <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
-            My Builds
-          </a>
+          <div className="flex items-center gap-5">
+            <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
+              My Builds
+            </a>
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
 
         <div className="bg-white/[0.06] border border-white/10 rounded-[24px] p-4 flex gap-3">
