@@ -22,7 +22,13 @@ VISUAL BAR -- build this to look like a funded startup's marketing/product page 
 - Secondary/supporting text uses reduced opacity (opacity-60 / opacity-50 / opacity-40 on the base text color) rather than a separate gray palette.
 - Real vertical rhythm: a centered max-w-[1200px]-ish container, generous section spacing, and a hero -> social proof / features -> how it works -> offerings (products, menu, plans) -> FAQ or trust -> closing CTA flow when the app is selling or listing something.
 - If it's a selling/marketing-style page, close with a bold, high-contrast CTA band: a full-bleed dark rounded panel with a soft radial gradient glow behind the headline, white bold text, and a light pill button.
-- This is the default aesthetic baseline, not a theme to force everywhere -- if the prompt clearly implies a different, well-defined style (e.g. "brutalist", "playful kids app", "dark hacker terminal"), follow that instead, but keep the same bar for spacing, hierarchy, and polish.`;
+- This is the default aesthetic baseline, not a theme to force everywhere -- if the prompt clearly implies a different, well-defined style (e.g. "brutalist", "playful kids app", "dark hacker terminal"), follow that instead, but keep the same bar for spacing, hierarchy, and polish.
+
+CONTENT DEPTH -- shallow, generic output is exactly what a disappointed user is reacting to when they say a generated app looks cheap. Avoid it:
+- Populate every list or grid with real depth -- at least 6-9 items for menus, product grids, and feature/testimonial grids, not 3 filler cards padded out with whitespace.
+- Write specific, persuasive copy tied to the actual prompt: real-sounding item names, numbers, and descriptions, not "Item 1" or "Feature description goes here." A vague prompt still gets a fully realized, specific product, not a generic template with the blanks half-filled.
+- Every interactive element the request implies must actually work end-to-end in the inline script: a cart that updates a running total, filters that actually filter, a form that validates and confirms, a modal that opens and closes. A button that looks real but does nothing is worse than not having the button.
+- Think through the full page before writing it: hero, the core interactive experience the app is actually for, supporting sections, and a close -- not just a hero and one lonely content block.`;
 
 const DESIGN_SYSTEM_PROMPT = `You are a senior product designer at a top consumer-SaaS studio doing a visual polish pass on a working HTML prototype. You will be given a complete HTML document that already works. Your job is ONLY to make it look like a beautiful, funded, high-converting product -- not to change what it does.
 
@@ -61,9 +67,15 @@ export type GenerateResult =
 
 /**
  * Two-model pipeline:
- *  1. OpenAI (GPT-4o) generates the working app -- structure, content, and
- *     the vanilla-JS interactivity. This is the only step that can fail the
- *     whole request; it's the part that has to be correct.
+ *  1. OpenAI (GPT-5.6 Terra) generates the working app -- structure,
+ *     content, and the vanilla-JS interactivity. This is the only step
+ *     that can fail the whole request; it's the part that has to be
+ *     correct. Terra (not the flagship Sol tier) is the deliberate choice:
+ *     it's the "everyday work" tier, competitive with the previous
+ *     flagship on straightforward one-shot code generation like this, at
+ *     roughly a sixth of Sol's output-token cost -- Sol is reserved for
+ *     genuinely long-horizon agentic work, which a single HTML document
+ *     from one prompt is not.
  *  2. Gemini takes that working HTML and does a dedicated visual-design
  *     pass -- spacing, type, color, polish -- without touching functionality.
  *     This step is best-effort: if GEMINI_API_KEY isn't set, or the call
@@ -109,13 +121,13 @@ export async function editWebsite(
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.6-terra",
       messages: [
         { role: "system", content: EDIT_SYSTEM_PROMPT },
         { role: "user", content: `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}` },
       ],
       temperature: 0.5,
-      max_tokens: 8000,
+      max_tokens: 16000,
     });
     raw = completion.choices[0]?.message?.content || "";
   } catch (err: any) {
@@ -150,13 +162,13 @@ async function generateStructure(prompt: string): Promise<GenerateResult> {
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.6-terra",
       messages: [
         { role: "system", content: STRUCTURE_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 8000,
+      max_tokens: 16000,
     });
     raw = completion.choices[0]?.message?.content || "";
   } catch (err: any) {
