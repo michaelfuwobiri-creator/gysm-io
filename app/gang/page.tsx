@@ -1,15 +1,15 @@
 // This page previously called GET/PATCH /api/projects (a like-and-browse
 // community feed) which read/wrote the Prisma/Neon database. That database
 // and API route have been removed in this pass -- it was a second, parallel
-// data layer disconnected from Supabase (see the dashboard/templates fixes),
+// data layer disconnected from the main database (see the dashboard/templates fixes),
 // and its POST handler accepted a raw client-supplied userId with zero
 // verification. This page is not linked from anywhere in the app right now,
 // so nothing currently sends users here.
 //
 // Left as an honest placeholder rather than rebuilt: turning this into a
-// real Supabase-backed community feed (likes, public authorship, etc.) is
+// real, Neon-backed community feed (likes, public authorship, etc.) is
 // new feature work, not a fix to something existing, so it's your call --
-// tell me if you want it rebuilt on Supabase or removed outright.
+// tell me if you want it rebuilt on Neon or removed outright.
 export default function GangPage() {
   return (
     <div className="min-h-screen bg-black text-white grid place-items-center p-6 text-center">

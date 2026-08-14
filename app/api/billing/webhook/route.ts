@@ -1,27 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
-import { stripe, getPlanById } from "@/lib/stripe";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getStripe, getPlanById } from "@/lib/stripe";
+import { sql } from "@/lib/db";
 import { addCredits } from "@/lib/credits";
 
 export const runtime = "nodejs";
 
-// Previously this verified the Stripe signature correctly but then did
-// nothing except console.log("PAYMENT OK", ...) -- a real payment would
-// succeed in Stripe and the user would receive zero credits. This is the fix.
+// Verifies the Stripe signature, then credits the right user in Neon.
 //
 // IMPORTANT (can't be done from here -- needs to be checked in the Stripe
 // Dashboard): make sure the webhook endpoint registered under Developers ->
 // Webhooks points at /api/billing/webhook, not /api/stripe/webhook (that
 // second route was a stub that returned 200 for literally anything without
-// checking the signature -- it's been removed in this pass).
+// checking the signature -- it's been removed).
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
   const body = await req.text();
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = getStripe().webhooks.constructEvent(body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err: any) {
     console.error("[billing/webhook] signature verification failed:", err?.message || err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -46,17 +44,16 @@ export async function POST(req: NextRequest) {
         await addCredits(userId, plan.credits);
 
         if (plan.interval === "month" && session.subscription) {
-          await supabaseAdmin.from("subscriptions").upsert(
-            {
-              user_id: userId,
-              stripe_customer_id: (session.customer as string) ?? null,
-              stripe_subscription_id: session.subscription as string,
-              plan: plan.id,
-              status: "active",
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id" }
-          );
+          await sql`
+            insert into subscriptions (user_id, stripe_customer_id, stripe_subscription_id, plan, status, updated_at)
+            values (${userId}, ${(session.customer as string) ?? null}, ${session.subscription as string}, ${plan.id}, 'active', now())
+            on conflict (user_id) do update set
+              stripe_customer_id = excluded.stripe_customer_id,
+              stripe_subscription_id = excluded.stripe_subscription_id,
+              plan = excluded.plan,
+              status = excluded.status,
+              updated_at = now()
+          `;
         }
         break;
       }
@@ -64,24 +61,37 @@ export async function POST(req: NextRequest) {
       // Monthly renewal on an existing subscription -> top up credits again.
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subId = (invoice as any).subscription as string | null;
-        if (!subId) break;
+        // Stripe moved this field on newer API versions: it used to be
+        // invoice.subscription directly, now it's nested under
+        // invoice.parent.subscription_details.subscription. Reading only
+        // the old path (as this used to) means subId is always undefined
+        // on this app's pinned API version (2026-07-29.dahlia) and this
+        // case silently no-ops on every renewal -- no credits, no error,
+        // nothing in the logs. Check both so it works regardless of which
+        // shape Stripe sends.
+        const subId =
+          ((invoice as any).subscription as string | null) ??
+          ((invoice as any).parent?.subscription_details?.subscription as string | null) ??
+          null;
+        if (!subId) {
+          console.error("[billing/webhook] invoice.paid had no subscription id", { invoiceId: invoice.id });
+          break;
+        }
 
-        const { data: sub } = await supabaseAdmin
-          .from("subscriptions")
-          .select("user_id, plan")
-          .eq("stripe_subscription_id", subId)
-          .maybeSingle();
+        const rows = await sql`
+          select user_id, plan from subscriptions where stripe_subscription_id = ${subId}
+        `;
+        const sub = rows[0] as { user_id: string; plan: string } | undefined;
 
         if (sub) {
           const plan = getPlanById(sub.plan);
           if (plan) {
             await addCredits(sub.user_id, plan.credits);
           }
-          await supabaseAdmin
-            .from("subscriptions")
-            .update({ status: "active", updated_at: new Date().toISOString() })
-            .eq("stripe_subscription_id", subId);
+          await sql`
+            update subscriptions set status = 'active', updated_at = now()
+            where stripe_subscription_id = ${subId}
+          `;
         }
         break;
       }
@@ -89,10 +99,10 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
-        await supabaseAdmin
-          .from("subscriptions")
-          .update({ status: sub.status, updated_at: new Date().toISOString() })
-          .eq("stripe_subscription_id", sub.id);
+        await sql`
+          update subscriptions set status = ${sub.status}, updated_at = now()
+          where stripe_subscription_id = ${sub.id}
+        `;
         break;
       }
 
@@ -101,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     // Signature is already verified at this point, so a failure here is OUR
-    // bug (e.g. Supabase unreachable), not a forged request. Return 500 so
+    // bug (e.g. Neon unreachable), not a forged request. Return 500 so
     // Stripe retries with backoff instead of silently dropping the credit.
     console.error("[billing/webhook] handler error:", err?.message || err);
     return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
@@ -111,4 +121,3 @@ export async function POST(req: NextRequest) {
 }
 
 export const dynamic = 'force-dynamic'
-

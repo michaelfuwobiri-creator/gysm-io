@@ -1,15 +1,29 @@
 import Stripe from "stripe";
 import { CREDITS_PER_PLAN } from "@/lib/credits";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error(
-    "Missing STRIPE_SECRET_KEY. Set it in Vercel -> Project -> Settings -> Environment Variables."
-  );
-}
+let _stripe: Stripe | null = null;
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-07-29.dahlia",
-});
+/**
+ * Lazily creates the Stripe client on first use instead of throwing at
+ * import time. This file also exports PRICING_PLANS, which pages like
+ * app/pricing/page.tsx import just to render prices -- those shouldn't 500
+ * the whole page because STRIPE_SECRET_KEY happens to be unset in this
+ * environment. Only actual checkout/webhook calls need the key, so only
+ * they should fail if it's missing.
+ */
+export function getStripe(): Stripe {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error(
+      "Missing STRIPE_SECRET_KEY. Set it in Vercel -> Project -> Settings -> Environment Variables."
+    );
+  }
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2026-07-29.dahlia",
+    });
+  }
+  return _stripe;
+}
 
 export type PricingPlan = {
   id: "starter" | "agency" | "credits_10" | "credits_30";
@@ -28,10 +42,8 @@ export type PricingPlan = {
 
 /**
  * Single source of truth for pricing, consumed by app/pricing/page.tsx and
- * app/api/billing/checkout/route.ts. This mirrors the four plans that were
- * already hardcoded (inconsistently, in mixed EUR/USD) in the old
- * app/api/billing/plans/route.ts -- normalized here to EUR throughout.
- * Change prices here and both the pricing page and checkout stay in sync.
+ * app/api/billing/checkout/route.ts. Change prices here and both the
+ * pricing page and checkout stay in sync.
  */
 export const PRICING_PLANS: PricingPlan[] = [
   {

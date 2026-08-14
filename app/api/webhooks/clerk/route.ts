@@ -1,6 +1,6 @@
-﻿import { neon } from '@neondatabase/serverless'
 import { Webhook } from 'svix'
 import { headers } from 'next/headers'
+import { sql } from '@/lib/db'
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET!
@@ -21,7 +21,6 @@ export async function POST(req: Request) {
     })
   } catch { return new Response('Invalid', { status: 400 }) }
 
-  const sql = neon(process.env.DATABASE_URL!)
   const { id, email_addresses, first_name, last_name, image_url } = evt.data
   const email = email_addresses?.[0]?.email_address || ''
   const name = `${first_name || ''} ${last_name || ''}`.trim() || email
