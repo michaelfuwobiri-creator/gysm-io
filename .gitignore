@@ -4,6 +4,6 @@
 .env
 .env.local
 dist
-build
+/build
 *.log
 tsconfig.tsbuildinfo
