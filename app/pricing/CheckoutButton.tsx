@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { getPlanById } from "@/lib/stripe";
 
 export default function CheckoutButton({
   planId,
@@ -13,6 +15,7 @@ export default function CheckoutButton({
   highlight?: boolean;
 }) {
   const router = useRouter();
+  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,6 +23,25 @@ export default function CheckoutButton({
     setLoading(true);
     setError("");
     try {
+      // Inside the native iOS app, purchases must go through StoreKit
+      // (Apple Guideline 3.1.1) rather than a Stripe redirect -- everything
+      // else (web, and the Android TWA, which is just a browser tab) keeps
+      // using the existing Stripe checkout below unchanged.
+      const { isNativeIOSApp } = await import("@/lib/iap-client");
+      if (await isNativeIOSApp()) {
+        if (!user) {
+          router.push(`/sign-in?redirect_url=${encodeURIComponent("/pricing")}`);
+          return;
+        }
+        const plan = getPlanById(planId);
+        if (!plan) throw new Error(`Unknown plan "${planId}".`);
+
+        const { purchasePlanNative } = await import("@/lib/iap-client");
+        await purchasePlanNative(plan, user.id);
+        router.push("/builder?success=true&source=iap");
+        return;
+      }
+
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

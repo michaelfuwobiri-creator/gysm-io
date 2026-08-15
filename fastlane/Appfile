@@ -1,0 +1,4 @@
+app_identifier("io.gysm.app")
+apple_id(ENV["APPLE_ID"] || "michaelfuwobiri@gmail.com")
+itc_team_id(ENV["ITC_TEAM_ID"])
+team_id(ENV["APPLE_TEAM_ID"] || "FJU33P8JUF")

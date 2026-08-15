@@ -1,0 +1,56 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload a TestFlight build via CI (no local Mac needed)"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true,
+      duration: 1200,
+      in_house: false
+    )
+
+    # Pulls (or creates, on first run) the distribution cert + provisioning
+    # profile from the encrypted git repo configured via MATCH_GIT_URL.
+    # readonly is false only on the very first run so match can create the
+    # cert/profile; after that this should stay true in the workflow.
+    match(
+      type: "appstore",
+      api_key: api_key,
+      git_url: ENV["MATCH_GIT_URL"],
+      readonly: ENV["MATCH_READONLY"] != "false"
+    )
+
+    increment_build_number(
+      xcodeproj: "ios/App/App.xcodeproj",
+      build_number: ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M")
+    )
+
+    build_app(
+      project: "ios/App/App.xcodeproj",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "build/ios",
+      xcargs: "-allowProvisioningUpdates"
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Just build the .ipa locally in CI, no upload (for smoke-testing the pipeline)"
+  lane :build_only do
+    match(type: "appstore", git_url: ENV["MATCH_GIT_URL"], readonly: true)
+    increment_build_number(xcodeproj: "ios/App/App.xcodeproj")
+    build_app(
+      project: "ios/App/App.xcodeproj",
+      scheme: "App",
+      export_method: "app-store",
+      output_directory: "build/ios"
+    )
+  end
+end
