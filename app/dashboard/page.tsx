@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { UserButton } from "@clerk/nextjs";
+import PublishButton from "./PublishButton";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
@@ -18,7 +19,7 @@ export default async function DashboardPage() {
   let list: any[] = [];
   try {
     list = await sql`
-      select id, prompt, html, created_at from projects
+      select id, prompt, html, created_at, is_public, title from projects
       where user_id = ${user.id}
       order by created_at desc
       limit 50
@@ -33,6 +34,9 @@ export default async function DashboardPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">My Builds</h1>
           <div className="flex items-center gap-4">
+            <a href="/buildguild" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
+              BuildGuild
+            </a>
             <a href="/builder" className="px-4 py-2 bg-white text-black rounded-lg font-semibold">
               + New Build
             </a>
@@ -71,6 +75,12 @@ export default async function DashboardPage() {
                     View live
                   </a>
                 </div>
+                <PublishButton
+                  projectId={p.id}
+                  initialIsPublic={!!p.is_public}
+                  initialTitle={p.title || ""}
+                  defaultTitle={p.prompt.slice(0, 80)}
+                />
               </div>
             ))}
           </div>

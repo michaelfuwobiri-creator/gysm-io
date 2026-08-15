@@ -115,6 +115,7 @@ export default function Page() {
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <div className="flex items-center gap-2"><div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div><span className="font-black tracking-tighter text-[16px]">GYSM.IO</span></div>
           <div className="flex items-center gap-2">
+            <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Templates</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
             {isLoaded && isSignedIn ? (

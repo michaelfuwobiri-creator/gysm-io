@@ -41,6 +41,12 @@ export default function BuilderClient({
   const [log, setLog] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishTagline, setPublishTagline] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
+  const [publishError, setPublishError] = useState("");
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -137,6 +143,11 @@ export default function BuilderClient({
               setProjectId(evt.projectId ?? null);
               setSuggestions(Array.isArray(evt.suggestions) ? evt.suggestions : []);
               setView("preview");
+              setPublishOpen(false);
+              setPublished(false);
+              setPublishTitle("");
+              setPublishTagline("");
+              setPublishError("");
               finished = true;
             }
           }
@@ -169,6 +180,29 @@ export default function BuilderClient({
     });
   }
 
+  async function publishToBuildGuild() {
+    if (!projectId || !publishTitle.trim() || publishing) return;
+    setPublishing(true);
+    setPublishError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: publishTitle.trim(), tagline: publishTagline.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPublishError(data?.error || "Failed to publish.");
+        return;
+      }
+      setPublished(true);
+    } catch {
+      setPublishError("Failed to publish. Check your connection and try again.");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   const isLoading = status === "loading";
 
   return (
@@ -199,12 +233,20 @@ export default function BuilderClient({
                   setSuggestions([]);
                   setLog([]);
                   setView("preview");
+                  setPublishOpen(false);
+                  setPublished(false);
+                  setPublishTitle("");
+                  setPublishTagline("");
+                  setPublishError("");
                 }}
                 className="text-[11px] opacity-50 hover:opacity-100"
               >
                 New build
               </button>
             )}
+            <a href="/buildguild" className="text-[11px] opacity-50 hover:opacity-100">
+              BuildGuild
+            </a>
             <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
               My Builds
             </a>
@@ -315,8 +357,69 @@ export default function BuilderClient({
                       Publish / view live →
                     </a>
                   )}
+                  {projectId && !published && (
+                    <button
+                      onClick={() => {
+                        if (!publishTitle) setPublishTitle(prompt.slice(0, 80));
+                        setPublishOpen((v) => !v);
+                      }}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-fuchsia-600 text-white"
+                    >
+                      Share to BuildGuild
+                    </button>
+                  )}
+                  {projectId && published && (
+                    <a
+                      href={`/buildguild/${projectId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-600 text-white"
+                    >
+                      Live on BuildGuild →
+                    </a>
+                  )}
                 </div>
               </div>
+
+              {publishOpen && !published && (
+                <div className="px-4 py-4 bg-fuchsia-50 border-b border-black/10 flex flex-col gap-2">
+                  <input
+                    value={publishTitle}
+                    onChange={(e) => setPublishTitle(e.target.value)}
+                    placeholder="Title (shown on BuildGuild)"
+                    maxLength={120}
+                    className="w-full h-10 px-4 rounded-full border border-black/10 text-black text-[13px] outline-none"
+                  />
+                  <input
+                    value={publishTagline}
+                    onChange={(e) => setPublishTagline(e.target.value)}
+                    placeholder="One-line tagline (optional)"
+                    maxLength={200}
+                    className="w-full h-10 px-4 rounded-full border border-black/10 text-black text-[13px] outline-none"
+                  />
+                  {publishError && <p className="text-[12px] text-red-600">{publishError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setPublishOpen(false)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold text-black/50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={publishToBuildGuild}
+                      disabled={!publishTitle.trim() || publishing}
+                      className="px-4 py-1.5 rounded-full text-xs font-bold bg-black text-white disabled:opacity-40"
+                    >
+                      {publishing ? "Publishing…" : "Publish to BuildGuild"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {published && (
+                <div className="px-4 py-2.5 bg-emerald-50 border-b border-black/10 text-emerald-700 text-[12px] font-semibold">
+                  Live on BuildGuild — anyone can view and comment on it now.
+                </div>
+              )}
 
               {view === "preview" ? (
                 <iframe
