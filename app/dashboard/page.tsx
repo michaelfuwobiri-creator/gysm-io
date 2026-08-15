@@ -75,6 +75,14 @@ export default async function DashboardPage() {
                     View live
                   </a>
                 </div>
+                <a
+                  href={`/publish/${p.id}/app-stores`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-400 text-xs font-bold hover:bg-violet-500/10"
+                >
+                  Publish to App Store / Play Store
+                </a>
                 <PublishButton
                   projectId={p.id}
                   initialIsPublic={!!p.is_public}

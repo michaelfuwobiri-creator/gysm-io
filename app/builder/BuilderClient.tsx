@@ -378,6 +378,16 @@ export default function BuilderClient({
                       Publish / view live →
                     </a>
                   )}
+                  {projectId && (
+                    <a
+                      href={`/publish/${projectId}/app-stores`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold border border-black/15 text-black/70"
+                    >
+                      App Store / Play Store →
+                    </a>
+                  )}
                   {projectId && !published && (
                     <button
                       onClick={() => {
