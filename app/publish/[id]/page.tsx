@@ -35,13 +35,16 @@ export default async function PublishedProjectPage({
 }) {
   let project: { id: string; prompt: string; html: string } | null = null;
 
-  try {
-    const rows = await sql`
-      select id, prompt, html from projects where id = ${params.id} limit 1
-    `;
-    project = (rows[0] as any) ?? null;
-  } catch (error: any) {
-    console.error("[publish] failed to load project:", error.message);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (UUID_RE.test(params.id)) {
+    try {
+      const rows = await sql`
+        select id, prompt, html from projects where id = ${params.id} limit 1
+      `;
+      project = (rows[0] as any) ?? null;
+    } catch (error: any) {
+      console.error("[publish] failed to load project:", error.message);
+    }
   }
 
   if (!project) {

@@ -16,16 +16,23 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
     html: string;
   } | null = null;
 
-  try {
-    const rows = await sql`
-      select id, title, tagline, publisher_name, published_at, html
-      from projects
-      where id = ${params.id} and is_public = true
-      limit 1
-    `;
-    app = (rows[0] as any) ?? null;
-  } catch (error: any) {
-    console.error("[buildguild] failed to load app:", error.message);
+  // Cheap shape check before hitting Postgres -- avoids a "invalid input
+  // syntax for type uuid" error-log entry every time a bot/scanner probes
+  // this route with a non-UUID path segment (observed in production: stray
+  // "%26" hits from crawler noise).
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (UUID_RE.test(params.id)) {
+    try {
+      const rows = await sql`
+        select id, title, tagline, publisher_name, published_at, html
+        from projects
+        where id = ${params.id} and is_public = true
+        limit 1
+      `;
+      app = (rows[0] as any) ?? null;
+    } catch (error: any) {
+      console.error("[buildguild] failed to load app:", error.message);
+    }
   }
 
   if (!app) {
