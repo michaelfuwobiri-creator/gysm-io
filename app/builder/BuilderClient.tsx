@@ -39,6 +39,7 @@ export default function BuilderClient({
   const [showToast, setShowToast] = useState(false);
   const [view, setView] = useState<View>("preview");
   const [log, setLog] = useState<string[]>([]);
+  const [elapsed, setElapsed] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
@@ -74,6 +75,20 @@ export default function BuilderClient({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Live "Xs" counter while a build is running -- the first stage (the
+  // OpenAI structure call) is the vast majority of total build time and,
+  // without this, the log just sits on one line with no visible motion
+  // for 30-60+ seconds, which reads as frozen even when it's working.
+  useEffect(() => {
+    if (status !== "loading") {
+      setElapsed(0);
+      return;
+    }
+    const start = Date.now();
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [status]);
 
   const generate = useCallback(
     async (promptOverride?: string, opts?: { asEdit?: boolean }) => {
@@ -287,6 +302,12 @@ export default function BuilderClient({
         {/* Live build log -- shown while generating, replaces the old plain spinner */}
         {isLoading && (
           <div className="mt-6 rounded-[20px] border border-white/10 bg-zinc-950 p-5 font-mono text-[13px]">
+            <div className="flex items-center justify-between mb-3 text-white/40">
+              <span>{elapsed}s elapsed</span>
+              {elapsed > 15 && (
+                <span className="text-white/30">Full builds can take up to ~90s — still working</span>
+              )}
+            </div>
             <ul className="space-y-2">
               {STAGE_ORDER.map((key) => {
                 const label = STAGE_LABELS[key];

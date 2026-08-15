@@ -5,6 +5,17 @@ import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/cre
 import { generateWebsite, editWebsite, BuildStage } from "@/lib/ai/orchestrator";
 import { buildSuggestions } from "@/lib/suggestions";
 
+// This route runs two sequential AI calls (an OpenAI structure pass, then
+// a best-effort Gemini design pass) which can legitimately take 30-90+
+// seconds combined for a full app -- comfortably past Vercel's default
+// serverless function timeout (10s on Hobby without this set). Without an
+// explicit maxDuration, longer generations were at real risk of being
+// killed mid-stream by the platform, which the client can't distinguish
+// from a hang: the fetch just never resolves. This project has Fluid
+// Compute enabled (Hobby allows up to 300s with it on), so 120s gives
+// real headroom above observed worst-case latency without needing Pro.
+export const maxDuration = 120;
+
 // Streams newline-delimited JSON events so the client can show a live,
 // step-by-step build log instead of a single opaque spinner:
 //   {"type":"stage","stage":"structure"}
