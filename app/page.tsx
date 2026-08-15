@@ -178,6 +178,12 @@ export default function Page() {
             </button>
           </div>
           <div className="mt-3 text-[12px] text-black/40 font-medium">Live preview in seconds • credits used per build</div>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[12px] font-semibold">
+                      <span className="opacity-40">Popular:</span>
+                      <a href="/build/dating-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Dating app</a>
+                      <a href="/build/saas" className="opacity-60 hover:opacity-100 underline underline-offset-4">SaaS</a>
+                      <a href="/build/booking-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Booking app</a>
+          </div>
         </div>
       </section>
 
