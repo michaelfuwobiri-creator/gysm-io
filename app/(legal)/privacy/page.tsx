@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           <h2 className="text-[18px] font-bold text-black mb-2">Contact</h2>
           <p>
             Questions about this policy or your data can be sent to{" "}
-            <a href="mailto:michaelfuwobiri@gmail.com" className="underline">michaelfuwobiri@gmail.com</a>.
+            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a>.
           </p>
         </section>
       </div>

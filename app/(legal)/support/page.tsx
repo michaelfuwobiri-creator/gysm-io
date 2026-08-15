@@ -9,7 +9,7 @@ export default function SupportPage() {
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
           Need help with GYSM.IO? Email us at{" "}
-          <a href="mailto:michaelfuwobiri@gmail.com" className="underline font-semibold text-black">michaelfuwobiri@gmail.com</a>{" "}
+          <a href="mailto:support@gysm.io" className="underline font-semibold text-black">support@gysm.io</a>{" "}
           and we&apos;ll get back to you.
         </p>
 
@@ -39,7 +39,7 @@ export default function SupportPage() {
             Stripe under their own policy even after your GYSM account is deleted. Anything you
             published to BuildGuild is removed at the same time. If you&apos;d rather we do it for
             you, email{" "}
-            <a href="mailto:michaelfuwobiri@gmail.com" className="underline font-semibold text-black">michaelfuwobiri@gmail.com</a>{" "}
+            <a href="mailto:support@gysm.io" className="underline font-semibold text-black">support@gysm.io</a>{" "}
             from your account email and we&apos;ll delete it within a few business days.
           </p>
         </section>
