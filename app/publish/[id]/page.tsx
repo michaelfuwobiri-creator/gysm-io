@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import type { Metadata } from "next";
 
 // Public, no-auth live view of a saved build -- the real implementation of
 // what app/publish/page.tsx (no id) has been a placeholder for. Renders
@@ -6,6 +7,27 @@ import { sql } from "@/lib/db";
 // dashboard already uses (never dangerouslySetInnerHTML into the real
 // gysm.io origin -- see the removed /publish stub's comment for why that
 // mattered).
+
+// Per-app installable PWA: links this build's own manifest (see the
+// sibling manifest.webmanifest route) so "Add to Home Screen" installs it
+// as its own app -- distinct name/icon -- instead of a GYSM.IO bookmark.
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  let title = "GYSM App";
+  try {
+    const rows = await sql`select title, prompt from projects where id = ${params.id} limit 1`;
+    const project = rows[0] as any;
+    if (project) title = project.title || project.prompt || title;
+  } catch {
+    // Non-critical -- fall back to a generic title.
+  }
+
+  return {
+    title: `${title} — built with GYSM.IO`,
+    manifest: `/publish/${params.id}/manifest.webmanifest`,
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title },
+  };
+}
+
 export default async function PublishedProjectPage({
   params,
 }: {
@@ -43,6 +65,19 @@ export default async function PublishedProjectPage({
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            name: project.prompt,
+            applicationCategory: "LifestyleApplication",
+            operatingSystem: "Web",
+            description: `${project.prompt} -- built with GYSM.IO.`,
+          }),
+        }}
+      />
       <iframe
         srcDoc={project.html}
         sandbox="allow-scripts allow-same-origin"
