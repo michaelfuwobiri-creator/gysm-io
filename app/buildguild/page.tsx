@@ -36,7 +36,6 @@ export default async function BuildGuildPage() {
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div>
             <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span>
           </a>
           <div className="flex items-center gap-2">
