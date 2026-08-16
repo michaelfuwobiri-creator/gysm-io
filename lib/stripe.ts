@@ -41,6 +41,9 @@ export type PricingPlan = {
   credits: number;
   builds: number;
   description: string;
+  /** Short catchy line shown under the price on the pricing page instead
+   *  of the raw builds/$-per-build math -- see app/pricing/page.tsx. */
+  tagline: string;
   highlight?: boolean;
   /** Name of the Vercel env var holding the real Stripe Price ID for this plan. */
   priceIdEnvVar: string;
@@ -69,6 +72,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.credits_starter,
     builds: BUILDS_PER_PLAN.credits_starter,
     description: "Try it out. 5 builds, no subscription.",
+    tagline: "Just enough to try it",
     priceIdEnvVar: "STRIPE_CREDITS_STARTER_PRICE_ID",
   },
   {
@@ -80,6 +84,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.credits_popular,
     builds: BUILDS_PER_PLAN.credits_popular,
     description: "Pay as you go. 20 builds, no subscription.",
+    tagline: "The sweet spot",
     highlight: true,
     priceIdEnvVar: "STRIPE_CREDITS_POPULAR_PRICE_ID",
   },
@@ -92,6 +97,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.credits_bulk,
     builds: BUILDS_PER_PLAN.credits_bulk,
     description: "Best per-build rate without a subscription. 50 builds.",
+    tagline: "Stock up and save",
     priceIdEnvVar: "STRIPE_CREDITS_BULK_PRICE_ID",
   },
   {
@@ -103,6 +109,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.plan_builder,
     builds: BUILDS_PER_PLAN.plan_builder,
     description: "For solo builders shipping side projects. 40 builds/mo.",
+    tagline: "For your next side project",
     priceIdEnvVar: "STRIPE_PLAN_BUILDER_PRICE_ID",
   },
   {
@@ -114,6 +121,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.plan_pro,
     builds: BUILDS_PER_PLAN.plan_pro,
     description: "For freelancers running client work. 150 builds/mo.",
+    tagline: "Built for freelance work",
     highlight: true,
     priceIdEnvVar: "STRIPE_PLAN_PRO_PRICE_ID",
   },
@@ -126,6 +134,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     credits: CREDITS_PER_PLAN.plan_studio,
     builds: BUILDS_PER_PLAN.plan_studio,
     description: "For agencies shipping at scale. 600 builds/mo.",
+    tagline: "Ship without limits",
     priceIdEnvVar: "STRIPE_PLAN_STUDIO_PRICE_ID",
   },
 ];

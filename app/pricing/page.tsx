@@ -64,7 +64,7 @@ export default function PricingPage({
                 <span className="text-4xl font-black">${plan.price}</span>
               </div>
               <p className="mt-3 text-sm opacity-80">{plan.description}</p>
-              <p className="mt-1 text-xs opacity-50">{plan.builds} builds · ${(plan.price / plan.builds).toFixed(2)}/build</p>
+              <p className="mt-1 text-xs opacity-50">{plan.tagline}</p>
               <CheckoutButton planId={plan.id} label={`Get ${plan.name}`} highlight={plan.highlight} />
             </div>
           ))}
@@ -88,7 +88,7 @@ export default function PricingPage({
                 <span className="text-sm opacity-60">/mo</span>
               </div>
               <p className="mt-3 text-sm opacity-80">{plan.description}</p>
-              <p className="mt-1 text-xs opacity-50">{plan.builds} builds/mo · ${(plan.price / plan.builds).toFixed(2)}/build</p>
+              <p className="mt-1 text-xs opacity-50">{plan.tagline}</p>
               <CheckoutButton planId={plan.id} label={`Get ${plan.name}`} highlight={plan.highlight} />
             </div>
           ))}
