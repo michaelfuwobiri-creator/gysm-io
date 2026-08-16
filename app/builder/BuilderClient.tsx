@@ -236,7 +236,7 @@ export default function BuilderClient({
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-white/10 mb-6">
           <h1 className="text-2xl font-black">
-            GYSM<span className="opacity-30">.IO</span>
+            GYSM<span className="text-fuchsia-500">.IO</span>
           </h1>
           <div className="flex items-center gap-5">
             {html && !isLoading && (

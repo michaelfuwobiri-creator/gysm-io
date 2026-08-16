@@ -51,7 +51,7 @@ export default function UseCaseLanding({
       {/* NAV */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2"><div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div><span className="font-black tracking-tighter text-[16px]">GYSM.IO</span></a>
+          <a href="/" className="flex items-center gap-2"><div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span></a>
           <div className="flex items-center gap-2">
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
@@ -145,7 +145,7 @@ export default function UseCaseLanding({
               <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
             </div>
           </div>
-          <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM.IO — built for founders who ship</div>
+          <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM<span className="text-fuchsia-500">.IO</span> — built for founders who ship</div>
         </div>
       </section>
     </div>

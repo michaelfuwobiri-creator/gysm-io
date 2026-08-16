@@ -90,7 +90,7 @@ export default async function PublishedProjectPage({
       <div className="shrink-0 flex items-center justify-center gap-2 py-2 bg-black text-white/40 text-[11px]">
         Built with
         <a href="/" className="font-black text-white/70 hover:text-white">
-          GYSM<span className="opacity-50">.IO</span>
+          GYSM<span className="text-fuchsia-500">.IO</span>
         </a>
         — describe an app, get a real one
       </div>

@@ -24,7 +24,7 @@ export default function PricingPage({
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-white/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="opacity-30">.IO</span>
+            GYSM<span className="text-fuchsia-500">.IO</span>
           </a>
           <a href="/builder" className="text-[11px] opacity-50 hover:opacity-100">
             Back to builder

@@ -37,7 +37,7 @@ export default async function BuildGuildPage() {
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-[8px] bg-black text-white grid place-items-center font-black text-[13px]">G</div>
-            <span className="font-black tracking-tighter text-[16px]">GYSM.IO</span>
+            <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span>
           </a>
           <div className="flex items-center gap-2">
             <a href="/dashboard" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
