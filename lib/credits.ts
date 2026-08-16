@@ -1,22 +1,10 @@
 import { sql } from "@/lib/db";
-
-export const CREDIT_COST_PER_BUILD = 500;
-
-// Builds included per plan per month, and the credit equivalent
-// (builds * CREDIT_COST_PER_BUILD). Single source of truth for
-// lib/stripe.ts PRICING_PLANS -- change build counts here.
-export const BUILDS_PER_PLAN = {
-  credits_starter: 5,
-  credits_popular: 20,
-  credits_bulk: 50,
-  plan_builder: 40,
-  plan_pro: 150,
-  plan_studio: 600,
-} as const;
-
-export const CREDITS_PER_PLAN = Object.fromEntries(
-  Object.entries(BUILDS_PER_PLAN).map(([id, builds]) => [id, builds * CREDIT_COST_PER_BUILD])
-) as Record<keyof typeof BUILDS_PER_PLAN, number>;
+// Plain constants (no db import) live in credits-constants.ts. Imported
+// here (for local use below) and re-exported so existing `@/lib/credits`
+// importers keep working -- see that file for why the split exists
+// (client-bundle DB leak fix).
+import { CREDIT_COST_PER_BUILD, BUILDS_PER_PLAN, CREDITS_PER_PLAN } from "@/lib/credits-constants";
+export { CREDIT_COST_PER_BUILD, BUILDS_PER_PLAN, CREDITS_PER_PLAN };
 
 export async function getCreditBalance(userId: string): Promise<number> {
   try {

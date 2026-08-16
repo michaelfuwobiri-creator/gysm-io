@@ -1,5 +1,11 @@
 import Stripe from "stripe";
-import { CREDITS_PER_PLAN, BUILDS_PER_PLAN } from "@/lib/credits";
+// Import from credits-constants.ts (not credits.ts) -- this file is
+// imported by client components (app/pricing/CheckoutButton.tsx), and
+// credits.ts pulls in lib/db.ts, which throws at module-load time if
+// DATABASE_URL isn't set. Since only NEXT_PUBLIC_* vars are ever inlined
+// into client bundles, that throw would fire in every visitor's browser.
+// credits-constants.ts has the same plan/build numbers with no db import.
+import { CREDITS_PER_PLAN, BUILDS_PER_PLAN } from "@/lib/credits-constants";
 
 let _stripe: Stripe | null = null;
 
