@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
@@ -89,6 +89,17 @@ export default function Page() {
   const { isLoaded, isSignedIn } = useUser();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
+  // Clerk's useUser() can resolve isLoaded/isSignedIn before React's first
+  // client render commits, which makes that first client render diverge
+  // from the server-rendered HTML (server always renders "logged out").
+  // Gating on `mounted` (only ever true after the initial commit, via
+  // useEffect) keeps the first client render identical to the server
+  // render, so hydration never mismatches -- the nav then swaps to the
+  // signed-in state a tick later, same as any client-only UI.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function startBuilding(promptText?: string) {
     const p = (promptText ?? prompt).trim();
@@ -140,7 +151,7 @@ export default function Page() {
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Templates</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
-            {isLoaded && isSignedIn ? (
+            {mounted && isLoaded && isSignedIn ? (
               <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
             ) : (
               <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>

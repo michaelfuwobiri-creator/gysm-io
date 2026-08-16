@@ -16,6 +16,13 @@ type Comment = {
 // not the actual gate).
 export default function CommentSection({ projectId }: { projectId: string }) {
   const { isLoaded, isSignedIn } = useUser();
+  // Same hydration-mismatch guard as the homepage nav: Clerk can resolve
+  // isLoaded/isSignedIn before the first client render commits, which
+  // would make that render diverge from the server-rendered HTML.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -88,7 +95,7 @@ export default function CommentSection({ projectId }: { projectId: string }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-black/5">
-        {!isLoaded ? null : isSignedIn ? (
+        {!mounted || !isLoaded ? null : isSignedIn ? (
           <div className="flex flex-col gap-2">
             <textarea
               value={draft}
