@@ -28,53 +28,49 @@ const TESTIMONIALS = [
 // Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
 // (below) instead of a stock emoji, so the grid reads like an actual app
 // showcase/portfolio rather than a placeholder tile set.
+// Real apps published to BuildGuild by GYSM's own founder while testing the
+// platform (verified live at /publish/[id] as of writing) -- swapped in for
+// the earlier fictional placeholder tiles so this grid links to real,
+// clickable builds instead of names nothing points to. Each `mark` recreates
+// that app's actual generated logo (icon shape + color + wordmark), not a
+// generic placeholder glyph.
 const APPS = [
-  { name: "ZodiacMoonMatch", tag: "Live", color: "from-violet-100 to-fuchsia-100", ink: "text-violet-700" },
-  { name: "ModernClinic", tag: "Live", color: "from-sky-100 to-teal-100", ink: "text-teal-700" },
-  { name: "Radar", tag: "Trending", color: "from-emerald-100 to-lime-100", ink: "text-emerald-700" },
-  { name: "CutRoom", tag: "Live", color: "from-orange-100 to-red-100", ink: "text-orange-700" },
-  { name: "MemoryCloud", tag: "Live", color: "from-blue-100 to-cyan-100", ink: "text-blue-700" },
+  { name: "orbit.", tag: "Live", projectId: "5b983815-8702-4bde-b4d6-712ae95d95c0", color: "from-fuchsia-500 to-violet-600", desc: "Zodiac dating app" },
+  { name: "Studio Sol", tag: "Live", projectId: "2f736c3e-f255-4ec2-80f6-60dac7d3afd3", color: "from-pink-500 to-orange-500", desc: "Salon booking" },
+  { name: "loop.", tag: "Live", projectId: "7ce589a2-76aa-4a38-98c4-a915423d347c", color: "from-indigo-500 to-purple-600", desc: "Habit tracker" },
+  { name: "VelocityRun", tag: "Live", projectId: "01d17652-6489-42d2-bfdf-61e12810e285", color: "from-indigo-600 to-fuchsia-600", desc: "Racing game" },
 ];
 
+// Recreates each real app's actual generated mark (icon shape + letter +
+// wordmark), not a generic placeholder glyph -- verified against the live
+// build at /publish/[projectId] for each entry in APPS.
 function AppLogo({ name, className }: { name: string; className?: string }) {
   switch (name) {
-    case "ZodiacMoonMatch":
+    case "orbit.":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={className}>
-          <path d="M14.8 3.6a8.2 8.2 0 1 0 5.9 13.1A9.1 9.1 0 0 1 14.8 3.6Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" />
-          <path d="M18.6 5.3l.55 1.35L20.5 7.2l-1.35.55-.55 1.35-.55-1.35L16.7 7.2l1.35-.55.55-1.35Z" fill="currentColor" />
-        </svg>
+        <div className={`${className} rounded-full bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center`}>
+          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
+            <path d="M12 4l1.6 5.4L19 11l-5.4 1.6L12 18l-1.6-5.4L5 11l5.4-1.6L12 4Z" fill="white" />
+          </svg>
+        </div>
       );
-    case "ModernClinic":
+    case "Studio Sol":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={className}>
-          <path d="M12 4v4.2M9.9 6.1h4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M4 13c1.7-2.4 3-2.4 4.3-.4S10.6 15 12 12.6 14.3 10.6 15.7 12.6 18.3 15.4 20 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-          <rect x="4" y="16.6" width="16" height="3.6" rx="1.8" stroke="currentColor" strokeWidth="1.7" />
-        </svg>
+        <div className={`${className} rounded-[10px] bg-gradient-to-br from-pink-500 to-orange-400 grid place-items-center text-white font-black`}>
+          S
+        </div>
       );
-    case "Radar":
+    case "loop.":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={className}>
-          <circle cx="12" cy="12" r="8.3" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
-          <circle cx="12" cy="12" r="5.1" stroke="currentColor" strokeWidth="1.5" opacity="0.55" />
-          <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-          <path d="M12 12L17.8 6.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-        </svg>
+        <div className={`${className} rounded-[10px] bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center text-white font-black`}>
+          L
+        </div>
       );
-    case "CutRoom":
+    case "VelocityRun":
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={className}>
-          <path d="M4.3 5.8l15.2 3.9-1 3.9-15.2-3.9 1-3.9Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-          <path d="M4.3 9.7h15.2v8.7a1 1 0 0 1-1 1H5.3a1 1 0 0 1-1-1V9.7Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        </svg>
-      );
-    case "MemoryCloud":
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className={className}>
-          <path d="M7.3 17.3a3.9 3.9 0 0 1-.5-7.77 4.9 4.9 0 0 1 9.4-1.86A4.4 4.4 0 0 1 17.3 17.3H7.3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-          <circle cx="12" cy="13" r="2" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
+        <div className={`${className} rounded-[10px] bg-gradient-to-br from-indigo-600 to-fuchsia-600 grid place-items-center text-white font-black`}>
+          V
+        </div>
       );
     default:
       return null;
@@ -251,12 +247,26 @@ export default function Page() {
           <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Apps built<br />on GYSM</h2>
           <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
         </div>
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {APPS.map((app) => (
-            <div key={app.name} className="group rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg transition">
-              <div className={`h-[88px] md:h-[110px] rounded-[14px] bg-gradient-to-br ${app.color} grid place-items-center`}><AppLogo name={app.name} className={`h-9 w-9 md:h-11 md:w-11 ${app.ink}`} /></div>
-              <div className="mt-3 flex items-center justify-between"><div className="text-[13px] font-bold">{app.name}</div><div className="text-[10px] font-bold px-2 py-1 rounded-full bg-black text-white">{app.tag}</div></div>
-            </div>
+            <a
+              key={app.name}
+              href={`/publish/${app.projectId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg transition"
+            >
+              <div className="h-[88px] md:h-[110px] rounded-[14px] bg-zinc-50 border border-black/5 grid place-items-center">
+                <AppLogo name={app.name} className="h-11 w-11 md:h-14 md:w-14 text-[18px] md:text-[22px]" />
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <div>
+                  <div className="text-[13px] font-bold">{app.name}</div>
+                  <div className="text-[11px] opacity-50 mt-0.5">{app.desc}</div>
+                </div>
+                <div className="text-[10px] font-bold px-2 py-1 rounded-full bg-black text-white shrink-0">{app.tag}</div>
+              </div>
+            </a>
           ))}
         </div>
       </section>
