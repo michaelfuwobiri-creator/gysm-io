@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import PWARegister from "./components/PWARegister";
 
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PWARegister />
         </ClerkProvider>
+        <Analytics />
       </body>
     </html>
   );

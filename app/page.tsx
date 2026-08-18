@@ -15,7 +15,6 @@ const FEATURES = [
 // fabricated testimonials (Sarah/Marcus/Priya/David/Alex are example quotes,
 // not real customers) -- he opted to proceed anyway. Mike's own entry is a
 // genuine testimonial from GYSM's real founder.
-const FOUNDER = { name: "Mike F.", role: "Founder, GYSM.IO — built ZodiacMoonMatch", text: "I built ZodiacMoonMatch, a zodiac compatibility matcher, testing GYSM on my own product. Auth, payments, and a working preview before I'd normally finish scoping the thing.", avatar: "https://design.canva.ai/7rwsQzM6U8-6YDZ", tag: "Live", built: "Built ZodiacMoonMatch" };
 
 const TESTIMONIALS = [
   { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", avatar: "https://design.canva.ai/zGfnpM4y1x8NGg5" },
@@ -194,31 +193,6 @@ export default function Page() {
                       <a href="/build/dating-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Dating app</a>
                       <a href="/build/saas" className="opacity-60 hover:opacity-100 underline underline-offset-4">SaaS</a>
                       <a href="/build/booking-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Booking app</a>
-          </div>
-        </div>
-      </section>
-
-      {/* FOUNDER SPOTLIGHT -- pulled out of the carousel below since this is
-          the one genuine testimonial (real founder, real product, real
-          quote); everything in TESTIMONIALS is a fabricated example. Light
-          background on purpose -- keeps it consistent with the rest of the
-          page instead of matching the black GYSM-song block further down. */}
-      <section className="mt-10 md:mt-16 max-w-[1280px] mx-auto px-5 md:px-8">
-        <div className="relative overflow-hidden rounded-[20px] border border-black/[0.08] bg-[#FCFCF9] p-6 md:p-8">
-          <div className="pointer-events-none absolute top-0 right-0 h-[180px] w-[180px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.08),transparent_70%)]" />
-          <div className="relative flex gap-5 items-start">
-            <img src={FOUNDER.avatar} alt={FOUNDER.name} className="h-[76px] w-[76px] rounded-full object-cover bg-violet-100 border border-black/5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[15px] font-bold">Mike Fuwobiri</span>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-800">{FOUNDER.role}</span>
-              </div>
-              <p className="mt-2.5 text-[14px] leading-[1.6]">"{FOUNDER.text}"</p>
-              <div className="mt-3.5 flex items-center gap-2">
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-black text-white">{FOUNDER.tag}</span>
-                <span className="text-[12px] opacity-50">{FOUNDER.built}</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
