@@ -13,6 +13,7 @@ HARD RULES:
 - Use https://picsum.photos/seed/UNIQUE-SEED/WIDTH/HEIGHT for placeholder images, with a different seed per image.
 - If the request involves selling or listing items (food, products, services, bookings), give every item a name, short description, and a clear price formatted like "$14.99" shown as a badge.
 - Always render something complete and believable, even for a vague prompt -- never return an empty page, a "TODO", or placeholder-only content.
+- If a reference image is provided alongside the prompt, use it as visual/content inspiration -- subject matter, mood, layout, or style it implies -- for what you build. You don't need to literally recreate the image pixel-for-pixel; capture what it's telling you about the app the user wants.
 
 VISUAL BAR -- build this to look like a funded startup's marketing/product page shipped it, not a wireframe. Default to this house style (the same system GYSM.IO's own homepage uses) unless the request clearly calls for something else:
 - Oversized, extremely bold headlines (font-black), tight tracking (tracking-tight or tighter), tight leading (leading-none or leading-[0.9]) for hero/section titles.
@@ -56,7 +57,8 @@ HARD RULES:
 - If the change asks for new interactive behavior, wire it up the same way the existing inline <script> already does things -- vanilla JS only, naming consistent with what's already there.
 - Keep the same Tailwind CDN + Inter font setup already in <head>.
 - Match the existing visual style (colors, type scale, button and card shapes) for anything you add or change, so it looks like it was designed alongside the rest, not bolted on.
-- If the requested change is ambiguous, make the most reasonable, tasteful interpretation rather than leaving it half-done -- there's no way to ask a follow-up here.`;
+- If the requested change is ambiguous, make the most reasonable, tasteful interpretation rather than leaving it half-done -- there's no way to ask a follow-up here.
+- If a reference image is provided alongside the change request, use it as visual/content inspiration for that change.`;
 
 export type BuildStage = "structure" | "structure_done" | "design" | "design_done";
 export type StageCallback = (stage: BuildStage) => void;
@@ -86,9 +88,13 @@ export type GenerateResult =
  * app/api/generate/route.ts stays a thin auth/credits wrapper around this
  * function -- it doesn't know or care that two models are involved.
  */
-export async function generateWebsite(prompt: string, onStage?: StageCallback): Promise<GenerateResult> {
+export async function generateWebsite(
+  prompt: string,
+  onStage?: StageCallback,
+  imageDataUrl?: string
+): Promise<GenerateResult> {
   onStage?.("structure");
-  const structure = await generateStructure(prompt);
+  const structure = await generateStructure(prompt, imageDataUrl);
   if (!structure.ok) return structure;
   onStage?.("structure_done");
 
@@ -108,7 +114,8 @@ export async function generateWebsite(prompt: string, onStage?: StageCallback): 
 export async function editWebsite(
   existingHtml: string,
   instruction: string,
-  onStage?: StageCallback
+  onStage?: StageCallback,
+  imageDataUrl?: string
 ): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
@@ -118,13 +125,21 @@ export async function editWebsite(
   onStage?.("structure");
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  const editText = `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}`;
+  const editUserContent: any = imageDataUrl
+    ? [
+        { type: "text", text: editText },
+        { type: "image_url", image_url: { url: imageDataUrl } },
+      ]
+    : editText;
+
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
       messages: [
         { role: "system", content: EDIT_SYSTEM_PROMPT },
-        { role: "user", content: `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}` },
+        { role: "user", content: editUserContent },
       ],
       max_completion_tokens: 16000,
     });
@@ -150,7 +165,7 @@ export async function editWebsite(
   return { ok: true, html: polished };
 }
 
-async function generateStructure(prompt: string): Promise<GenerateResult> {
+async function generateStructure(prompt: string, imageDataUrl?: string): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
     return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
@@ -158,13 +173,20 @@ async function generateStructure(prompt: string): Promise<GenerateResult> {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  const structureUserContent: any = imageDataUrl
+    ? [
+        { type: "text", text: prompt },
+        { type: "image_url", image_url: { url: imageDataUrl } },
+      ]
+    : prompt;
+
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
       messages: [
         { role: "system", content: STRUCTURE_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
+        { role: "user", content: structureUserContent },
       ],
       max_completion_tokens: 16000,
     });

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+import ShareButton from "@/app/components/ShareButton";
 
 type Status = "idle" | "loading" | "error";
 type View = "preview" | "code";
@@ -16,6 +17,14 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_ORDER = ["structure", "structure_done", "design", "design_done", "saving"];
+
+// Hard client-side cap on attached reference images. Vercel's serverless
+// request body limit is a hard ~4.5MB platform ceiling (not something we
+// can raise), and base64 inflates a file by ~33% -- 3MB raw keeps the
+// encoded payload, plus the prompt JSON wrapper, safely under that with
+// room to spare. app/api/generate/route.ts enforces the same ceiling
+// server-side too, since client-side validation alone is never trustworthy.
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 type Props = {
   initialHtml?: string | null;
@@ -48,6 +57,15 @@ export default function BuilderClient({
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [publishError, setPublishError] = useState("");
+
+  // Reference photo/illustration a user can attach to show the builder
+  // what they want -- a mood board of one image, not a stored asset. Sent
+  // alongside the prompt as a data: URL and passed straight through to
+  // the vision-capable model in lib/ai/orchestrator.ts.
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -90,6 +108,25 @@ export default function BuilderClient({
     return () => clearInterval(t);
   }, [status]);
 
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImageError("");
+    if (!file.type.startsWith("image/")) {
+      setImageError("Attach an image file (PNG, JPG, etc.).");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError("That image is too large -- keep it under 3MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setImageDataUrl(reader.result as string);
+    reader.onerror = () => setImageError("Couldn't read that image. Try another file.");
+    reader.readAsDataURL(file);
+  }
+
   const generate = useCallback(
     async (promptOverride?: string, opts?: { asEdit?: boolean }) => {
       const p = (promptOverride ?? prompt).trim();
@@ -110,6 +147,7 @@ export default function BuilderClient({
           body: JSON.stringify({
             prompt: p,
             previousHtml: opts?.asEdit ? html : undefined,
+            image: imageDataUrl ?? undefined,
           }),
         });
 
@@ -163,6 +201,8 @@ export default function BuilderClient({
               setPublishTitle("");
               setPublishTagline("");
               setPublishError("");
+              setImageDataUrl(null);
+              setImageError("");
               finished = true;
             }
           }
@@ -175,7 +215,7 @@ export default function BuilderClient({
         setStatus("error");
       }
     },
-    [prompt, html, router]
+    [prompt, html, router, imageDataUrl]
   );
 
   // Fire the initial generate automatically only if a pending prompt was
@@ -219,9 +259,18 @@ export default function BuilderClient({
   }
 
   const isLoading = status === "loading";
+  const shareUrl =
+    projectId && typeof window !== "undefined" ? `${window.location.origin}/publish/${projectId}` : "";
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
+      {/* Soft ambient glow behind the whole page -- same violet/fuchsia
+          identity as the marketing site, so the builder doesn't feel like
+          a separate, plainer tool bolted onto a polished landing page. */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 blur-[120px]" />
+      </div>
+
       {showToast && (
         <div className="fixed top-4 right-4 z-50 bg-green-500 text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
           Payment successful — you're unlocked
@@ -233,12 +282,12 @@ export default function BuilderClient({
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex justify-between items-center py-4 border-b border-white/10 mb-6">
+      <div className="max-w-6xl mx-auto p-6 relative">
+        <div className="flex justify-between items-center py-4 border-b border-white/10 mb-8">
           <h1 className="text-2xl font-black">
             GYSM<span className="text-fuchsia-500">.IO</span>
           </h1>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2">
             {html && !isLoading && (
               <button
                 onClick={() => {
@@ -253,38 +302,91 @@ export default function BuilderClient({
                   setPublishTitle("");
                   setPublishTagline("");
                   setPublishError("");
+                  setImageDataUrl(null);
+                  setImageError("");
                 }}
-                className="text-[11px] opacity-50 hover:opacity-100"
+                className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition"
               >
                 New build
               </button>
             )}
-            <a href="/buildguild" className="text-[11px] opacity-50 hover:opacity-100">
+            <a href="/buildguild" className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition">
               BuildGuild
             </a>
-            <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
+            <a href="/dashboard" className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition">
               My Builds
             </a>
-            <UserButton afterSignOutUrl="/" />
+            <div className="ml-1">
+              <UserButton afterSignOutUrl="/" />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white/[0.06] border border-white/10 rounded-[24px] p-4 flex gap-3">
-          <input
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
-            placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
-            className="flex-1 h-[56px] bg-black rounded-full px-6 outline-none border border-white/10"
-            disabled={isLoading}
-          />
-          <button
-            onClick={() => generate()}
-            disabled={isLoading || !prompt.trim()}
-            className="h-[56px] px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0"
-          >
-            {isLoading ? "Building…" : html ? "Rebuild →" : "Generate →"}
-          </button>
+        {!html && !isLoading && (
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-400/90 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
+              Prompt to product
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05]">
+              What do you want to{" "}
+              <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">build</span>?
+            </h2>
+          </div>
+        )}
+
+        <div className="relative rounded-[26px] p-[1.5px] bg-gradient-to-r from-violet-600/40 via-fuchsia-500/40 to-violet-600/40">
+          <div className="bg-[#0A0A0A] border border-white/5 rounded-[24.5px] p-4 flex flex-col gap-3">
+            {imageDataUrl && (
+              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 rounded-2xl px-3 py-2 self-start">
+                <img src={imageDataUrl} alt="Attached reference" className="w-12 h-12 rounded-xl object-cover" />
+                <span className="text-[12px] text-white/50">Reference image attached</span>
+                <button
+                  onClick={() => setImageDataUrl(null)}
+                  className="text-white/40 hover:text-white text-[13px] font-bold px-2"
+                  aria-label="Remove attached image"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                title="Attach a photo or illustration for reference"
+                className="h-[56px] w-[56px] shrink-0 grid place-items-center rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/10 disabled:opacity-40 transition"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
+              <input
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
+                placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
+                className="flex-1 h-[56px] bg-black rounded-full px-6 outline-none border border-white/10 focus:border-fuchsia-500/40 transition"
+                disabled={isLoading}
+              />
+              <button
+                onClick={() => generate()}
+                disabled={isLoading || !prompt.trim()}
+                className="h-[56px] px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0 hover:bg-fuchsia-50 transition"
+              >
+                {isLoading ? "Building…" : html ? "Rebuild →" : "Generate →"}
+              </button>
+            </div>
+            {imageError && <p className="text-[12px] text-red-400 px-2">{imageError}</p>}
+          </div>
         </div>
 
         {status === "error" && (
@@ -337,7 +439,7 @@ export default function BuilderClient({
           </div>
         )}
 
-        <div className="mt-6 rounded-[20px] overflow-hidden border border-white/10 bg-white min-h-[600px]">
+        <div className="mt-6 rounded-[20px] overflow-hidden border border-white/10 bg-white min-h-[600px] shadow-[0_0_60px_-15px_rgba(217,70,239,0.15)]">
           {!isLoading && html && (
             <>
               <div className="flex items-center justify-between px-4 py-2 bg-zinc-100 border-b border-black/10">
@@ -377,6 +479,9 @@ export default function BuilderClient({
                     >
                       Publish / view live →
                     </a>
+                  )}
+                  {projectId && shareUrl && (
+                    <ShareButton url={shareUrl} title={prompt} variant="light" />
                   )}
                   {projectId && (
                     <a
@@ -468,7 +573,12 @@ export default function BuilderClient({
           )}
 
           {!isLoading && !html && (
-            <div className="h-[750px] flex items-center justify-center text-black/30 text-sm px-8 text-center">
+            <div className="h-[750px] flex flex-col items-center justify-center text-black/30 text-sm px-8 text-center gap-3">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-20">
+                <rect x="3" y="3" width="18" height="18" rx="4" />
+                <path d="M3 15l4.5-4.5a2 2 0 012.8 0L15 15" />
+                <circle cx="9" cy="8.5" r="1.5" />
+              </svg>
               Your preview shows up here once you generate something.
             </div>
           )}

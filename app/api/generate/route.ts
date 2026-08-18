@@ -43,10 +43,24 @@ export async function POST(req: NextRequest) {
 
   let prompt = "";
   let previousHtml: string | null = null;
+  let image: string | undefined;
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
+    // Optional reference photo/illustration a user attaches to show the
+    // builder what they want, sent as a data: URL from BuilderClient's
+    // FileReader. Kept under a hard size cap here too (not just client
+    // side) since Vercel's serverless request body limit is ~4.5MB --
+    // an oversized image would otherwise fail the whole request with an
+    // opaque platform error instead of a clear message.
+    const rawImage = typeof body?.image === "string" ? body.image : undefined;
+    if (rawImage) {
+      if (!rawImage.startsWith("data:image/") || rawImage.length > 4_500_000) {
+        return Response.json({ error: "That image is too large or not a supported format." }, { status: 400 });
+      }
+      image = rawImage;
+    }
   } catch {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -72,8 +86,8 @@ export async function POST(req: NextRequest) {
 
       try {
         const result = previousHtml
-          ? await editWebsite(previousHtml, prompt, onStage)
-          : await generateWebsite(prompt, onStage);
+          ? await editWebsite(previousHtml, prompt, onStage, image)
+          : await generateWebsite(prompt, onStage, image);
 
         if (!result.ok) {
           const failure = result as Extract<typeof result, { ok: false }>;

@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import type { Metadata } from "next";
+import ShareButton from "@/app/components/ShareButton";
 
 // Public, no-auth live view of a saved build -- the real implementation of
 // what app/publish/page.tsx (no id) has been a placeholder for. Renders
@@ -87,12 +88,20 @@ export default async function PublishedProjectPage({
         className="flex-1 w-full border-0 bg-white"
         title={project.prompt}
       />
-      <div className="shrink-0 flex items-center justify-center gap-2 py-2 bg-black text-white/40 text-[11px]">
-        Built with
-        <a href="/" className="font-black text-white/70 hover:text-white">
-          GYSM<span className="text-fuchsia-500">.IO</span>
-        </a>
-        — describe an app, get a real one
+      <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-black text-white/40 text-[11px]">
+        <div className="flex items-center gap-2">
+          Built with
+          <a href="/" className="font-black text-white/70 hover:text-white">
+            GYSM<span className="text-fuchsia-500">.IO</span>
+          </a>
+          — describe an app, get a real one
+        </div>
+        <ShareButton
+          url={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/publish/${project.id}`}
+          title={project.prompt}
+          variant="dark"
+          dropUp
+        />
       </div>
     </div>
   );

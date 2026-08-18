@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import CommentSection from "./CommentSection";
+import ShareButton from "@/app/components/ShareButton";
 
 // Public detail view for one published BuildGuild app: full live preview
 // plus the discussion thread (see CommentSection, which talks to
@@ -75,13 +76,21 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
             />
           </div>
 
-          <div className="mt-6">
-            <h1 className="text-[26px] md:text-[32px] font-black tracking-tight">{app.title || "Untitled build"}</h1>
-            {app.tagline && <p className="mt-1.5 text-[15px] opacity-60">{app.tagline}</p>}
-            <p className="mt-3 text-[12px] opacity-40">
-              Published by {app.publisher_name || "a GYSM builder"} on{" "}
-              {new Date(app.published_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
-            </p>
+          <div className="mt-6 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[26px] md:text-[32px] font-black tracking-tight">{app.title || "Untitled build"}</h1>
+              {app.tagline && <p className="mt-1.5 text-[15px] opacity-60">{app.tagline}</p>}
+              <p className="mt-3 text-[12px] opacity-40">
+                Published by {app.publisher_name || "a GYSM builder"} on{" "}
+                {new Date(app.published_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+              </p>
+            </div>
+            <ShareButton
+              url={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/buildguild/${app.id}`}
+              title={app.title || "A build"}
+              variant="light"
+              className="shrink-0"
+            />
           </div>
         </div>
 
