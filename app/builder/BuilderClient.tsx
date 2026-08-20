@@ -436,37 +436,39 @@ export default function BuilderClient({
               </div>
             )}
 
-            <div className="flex gap-3">
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleImageChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
-                title="Attach a photo or illustration for reference"
-                className="h-[56px] w-[56px] shrink-0 grid place-items-center rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/10 disabled:opacity-40 transition"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                </svg>
-              </button>
-              <input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
-                placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
-                className="flex-1 h-[56px] bg-black rounded-full px-6 outline-none border border-white/10 focus:border-fuchsia-500/40 transition"
-                disabled={isLoading}
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex gap-3 min-w-0">
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  title="Attach a photo or illustration for reference"
+                  className="h-[48px] w-[48px] sm:h-[56px] sm:w-[56px] shrink-0 grid place-items-center rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/10 disabled:opacity-40 transition"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </button>
+                <input
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
+                  placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
+                  className="min-w-0 flex-1 h-[48px] sm:h-[56px] bg-black rounded-full px-5 sm:px-6 outline-none border border-white/10 focus:border-fuchsia-500/40 transition"
+                  disabled={isLoading}
+                />
+              </div>
               <button
                 onClick={() => generate()}
                 disabled={isLoading || !prompt.trim()}
-                className="h-[56px] px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0 hover:bg-fuchsia-50 transition"
+                className="w-full sm:w-auto h-[48px] sm:h-[56px] px-6 sm:px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0 hover:bg-fuchsia-50 transition"
               >
                 {isLoading ? "Building…" : html ? "Rebuild →" : "Generate →"}
               </button>

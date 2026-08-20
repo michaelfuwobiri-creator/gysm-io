@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { UserButton } from "@clerk/nextjs";
 import PublishButton from "./PublishButton";
+import DeleteButton from "./DeleteButton";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
@@ -89,6 +90,7 @@ export default async function DashboardPage() {
                   initialTitle={p.title || ""}
                   defaultTitle={p.prompt.slice(0, 80)}
                 />
+                <DeleteButton projectId={p.id} />
               </div>
             ))}
           </div>
