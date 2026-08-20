@@ -15,17 +15,22 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   try {
     const rows = await sql`
-      select prompt, html, name from projects where id = ${params.id} and user_id = ${user.id} limit 1
+      select prompt, html, name, org_id from projects
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
+      limit 1
     `;
     const src = rows[0] as any;
     if (!src) {
       return Response.json({ error: "Build not found." }, { status: 404 });
     }
 
+    // A duplicate stays with the same team the source belongs to (or
+    // becomes personal if the source was personal) -- copying a shared
+    // build shouldn't quietly strip it out of the team.
     const baseName = (src.name || src.prompt || "Untitled build").toString().slice(0, 110);
     const inserted = await sql`
-      insert into projects (user_id, prompt, html, name)
-      values (${user.id}, ${src.prompt}, ${src.html}, ${`${baseName} (copy)`})
+      insert into projects (user_id, prompt, html, name, org_id)
+      values (${user.id}, ${src.prompt}, ${src.html}, ${`${baseName} (copy)`}, ${src.org_id ?? null})
       returning id
     `;
     const newId = (inserted[0] as any)?.id;

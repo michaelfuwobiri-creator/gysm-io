@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import PublishButton from "./PublishButton";
 import DeleteButton from "./DeleteButton";
 import RenameButton from "./RenameButton";
@@ -25,14 +25,26 @@ export default async function DashboardPage() {
     redirect("/sign-in?redirect_url=/dashboard");
   }
 
+  // When the user has an org selected in the OrganizationSwitcher below,
+  // this shows that team's builds instead of their personal ones -- same
+  // switch-to-see-a-different-workspace behavior as any Clerk Orgs app.
+  // Switching back to "Personal account" shows exactly what this page
+  // always showed before teams existed.
   let list: any[] = [];
   try {
-    list = await sql`
-      select id, prompt, html, created_at, is_public, title, name, views from projects
-      where user_id = ${user.id} and root_project_id is null
-      order by created_at desc
-      limit 50
-    `;
+    list = user.orgId
+      ? await sql`
+          select id, prompt, html, created_at, is_public, title, name, views from projects
+          where org_id = ${user.orgId} and root_project_id is null
+          order by created_at desc
+          limit 50
+        `
+      : await sql`
+          select id, prompt, html, created_at, is_public, title, name, views from projects
+          where user_id = ${user.id} and org_id is null and root_project_id is null
+          order by created_at desc
+          limit 50
+        `;
   } catch (error: any) {
     console.error("[dashboard] failed to load projects:", error.message);
   }
@@ -40,9 +52,16 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">My Builds</h1>
+        <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold">{user.orgId ? "Team Builds" : "My Builds"}</h1>
           <div className="flex items-center gap-4">
+            <OrganizationSwitcher
+              afterCreateOrganizationUrl="/dashboard"
+              afterSelectOrganizationUrl="/dashboard"
+              afterSelectPersonalUrl="/dashboard"
+              afterLeaveOrganizationUrl="/dashboard"
+              appearance={{ elements: { organizationSwitcherTrigger: "text-white" } }}
+            />
             <a href="/buildguild" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
               BuildGuild
             </a>
@@ -55,7 +74,9 @@ export default async function DashboardPage() {
 
         {list.length === 0 ? (
           <div className="text-white/50 p-8 border border-dashed border-white/10 rounded-xl text-center">
-            No builds yet. Head to the builder and generate your first one.
+            {user.orgId
+              ? "No team builds yet. Generate one from the builder while this org is active, or ask a teammate to."
+              : "No builds yet. Head to the builder and generate your first one."}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

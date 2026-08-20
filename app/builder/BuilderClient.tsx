@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import ShareButton from "@/app/components/ShareButton";
 
 type Status = "idle" | "loading" | "error";
@@ -526,6 +526,15 @@ export default function BuilderClient({
             <a href="/dashboard" className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition">
               My Builds
             </a>
+            <div className="ml-1">
+              <OrganizationSwitcher
+                afterCreateOrganizationUrl="/dashboard"
+                afterSelectOrganizationUrl="/dashboard"
+                afterSelectPersonalUrl="/dashboard"
+                afterLeaveOrganizationUrl="/dashboard"
+                appearance={{ elements: { organizationSwitcherTrigger: "text-white" } }}
+              />
+            </div>
             <div className="ml-1">
               <UserButton afterSignOutUrl="/" />
             </div>

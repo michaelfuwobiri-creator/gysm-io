@@ -16,22 +16,35 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   try {
     const rootRows = await sql`
-      select coalesce(root_project_id, id) as root_id
+      select coalesce(root_project_id, id) as root_id, org_id
       from projects
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       limit 1
     `;
-    const rootId = (rootRows[0] as any)?.root_id;
+    const rootRow = rootRows[0] as any;
+    const rootId = rootRow?.root_id;
     if (!rootId) {
       return Response.json({ error: "Build not found." }, { status: 404 });
     }
 
-    const versions = await sql`
-      select id, prompt, created_at
-      from projects
-      where user_id = ${user.id} and (id = ${rootId} or root_project_id = ${rootId})
-      order by created_at asc
-    `;
+    // A team build's history is visible to the whole team (not just
+    // whoever made each individual edit) -- scoped by the chain's org_id
+    // rather than by which user made which version. A personal chain
+    // keeps the original per-user scoping.
+    const chainOrgId = rootRow.org_id ?? null;
+    const versions = chainOrgId
+      ? await sql`
+          select id, prompt, created_at
+          from projects
+          where (id = ${rootId} or root_project_id = ${rootId}) and org_id = ${chainOrgId}
+          order by created_at asc
+        `
+      : await sql`
+          select id, prompt, created_at
+          from projects
+          where (id = ${rootId} or root_project_id = ${rootId}) and user_id = ${user.id}
+          order by created_at asc
+        `;
     return Response.json({ versions });
   } catch (error: any) {
     console.error("[projects] failed to load history:", error.message);

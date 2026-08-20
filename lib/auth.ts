@@ -7,8 +7,21 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 // the login UI stopped writing to once the app moved to Clerk. That
 // mismatch was why signed-in users kept getting bounced back to a login
 // screen: this function was checking the wrong session.
-export async function getUser(): Promise<{ id: string; email: string | null; name: string | null } | null> {
-  const { userId } = await auth();
+export async function getUser(): Promise<{
+  id: string;
+  email: string | null;
+  name: string | null;
+  // Additive: the caller's active Clerk Organization, when they have one
+  // selected (see the OrganizationSwitcher in the dashboard/builder
+  // headers). null means "personal account" -- the same behavior every
+  // existing user already had before Organizations existed. Every route
+  // that scopes a query by user_id continues to work unchanged; routes
+  // that also want to allow org-shared access OR this in alongside
+  // user_id (see app/api/projects/[id]/* for the pattern).
+  orgId: string | null;
+  orgRole: string | null;
+} | null> {
+  const { userId, orgId, orgRole } = await auth();
   if (!userId) return null;
 
   const user = await currentUser();
@@ -22,5 +35,7 @@ export async function getUser(): Promise<{ id: string; email: string | null; nam
     // name, publisher name) -- falls back through Clerk's name fields to
     // the email's local part rather than ever showing a raw user_ id.
     name: fullName || user?.username || (email ? email.split("@")[0] : null),
+    orgId: orgId ?? null,
+    orgRole: orgRole ?? null,
   };
 }

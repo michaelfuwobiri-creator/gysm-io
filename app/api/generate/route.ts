@@ -144,15 +144,25 @@ export async function POST(req: NextRequest) {
         // group them; a fresh, non-edit generation leaves it null and
         // starts its own chain.
         let rootProjectId: string | null = null;
+        // Team builds (see db/migrations/0007, lib/auth.ts): an edit
+        // inherits the source build's org -- not necessarily whatever org
+        // happens to be active in the editor's session right now -- so a
+        // team build can't accidentally "go personal" just because a
+        // teammate had switched their Clerk org context when they opened
+        // it. A brand-new (non-edit) generation uses whatever org is
+        // active right now, same as every other "create" action.
+        let orgIdForSave: string | null = user.orgId;
         if (projectId) {
           try {
             const rootRows = await sql`
-              select coalesce(root_project_id, id) as root_id
+              select coalesce(root_project_id, id) as root_id, org_id
               from projects
-              where id = ${projectId} and user_id = ${user.id}
+              where id = ${projectId} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
               limit 1
             `;
-            rootProjectId = (rootRows[0] as any)?.root_id ?? null;
+            const rootRow = rootRows[0] as any;
+            rootProjectId = rootRow?.root_id ?? null;
+            if (rootRow) orgIdForSave = rootRow.org_id ?? null;
           } catch (error: any) {
             console.error("[generate] failed to resolve root project id:", error.message);
           }
@@ -163,8 +173,8 @@ export async function POST(req: NextRequest) {
         let newProjectId: string | null = null;
         try {
           const rows = await sql`
-            insert into projects (user_id, prompt, html, root_project_id)
-            values (${user.id}, ${prompt}, ${htmlToSave}, ${rootProjectId})
+            insert into projects (user_id, prompt, html, root_project_id, org_id)
+            values (${user.id}, ${prompt}, ${htmlToSave}, ${rootProjectId}, ${orgIdForSave})
             returning id
           `;
           newProjectId = (rows[0] as any)?.id ?? null;

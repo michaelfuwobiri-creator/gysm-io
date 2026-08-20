@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           tagline = ${tagline || null},
           publisher_name = ${user.name},
           published_at = now()
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       returning id
     `;
     if (rows.length === 0) {
@@ -58,7 +58,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     const rows = await sql`
       update projects
       set is_public = false
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       returning id
     `;
     if (rows.length === 0) {

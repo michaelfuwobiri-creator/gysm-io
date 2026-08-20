@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const rows = await sql`
       select id, prompt, html, name, root_project_id, created_at
       from projects
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       limit 1
     `;
     const project = rows[0] as any;
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const rows = await sql`
       update projects set name = ${name}
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       returning id
     `;
     if (rows.length === 0) {
@@ -81,13 +81,22 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
+    // For a team build, only its original creator or an org admin can
+    // delete it -- any member can rename/edit/duplicate it (see the
+    // PATCH handler above and generate/route.ts), but deletion is
+    // destructive for the whole team, not just the person clicking the
+    // button, so it gets a narrower check than the rest of this file.
     const rows = await sql`
       delete from projects
-      where id = ${params.id} and user_id = ${user.id}
+      where id = ${params.id}
+        and (
+          user_id = ${user.id}
+          or (org_id is not null and org_id = ${user.orgId} and ${user.orgRole === "org:admin"})
+        )
       returning id
     `;
     if (rows.length === 0) {
-      return Response.json({ error: "Build not found." }, { status: 404 });
+      return Response.json({ error: "Build not found, or you need to be an org admin to delete a teammate's build." }, { status: 404 });
     }
     return Response.json({ ok: true, id: params.id });
   } catch (error: any) {

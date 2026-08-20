@@ -8,9 +8,11 @@ import { addDomainToProject, getDomainStatus, removeDomainFromProject } from "@/
 // label. Good enough to reject junk before it ever reaches Vercel's API.
 const DOMAIN_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
 
-async function loadOwnedProject(id: string, userId: string) {
+async function loadOwnedProject(id: string, userId: string, orgId: string | null) {
   const rows = await sql`
-    select id, custom_domain, custom_domain_status from projects where id = ${id} and user_id = ${userId} limit 1
+    select id, custom_domain, custom_domain_status from projects
+    where id = ${id} and (user_id = ${userId} or (org_id is not null and org_id = ${orgId}))
+    limit 1
   `;
   return (rows[0] as any) ?? null;
 }
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!user) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   try {
-    const project = await loadOwnedProject(params.id, user.id);
+    const project = await loadOwnedProject(params.id, user.id, user.orgId);
     if (!project) return Response.json({ error: "Build not found." }, { status: 404 });
 
     const body = await req.json().catch(() => ({}));
@@ -57,7 +59,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!user) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   try {
-    const project = await loadOwnedProject(params.id, user.id);
+    const project = await loadOwnedProject(params.id, user.id, user.orgId);
     if (!project) return Response.json({ error: "Build not found." }, { status: 404 });
     if (!project.custom_domain) {
       return Response.json({ domain: null, status: "none" });
@@ -84,7 +86,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!user) return Response.json({ error: "Sign in required." }, { status: 401 });
 
   try {
-    const project = await loadOwnedProject(params.id, user.id);
+    const project = await loadOwnedProject(params.id, user.id, user.orgId);
     if (!project) return Response.json({ error: "Build not found." }, { status: 404 });
     if (!project.custom_domain) return Response.json({ ok: true });
 

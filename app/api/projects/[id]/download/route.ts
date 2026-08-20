@@ -14,7 +14,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   try {
     const rows = await sql`
-      select html, name, prompt from projects where id = ${params.id} and user_id = ${user.id} limit 1
+      select html, name, prompt from projects
+      where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
+      limit 1
     `;
     const project = rows[0] as any;
     if (!project) {
