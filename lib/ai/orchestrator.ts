@@ -37,6 +37,7 @@ HARD RULES:
 - Improve spacing, type scale, color harmony, visual hierarchy, and add tasteful hover/transition states -- using Tailwind utility classes only (same Tailwind CDN setup already in the document).
 - Do NOT change any element's id or any class name that the inline <script> references, and do NOT alter any JavaScript logic, variable names, or event handlers. The app must keep working exactly as it does now -- you are restyling it, not rebuilding it.
 - Do NOT remove content, sections, or functionality.
+- If the document contains an HTML comment block starting with <!-- GYSM_SCHEMA, copy it into your output byte-for-byte, unchanged, in the same position -- it is machine-parsed database schema, not visual markup, and must survive this pass exactly as given.
 - If you are not confident a change is safe, leave that part unchanged rather than risk breaking it.
 - Output ONLY the complete revised HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
 
@@ -59,6 +60,23 @@ HARD RULES:
 - Match the existing visual style (colors, type scale, button and card shapes) for anything you add or change, so it looks like it was designed alongside the rest, not bolted on.
 - If the requested change is ambiguous, make the most reasonable, tasteful interpretation rather than leaving it half-done -- there's no way to ask a follow-up here.
 - If a reference image is provided alongside the change request, use it as visual/content inspiration for that change.`;
+
+const BACKEND_SYSTEM_ADDENDUM = `
+REAL BACKEND -- this build has a connected Supabase project (the user's own, linked via "Connect database"). Use it for real data and real auth instead of localStorage or an in-memory array:
+- Load the Supabase client from CDN in <head>, before your inline <script>: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+- At the top of your inline <script>, initialize once with the EXACT values given to you below -- never invent placeholder URLs or keys: const sb = supabase.createClient("SUPABASE_URL_HERE", "SUPABASE_ANON_KEY_HERE");
+- Design a minimal Postgres schema for what this app actually needs to persist. Supabase Auth already manages its own users -- do not create your own users/accounts table, reference auth.uid() instead. Output the schema as one HTML comment immediately after the opening <body> tag, in exactly this format (valid Postgres DDL, every table with row level security enabled and policies scoping rows to auth.uid() for anything per-user):
+  <!-- GYSM_SCHEMA
+  create table if not exists ...;
+  alter table ... enable row level security;
+  create policy ... on ... for ... using (...);
+  GYSM_SCHEMA -->
+- Use sb.auth.signUp(...) / sb.auth.signInWithPassword(...) / sb.auth.signOut() for any sign-up, log-in, or log-out control. Use sb.from('table').select()/insert()/update()/delete() for any data the app stores or lists.
+- These calls are real network requests -- handle them properly: disable the triggering button while in flight, surface the actual returned error message on failure, only show a success state once the call actually resolves. No fake/instant success, no setTimeout-simulated saves.
+- If what's being built genuinely has nothing to persist or authenticate (e.g. a pure calculator, a static informational page), skip the schema block and the Supabase calls entirely -- only wire up what the app actually needs.
+`;
+
+export type BackendContext = { url: string; anonKey: string };
 
 export type BuildStage = "structure" | "structure_done" | "design" | "design_done";
 export type StageCallback = (stage: BuildStage) => void;
@@ -91,10 +109,11 @@ export type GenerateResult =
 export async function generateWebsite(
   prompt: string,
   onStage?: StageCallback,
-  imageDataUrl?: string
+  imageDataUrl?: string,
+  backendContext?: BackendContext
 ): Promise<GenerateResult> {
   onStage?.("structure");
-  const structure = await generateStructure(prompt, imageDataUrl);
+  const structure = await generateStructure(prompt, imageDataUrl, backendContext);
   if (!structure.ok) return structure;
   onStage?.("structure_done");
 
@@ -115,7 +134,8 @@ export async function editWebsite(
   existingHtml: string,
   instruction: string,
   onStage?: StageCallback,
-  imageDataUrl?: string
+  imageDataUrl?: string,
+  backendContext?: BackendContext
 ): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
@@ -125,7 +145,9 @@ export async function editWebsite(
   onStage?.("structure");
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const editText = `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}`;
+  const editText = backendContext
+    ? `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
+    : `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}`;
   const editUserContent: any = imageDataUrl
     ? [
         { type: "text", text: editText },
@@ -133,12 +155,14 @@ export async function editWebsite(
       ]
     : editText;
 
+  const editSystemPrompt = backendContext ? `${EDIT_SYSTEM_PROMPT}\n\n${BACKEND_SYSTEM_ADDENDUM}` : EDIT_SYSTEM_PROMPT;
+
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
       messages: [
-        { role: "system", content: EDIT_SYSTEM_PROMPT },
+        { role: "system", content: editSystemPrompt },
         { role: "user", content: editUserContent },
       ],
       max_completion_tokens: 16000,
@@ -165,7 +189,11 @@ export async function editWebsite(
   return { ok: true, html: polished };
 }
 
-async function generateStructure(prompt: string, imageDataUrl?: string): Promise<GenerateResult> {
+async function generateStructure(
+  prompt: string,
+  imageDataUrl?: string,
+  backendContext?: BackendContext
+): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
     return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
@@ -173,19 +201,25 @@ async function generateStructure(prompt: string, imageDataUrl?: string): Promise
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+  const structureText = backendContext
+    ? `${prompt}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
+    : prompt;
   const structureUserContent: any = imageDataUrl
     ? [
-        { type: "text", text: prompt },
+        { type: "text", text: structureText },
         { type: "image_url", image_url: { url: imageDataUrl } },
       ]
-    : prompt;
+    : structureText;
+  const structureSystemPrompt = backendContext
+    ? `${STRUCTURE_SYSTEM_PROMPT}\n\n${BACKEND_SYSTEM_ADDENDUM}`
+    : STRUCTURE_SYSTEM_PROMPT;
 
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-5.6-terra",
       messages: [
-        { role: "system", content: STRUCTURE_SYSTEM_PROMPT },
+        { role: "system", content: structureSystemPrompt },
         { role: "user", content: structureUserContent },
       ],
       max_completion_tokens: 16000,
@@ -253,4 +287,21 @@ function isCompleteHtmlDocument(html: string): boolean {
   if (!/<html[\s>]/i.test(html)) return false;
   if (!html.includes("</html>")) return false;
   return true;
+}
+
+const SCHEMA_COMMENT_RE = /<!--\s*GYSM_SCHEMA([\s\S]*?)GYSM_SCHEMA\s*-->/;
+
+/** Pulls the DDL out of a <!-- GYSM_SCHEMA ... GYSM_SCHEMA --> comment the
+ *  model emits when generating against a connected Supabase project (see
+ *  BACKEND_SYSTEM_ADDENDUM). Returns null if the build didn't need one. */
+export function extractSchemaSql(html: string): string | null {
+  const match = html.match(SCHEMA_COMMENT_RE);
+  return match ? match[1].trim() : null;
+}
+
+/** Removes the schema comment from the HTML actually shown/saved -- it's
+ *  build-time metadata for GYSM.IO's own provisioning step, not something
+ *  a user needs to see in "View source" or the code tab. */
+export function stripSchemaComment(html: string): string {
+  return html.replace(SCHEMA_COMMENT_RE, "").trim();
 }

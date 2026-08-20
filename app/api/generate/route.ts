@@ -2,8 +2,10 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/credits";
-import { generateWebsite, editWebsite, BuildStage } from "@/lib/ai/orchestrator";
+import { generateWebsite, editWebsite, BuildStage, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { buildSuggestions } from "@/lib/suggestions";
+import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
+import { runSql } from "@/lib/supabaseBackend";
 
 // This route runs two sequential AI calls (an OpenAI structure pass, then
 // a best-effort Gemini design pass) which can legitimately take 30-100+
@@ -44,10 +46,12 @@ export async function POST(req: NextRequest) {
   let prompt = "";
   let previousHtml: string | null = null;
   let image: string | undefined;
+  let projectId: string | undefined;
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
+    projectId = typeof body?.projectId === "string" && body.projectId ? body.projectId : undefined;
     // Optional reference photo/illustration a user attaches to show the
     // builder what they want, sent as a data: URL from BuilderClient's
     // FileReader. Kept under a hard size cap here too (not just client
@@ -85,9 +89,26 @@ export async function POST(req: NextRequest) {
       const onStage = (stage: BuildStage) => send({ type: "stage", stage });
 
       try {
+        // If this build already has an active "Connect database" link
+        // (see app/api/backend/*), the AI generates against the real
+        // Supabase project instead of mocked state -- see
+        // BACKEND_SYSTEM_ADDENDUM in lib/ai/orchestrator.ts.
+        let backendConnection: Awaited<ReturnType<typeof getConnection>> = null;
+        let backendContext: { url: string; anonKey: string } | undefined;
+        if (projectId) {
+          try {
+            backendConnection = await getConnection(projectId, user.id);
+            if (backendConnection?.status === "active" && backendConnection.api_url && backendConnection.anon_key) {
+              backendContext = { url: backendConnection.api_url, anonKey: backendConnection.anon_key };
+            }
+          } catch (error: any) {
+            console.error("[generate] backend connection lookup failed:", error.message);
+          }
+        }
+
         const result = previousHtml
-          ? await editWebsite(previousHtml, prompt, onStage, image)
-          : await generateWebsite(prompt, onStage, image);
+          ? await editWebsite(previousHtml, prompt, onStage, image, backendContext)
+          : await generateWebsite(prompt, onStage, image, backendContext);
 
         if (!result.ok) {
           const failure = result as Extract<typeof result, { ok: false }>;
@@ -108,24 +129,69 @@ export async function POST(req: NextRequest) {
 
         send({ type: "stage", stage: "saving" });
 
+        // Strip GYSM.IO's own build-time schema comment (if the model
+        // emitted one) before this ever reaches the user -- it's
+        // provisioning metadata, not something that belongs in "View
+        // source" or the code tab.
+        const schemaSql = extractSchemaSql(result.html);
+        const htmlToSave = schemaSql ? stripSchemaComment(result.html) : result.html;
+
         // Best-effort: a save failure shouldn't take away a build the user
         // already paid a credit for, but it's logged loudly so it's caught.
-        let projectId: string | null = null;
+        let newProjectId: string | null = null;
         try {
           const rows = await sql`
             insert into projects (user_id, prompt, html)
-            values (${user.id}, ${prompt}, ${result.html})
+            values (${user.id}, ${prompt}, ${htmlToSave})
             returning id
           `;
-          projectId = (rows[0] as any)?.id ?? null;
+          newProjectId = (rows[0] as any)?.id ?? null;
         } catch (error: any) {
           console.error("[generate] failed to save project:", error.message);
         }
 
+        // Edits always save as a new project row -- carry a database
+        // connection forward onto it instead of leaving it orphaned on
+        // the version it started on.
+        if (newProjectId && projectId && backendConnection && backendConnection.status !== "disconnected") {
+          try {
+            await relinkProjectId(projectId, newProjectId);
+          } catch (error: any) {
+            console.error("[generate] failed to relink backend connection:", error.message);
+          }
+        }
+
+        // Push the schema for a connected backend now that we know the
+        // (possibly relinked) project id it lives under.
+        if (schemaSql && backendConnection?.status === "active" && backendConnection.supabase_project_ref) {
+          const finalProjectId = newProjectId && projectId ? newProjectId : projectId;
+          try {
+            const token = await getValidAccessToken(backendConnection);
+            await runSql(token, backendConnection.supabase_project_ref, schemaSql);
+            if (finalProjectId && backendConnection.api_url && backendConnection.anon_key) {
+              await markActive(finalProjectId, {
+                apiUrl: backendConnection.api_url,
+                anonKey: backendConnection.anon_key,
+                schemaSql,
+              });
+            }
+          } catch (error: any) {
+            console.error("[generate] failed to push schema to Supabase:", error.message);
+            if (finalProjectId) {
+              try {
+                await markActive(finalProjectId, {
+                  apiUrl: backendConnection.api_url!,
+                  anonKey: backendConnection.anon_key!,
+                });
+              } catch {}
+            }
+          }
+        }
+
         send({
           type: "done",
-          html: result.html,
-          projectId,
+          html: htmlToSave,
+          projectId: newProjectId,
           suggestions: buildSuggestions(prompt),
         });
       } catch (err: any) {

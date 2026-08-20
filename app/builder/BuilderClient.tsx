@@ -66,6 +66,18 @@ export default function BuilderClient({
   const [imageError, setImageError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // "Connect database" -- links this build to a real Supabase project
+  // (the user's own, via OAuth) so it gets a real Postgres database and
+  // real auth instead of the mocked/in-memory state every build starts
+  // with. See app/api/backend/* and lib/backendStore.ts.
+  type BackendStatus = "none" | "connecting" | "provisioning" | "active" | "error" | "disconnected";
+  const [backend, setBackend] = useState<{
+    status: BackendStatus;
+    api_url?: string | null;
+    error_message?: string | null;
+  } | null>(null);
+  const [backendBanner, setBackendBanner] = useState<{ kind: "info" | "error"; text: string } | null>(null);
+
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -81,6 +93,70 @@ export default function BuilderClient({
       return () => clearTimeout(t);
     }
   }, [searchParams, router]);
+
+  // Landed back here from the Supabase OAuth callback
+  // (app/api/backend/callback/route.ts) -- surface the outcome, then
+  // strip the query params.
+  useEffect(() => {
+    const connecting = searchParams.get("backendConnecting");
+    const error = searchParams.get("backendError");
+    if (!connecting && !error) return;
+    if (connecting) setBackendBanner({ kind: "info", text: "Setting up your database\u2026" });
+    if (error) setBackendBanner({ kind: "error", text: error });
+    const dismiss = setTimeout(() => setBackendBanner(null), 6000);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("backendConnecting");
+    url.searchParams.delete("backendError");
+    router.replace(url.pathname + (url.search ? url.search : ""));
+    return () => clearTimeout(dismiss);
+  }, [searchParams, router]);
+
+  // Poll connection status while a project is loaded -- provisioning a
+  // fresh Supabase project takes roughly 1-2 minutes, so this keeps
+  // polling (every 4s) until it lands on active/error/none.
+  useEffect(() => {
+    if (!projectId) {
+      setBackend(null);
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/backend/status?projectId=${projectId}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setBackend(data);
+        if (data.status === "connecting" || data.status === "provisioning") {
+          timer = setTimeout(poll, 4000);
+        }
+      } catch {
+        // transient -- next mount/poll will retry
+      }
+    };
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [projectId]);
+
+  const connectDatabase = useCallback(() => {
+    if (!projectId) return;
+    window.location.href = `/api/backend/connect?projectId=${projectId}`;
+  }, [projectId]);
+
+  const disconnectDatabase = useCallback(async () => {
+    if (!projectId) return;
+    await fetch("/api/backend/disconnect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId }),
+    });
+    setBackend({ status: "disconnected" });
+  }, [projectId]);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
   // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
@@ -148,6 +224,7 @@ export default function BuilderClient({
             prompt: p,
             previousHtml: opts?.asEdit ? html : undefined,
             image: imageDataUrl ?? undefined,
+            projectId: opts?.asEdit ? projectId : undefined,
           }),
         });
 
@@ -279,6 +356,15 @@ export default function BuilderClient({
       {copied && (
         <div className="fixed top-4 right-4 z-50 bg-white text-black px-4 py-2 rounded-full text-sm font-bold shadow-lg">
           Copied code to clipboard
+        </div>
+      )}
+      {backendBanner && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
+            backendBanner.kind === "error" ? "bg-red-500 text-white" : "bg-emerald-500 text-black"
+          }`}
+        >
+          {backendBanner.text}
         </div>
       )}
 
@@ -482,6 +568,43 @@ export default function BuilderClient({
                   )}
                   {projectId && shareUrl && (
                     <ShareButton url={shareUrl} title={prompt} variant="light" />
+                  )}
+                  {projectId && (
+                    <div className="relative group">
+                      {(!backend || backend.status === "none" || backend.status === "disconnected") && (
+                        <button
+                          onClick={connectDatabase}
+                          className="px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-600/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition"
+                        >
+                          Connect database
+                        </button>
+                      )}
+                      {(backend?.status === "connecting" || backend?.status === "provisioning") && (
+                        <span className="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-500/30 text-amber-700 bg-amber-50 inline-flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Setting up database…
+                        </span>
+                      )}
+                      {backend?.status === "active" && (
+                        <button
+                          onClick={disconnectDatabase}
+                          title="Click to disconnect"
+                          className="px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-600/30 text-emerald-700 bg-emerald-50 inline-flex items-center gap-1.5"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Database connected
+                        </button>
+                      )}
+                      {backend?.status === "error" && (
+                        <button
+                          onClick={connectDatabase}
+                          title={backend.error_message || "Try again"}
+                          className="px-3 py-1.5 rounded-full text-xs font-bold border border-red-500/30 text-red-700 bg-red-50 hover:bg-red-100 transition"
+                        >
+                          Database failed — retry
+                        </button>
+                      )}
+                    </div>
                   )}
                   {projectId && (
                     <a

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function PricingPage({
   searchParams,
 }: {
-  searchParams: { reason?: string; canceled?: string };
+  searchParams: { reason?: string; canceled?: string; upsell?: string };
 }) {
   const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time");
   const monthly = PRICING_PLANS.filter((p) => p.interval === "month");
@@ -39,6 +39,11 @@ export default function PricingPage({
         {searchParams.canceled === "true" && (
           <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
             Checkout canceled — no charge was made.
+          </div>
+        )}
+        {searchParams.upsell === "connect_database" && (
+          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm">
+            "Connect database" links a build to your own Supabase project for real data and real auth — available on any monthly plan below.
           </div>
         )}
 
