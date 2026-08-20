@@ -19,10 +19,15 @@ import BuilderClient from "./BuilderClient";
 // instead of overwriting the shared template row. Lookup is intentionally
 // not scoped to user_id: templates are curated site-wide (see
 // app/api/projects/[id]/template), not personal builds.
+//
+// ?prompt=<text> is a plain deep-link: prefills the prompt box only, never
+// auto-submits (no surprise credit spend) and never touches initialHtml/
+// initialProjectId. Used by the "Build on GYSM.IO" links from the Chrome
+// extension (and anywhere else that wants to hand off a starting prompt).
 export default async function BuilderPage({
   searchParams,
 }: {
-  searchParams: { projectId?: string; template?: string };
+  searchParams: { projectId?: string; template?: string; prompt?: string };
 }) {
   let initialHtml: string | null = null;
   let initialPrompt = "";
@@ -66,6 +71,8 @@ export default async function BuilderPage({
     } catch (error: any) {
       console.error("[builder] failed to load template:", error.message);
     }
+  } else if (searchParams?.prompt) {
+    initialPrompt = searchParams.prompt;
   }
 
   return (
