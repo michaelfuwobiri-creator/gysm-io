@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { hasActiveSubscription } from "@/lib/credits";
+import { hasActiveSubscription, getCreditBalance } from "@/lib/credits";
 import { generatePkce, buildAuthorizeUrl, isBackendConnectConfigured } from "@/lib/supabaseBackend";
 import { encryptSecret } from "@/lib/crypto";
 import { randomUUID } from "crypto";
@@ -36,8 +36,16 @@ export async function GET(req: NextRequest) {
   // "Connect database" turns a mocked build into a real one -- gated to
   // paid plans (the value being sold is the unlock, not hosted infra:
   // the user's own free-tier Supabase project covers the database).
-  const subscribed = await hasActiveSubscription(user.id);
-  if (!subscribed) {
+  // "Paid" means either an active monthly subscription OR a positive
+  // credit balance (pay-as-you-go packs) -- getCreditBalance only
+  // returns >0 after a real Stripe purchase (see addCredits, called
+  // solely from the checkout/renewal webhook), so this can't be
+  // satisfied by an unpaid free-tier account.
+  const [subscribed, creditBalance] = await Promise.all([
+    hasActiveSubscription(user.id),
+    getCreditBalance(user.id),
+  ]);
+  if (!subscribed && creditBalance <= 0) {
     return NextResponse.redirect(`${siteUrl}/pricing?upsell=connect_database`);
   }
 
