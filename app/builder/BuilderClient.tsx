@@ -89,6 +89,20 @@ export default function BuilderClient({
   const [historyVersions, setHistoryVersions] = useState<HistoryVersion[]>([]);
   const [historyError, setHistoryError] = useState("");
 
+  // Custom domain -- lets a user point a domain they own at this build
+  // (see db/migrations/0006, app/api/projects/[id]/domain/route.ts,
+  // lib/vercelDomains.ts, and middleware.ts for the request-routing side).
+  type DomainState = {
+    domain: string | null;
+    status: "none" | "pending" | "verified";
+    verification: { type: string; domain: string; value: string }[];
+  };
+  const [domainOpen, setDomainOpen] = useState(false);
+  const [domainState, setDomainState] = useState<DomainState>({ domain: null, status: "none", verification: [] });
+  const [domainInput, setDomainInput] = useState("");
+  const [domainLoading, setDomainLoading] = useState(false);
+  const [domainError, setDomainError] = useState("");
+
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -208,6 +222,65 @@ export default function BuilderClient({
       setHistoryError(e?.message || "Failed to load that version.");
     }
   }, []);
+
+  const toggleDomainPanel = useCallback(async () => {
+    if (!projectId) return;
+    if (domainOpen) {
+      setDomainOpen(false);
+      return;
+    }
+    setDomainOpen(true);
+    setDomainError("");
+    setDomainLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/domain`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load domain status.");
+      setDomainState({ domain: data.domain, status: data.status, verification: data.verification || [] });
+      if (data.domain) setDomainInput(data.domain);
+    } catch (e: any) {
+      setDomainError(e?.message || "Failed to load domain status.");
+    } finally {
+      setDomainLoading(false);
+    }
+  }, [projectId, domainOpen]);
+
+  const connectDomain = useCallback(async () => {
+    if (!projectId || !domainInput.trim()) return;
+    setDomainLoading(true);
+    setDomainError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/domain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: domainInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to connect domain.");
+      setDomainState({ domain: data.domain, status: data.verified ? "verified" : "pending", verification: data.verification || [] });
+    } catch (e: any) {
+      setDomainError(e?.message || "Failed to connect domain.");
+    } finally {
+      setDomainLoading(false);
+    }
+  }, [projectId, domainInput]);
+
+  const disconnectDomain = useCallback(async () => {
+    if (!projectId) return;
+    setDomainLoading(true);
+    setDomainError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/domain`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to disconnect domain.");
+      setDomainState({ domain: null, status: "none", verification: [] });
+      setDomainInput("");
+    } catch (e: any) {
+      setDomainError(e?.message || "Failed to disconnect domain.");
+    } finally {
+      setDomainLoading(false);
+    }
+  }, [projectId]);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
   // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
@@ -633,6 +706,22 @@ export default function BuilderClient({
                     </button>
                   )}
                   {projectId && (
+                    <button
+                      onClick={toggleDomainPanel}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                        domainOpen
+                          ? "bg-black text-white border-black"
+                          : domainState.status === "verified"
+                          ? "border-emerald-600/30 text-emerald-700 bg-emerald-50"
+                          : domainState.status === "pending"
+                          ? "border-amber-500/30 text-amber-700 bg-amber-50"
+                          : "border-black/15 text-black/70 hover:bg-black/5"
+                      }`}
+                    >
+                      {domainState.status === "verified" ? "Domain connected" : domainState.status === "pending" ? "Domain pending" : "Custom domain"}
+                    </button>
+                  )}
+                  {projectId && (
                     <div className="relative group">
                       {(!backend || backend.status === "none" || backend.status === "disconnected") && (
                         <button
@@ -740,6 +829,72 @@ export default function BuilderClient({
               {published && (
                 <div className="px-4 py-2.5 bg-emerald-50 border-b border-black/10 text-emerald-700 text-[12px] font-semibold">
                   Live on BuildGuild — anyone can view and comment on it now.
+                </div>
+              )}
+
+              {domainOpen && (
+                <div className="px-4 py-4 bg-zinc-50 border-b border-black/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-2">
+                    Custom domain
+                  </div>
+                  {domainError && <p className="text-[12px] text-red-600 mb-2">{domainError}</p>}
+                  {!domainState.domain && (
+                    <div className="flex gap-2">
+                      <input
+                        value={domainInput}
+                        onChange={(e) => setDomainInput(e.target.value)}
+                        placeholder="myapp.com"
+                        className="flex-1 h-10 px-4 rounded-full border border-black/10 text-black text-[13px] outline-none"
+                      />
+                      <button
+                        onClick={connectDomain}
+                        disabled={!domainInput.trim() || domainLoading}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold bg-black text-white disabled:opacity-40"
+                      >
+                        {domainLoading ? "Connecting…" : "Connect"}
+                      </button>
+                    </div>
+                  )}
+                  {domainState.domain && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[13px] font-semibold text-black">{domainState.domain}</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={toggleDomainPanel}
+                            disabled={domainLoading}
+                            className="text-[12px] text-black/50 hover:text-black underline"
+                          >
+                            Refresh status
+                          </button>
+                          <button
+                            onClick={disconnectDomain}
+                            disabled={domainLoading}
+                            className="text-[12px] text-red-600 hover:text-red-700 underline"
+                          >
+                            Disconnect
+                          </button>
+                        </div>
+                      </div>
+                      {domainState.status === "verified" ? (
+                        <p className="text-[12px] text-emerald-700">Verified -- this domain now serves this build.</p>
+                      ) : (
+                        <div className="text-[12px] text-black/60 flex flex-col gap-2">
+                          <p>Not verified yet. Add this DNS record at your domain registrar, then click Refresh status:</p>
+                          {domainState.verification.map((v, i) => (
+                            <div key={i} className="bg-white border border-black/10 rounded-lg px-3 py-2 font-mono text-[11px] text-black/80">
+                              <div>Type: {v.type}</div>
+                              <div>Name: {v.domain}</div>
+                              <div className="break-all">Value: {v.value}</div>
+                            </div>
+                          ))}
+                          {domainState.verification.length === 0 && (
+                            <p>Checking verification requirements…</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
