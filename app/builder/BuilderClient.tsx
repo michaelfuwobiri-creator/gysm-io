@@ -30,12 +30,14 @@ type Props = {
   initialHtml?: string | null;
   initialPrompt?: string;
   initialProjectId?: string | null;
+  isAdmin?: boolean;
 };
 
 export default function BuilderClient({
   initialHtml = null,
   initialPrompt = "",
   initialProjectId = null,
+  isAdmin = false,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,6 +104,14 @@ export default function BuilderClient({
   const [domainInput, setDomainInput] = useState("");
   const [domainLoading, setDomainLoading] = useState(false);
   const [domainError, setDomainError] = useState("");
+
+  // Admin-only template curation (see app/api/projects/[id]/template) --
+  // lets Mike flag a build as a public /templates gallery entry. Hidden
+  // entirely for non-admins; isAdmin comes from the server (lib/isAdmin)
+  // since it's derived from the signed-in user's email, not something the
+  // client should decide on its own.
+  const [isTemplate, setIsTemplate] = useState(false);
+  const [templateLoading, setTemplateLoading] = useState(false);
 
   const lastPromptRef = useRef("");
 
@@ -281,6 +291,48 @@ export default function BuilderClient({
       setDomainLoading(false);
     }
   }, [projectId]);
+
+  // Load current is_template state whenever the open build changes, so the
+  // toggle reflects reality instead of always starting unfeatured.
+  useEffect(() => {
+    if (!isAdmin || !projectId) {
+      setIsTemplate(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/template`);
+        const data = await res.json();
+        if (!cancelled && res.ok) setIsTemplate(Boolean(data.isTemplate));
+      } catch {
+        // non-critical -- toggle just won't reflect state until next load
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, projectId]);
+
+  const toggleTemplate = useCallback(async () => {
+    if (!projectId || templateLoading) return;
+    const next = !isTemplate;
+    setTemplateLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/template`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featured: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to update template status.");
+      setIsTemplate(Boolean(data.isTemplate));
+    } catch {
+      // leave state unchanged on failure
+    } finally {
+      setTemplateLoading(false);
+    }
+  }, [projectId, isTemplate, templateLoading]);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
   // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
@@ -712,6 +764,19 @@ export default function BuilderClient({
                       }`}
                     >
                       History
+                    </button>
+                  )}
+                  {projectId && isAdmin && (
+                    <button
+                      onClick={toggleTemplate}
+                      disabled={templateLoading}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition disabled:opacity-40 ${
+                        isTemplate
+                          ? "border-fuchsia-600/30 text-fuchsia-700 bg-fuchsia-50"
+                          : "border-black/15 text-black/70 hover:bg-black/5"
+                      }`}
+                    >
+                      {isTemplate ? "Featured as template" : "Feature as template"}
                     </button>
                   )}
                   {projectId && (
