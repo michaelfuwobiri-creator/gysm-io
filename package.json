@@ -11,7 +11,7 @@
   "dependencies": {
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
-    "@clerk/nextjs": "^5.7.5",
+    "@clerk/nextjs": "^6.39.6",
     "@google/genai": "^2.17.1",
     "@neondatabase/serverless": "^1.1.0",
     "@revenuecat/purchases-capacitor": "^13.4.0",
