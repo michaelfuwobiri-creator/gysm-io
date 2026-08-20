@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
 
 // Shared renderer for the 4 curated /templates/<slug> landing pages
@@ -16,6 +17,10 @@ type Props = {
 };
 
 export default async function TemplateLandingPage({ id, eyebrow, title, description }: Props) {
+  // See app/templates/page.tsx for why this is needed -- a plain server
+  // component doing a DB read (no cookies/headers call) can otherwise get
+  // prerendered once at build time and keep serving that stale shell.
+  noStore();
   let html: string | null = null;
   try {
     const rows = await sql`
