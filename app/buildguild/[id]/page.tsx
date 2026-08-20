@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import CommentSection from "./CommentSection";
 import ShareButton from "@/app/components/ShareButton";
+import RemixButton from "./RemixButton";
 
 // Public detail view for one published BuildGuild app: full live preview
 // plus the discussion thread (see CommentSection, which talks to
@@ -85,12 +86,14 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
                 {new Date(app.published_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
               </p>
             </div>
-            <ShareButton
-              url={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/buildguild/${app.id}`}
-              title={app.title || "A build"}
-              variant="light"
-              className="shrink-0"
-            />
+            <div className="shrink-0 flex items-center gap-2">
+              <ShareButton
+                url={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/buildguild/${app.id}`}
+                title={app.title || "A build"}
+                variant="light"
+              />
+              <RemixButton projectId={app.id} />
+            </div>
           </div>
         </div>
 

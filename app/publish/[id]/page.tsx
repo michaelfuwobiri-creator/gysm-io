@@ -14,18 +14,44 @@ import ShareButton from "@/app/components/ShareButton";
 // as its own app -- distinct name/icon -- instead of a GYSM.IO bookmark.
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   let title = "GYSM App";
+  let tagline: string | null = null;
   try {
-    const rows = await sql`select title, prompt from projects where id = ${params.id} limit 1`;
+    const rows = await sql`select title, tagline, prompt from projects where id = ${params.id} limit 1`;
     const project = rows[0] as any;
-    if (project) title = project.title || project.prompt || title;
+    if (project) {
+      title = project.title || project.prompt || title;
+      tagline = project.tagline || null;
+    }
   } catch {
     // Non-critical -- fall back to a generic title.
   }
 
+  // Reuses the same title/tagline BuildGuild publishing already collects
+  // (see app/api/projects/[id]/publish/route.ts) as this page's SEO
+  // description and Open Graph/Twitter card, so a shared link to any
+  // published build looks right in Slack/iMessage/Twitter previews
+  // instead of falling back to generic site-wide copy.
+  const description = tagline || `${title} -- an app built with GYSM.IO. Describe an app, get a real one.`;
+  const url = `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/publish/${params.id}`;
+
   return {
     title: `${title} — built with GYSM.IO`,
+    description,
     manifest: `/publish/${params.id}/manifest.webmanifest`,
     appleWebApp: { capable: true, statusBarStyle: "black-translucent", title },
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${title} — built with GYSM.IO`,
+      description,
+      url,
+      siteName: "GYSM.IO",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} — built with GYSM.IO`,
+      description,
+    },
   };
 }
 
@@ -43,6 +69,15 @@ export default async function PublishedProjectPage({
         select id, prompt, html from projects where id = ${params.id} limit 1
       `;
       project = (rows[0] as any) ?? null;
+      // Best-effort view count -- fire-and-forget, never blocks or fails
+      // the page render. Simple per-load counter, not deduped per visitor;
+      // good enough to show "this build gets traffic" on the dashboard
+      // without standing up a real analytics pipeline.
+      if (project) {
+        sql`update projects set views = views + 1 where id = ${params.id}`.catch((error: any) => {
+          console.error("[publish] failed to bump view count:", error.message);
+        });
+      }
     } catch (error: any) {
       console.error("[publish] failed to load project:", error.message);
     }

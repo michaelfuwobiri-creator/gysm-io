@@ -136,13 +136,35 @@ export async function POST(req: NextRequest) {
         const schemaSql = extractSchemaSql(result.html);
         const htmlToSave = schemaSql ? stripSchemaComment(result.html) : result.html;
 
+        // Edits (asEdit-driven, previousHtml + projectId both present)
+        // always save as a NEW row rather than updating in place -- see
+        // the comment above result assignment. root_project_id links
+        // that new row back to the first row in its chain so the
+        // builder's History panel (GET /api/projects/[id]/history) can
+        // group them; a fresh, non-edit generation leaves it null and
+        // starts its own chain.
+        let rootProjectId: string | null = null;
+        if (projectId) {
+          try {
+            const rootRows = await sql`
+              select coalesce(root_project_id, id) as root_id
+              from projects
+              where id = ${projectId} and user_id = ${user.id}
+              limit 1
+            `;
+            rootProjectId = (rootRows[0] as any)?.root_id ?? null;
+          } catch (error: any) {
+            console.error("[generate] failed to resolve root project id:", error.message);
+          }
+        }
+
         // Best-effort: a save failure shouldn't take away a build the user
         // already paid a credit for, but it's logged loudly so it's caught.
         let newProjectId: string | null = null;
         try {
           const rows = await sql`
-            insert into projects (user_id, prompt, html)
-            values (${user.id}, ${prompt}, ${htmlToSave})
+            insert into projects (user_id, prompt, html, root_project_id)
+            values (${user.id}, ${prompt}, ${htmlToSave}, ${rootProjectId})
             returning id
           `;
           newProjectId = (rows[0] as any)?.id ?? null;

@@ -78,6 +78,17 @@ export default function BuilderClient({
   } | null>(null);
   const [backendBanner, setBackendBanner] = useState<{ kind: "info" | "error"; text: string } | null>(null);
 
+  // Version history -- every edit made via a suggestion chip saves as a
+  // new project row chained back to this build's root (see
+  // db/migrations/0004 and app/api/generate/route.ts). This panel lists
+  // that chain so a user can jump back to an earlier version instead of
+  // only ever being able to move forward.
+  type HistoryVersion = { id: string; prompt: string; created_at: string };
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyVersions, setHistoryVersions] = useState<HistoryVersion[]>([]);
+  const [historyError, setHistoryError] = useState("");
+
   const lastPromptRef = useRef("");
 
   // Toast after a successful Stripe redirect (?builder?success=true), then
@@ -157,6 +168,46 @@ export default function BuilderClient({
     });
     setBackend({ status: "disconnected" });
   }, [projectId]);
+
+  const toggleHistory = useCallback(async () => {
+    if (!projectId) return;
+    if (historyOpen) {
+      setHistoryOpen(false);
+      return;
+    }
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/history`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load history.");
+      setHistoryVersions(Array.isArray(data.versions) ? data.versions : []);
+    } catch (e: any) {
+      setHistoryError(e?.message || "Failed to load history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [projectId, historyOpen]);
+
+  // Jump the builder to an earlier version -- doesn't delete or overwrite
+  // anything; it just loads that version's saved html/prompt into view.
+  // Editing from there saves a new row chained to the same root, same as
+  // editing from the latest version would.
+  const openVersion = useCallback(async (versionId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${versionId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load that version.");
+      setHtml(data.html);
+      setPrompt(data.prompt || "");
+      setProjectId(data.id);
+      setView("preview");
+      setHistoryOpen(false);
+    } catch (e: any) {
+      setHistoryError(e?.message || "Failed to load that version.");
+    }
+  }, []);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
   // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
@@ -572,6 +623,16 @@ export default function BuilderClient({
                     <ShareButton url={shareUrl} title={prompt} variant="light" />
                   )}
                   {projectId && (
+                    <button
+                      onClick={toggleHistory}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                        historyOpen ? "bg-black text-white border-black" : "border-black/15 text-black/70 hover:bg-black/5"
+                      }`}
+                    >
+                      History
+                    </button>
+                  )}
+                  {projectId && (
                     <div className="relative group">
                       {(!backend || backend.status === "none" || backend.status === "disconnected") && (
                         <button
@@ -679,6 +740,41 @@ export default function BuilderClient({
               {published && (
                 <div className="px-4 py-2.5 bg-emerald-50 border-b border-black/10 text-emerald-700 text-[12px] font-semibold">
                   Live on BuildGuild — anyone can view and comment on it now.
+                </div>
+              )}
+
+              {historyOpen && (
+                <div className="px-4 py-4 bg-zinc-50 border-b border-black/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-2">
+                    Version history
+                  </div>
+                  {historyLoading && <p className="text-[13px] text-black/50">Loading…</p>}
+                  {historyError && <p className="text-[12px] text-red-600">{historyError}</p>}
+                  {!historyLoading && !historyError && historyVersions.length === 0 && (
+                    <p className="text-[13px] text-black/50">No earlier versions yet -- edits you make will show up here.</p>
+                  )}
+                  <div className="flex flex-col gap-1.5 max-h-[280px] overflow-y-auto">
+                    {historyVersions
+                      .slice()
+                      .reverse()
+                      .map((v) => (
+                        <button
+                          key={v.id}
+                          onClick={() => openVersion(v.id)}
+                          className={`text-left px-3 py-2 rounded-lg border text-[13px] transition ${
+                            v.id === projectId
+                              ? "border-black bg-white font-semibold text-black"
+                              : "border-black/10 bg-white/60 text-black/70 hover:bg-white"
+                          }`}
+                        >
+                          <div className="line-clamp-1">{v.prompt}</div>
+                          <div className="text-[11px] text-black/40 mt-0.5">
+                            {new Date(v.created_at).toLocaleString()}
+                            {v.id === projectId ? " • currently viewing" : ""}
+                          </div>
+                        </button>
+                      ))}
+                  </div>
                 </div>
               )}
 
