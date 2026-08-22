@@ -64,12 +64,12 @@ export default function RenameButton({ projectId, initialName }: Props) {
             }}
             maxLength={120}
             autoFocus
-            className="flex-1 h-8 px-3 rounded-lg bg-black border border-white/15 text-xs outline-none focus:border-fuchsia-500/40"
+            className="flex-1 h-8 px-3 rounded-lg bg-white border border-black/15 text-xs outline-none focus:border-fuchsia-500/40"
           />
           <button
             onClick={save}
             disabled={saving}
-            className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-bold disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg bg-black text-white text-xs font-bold disabled:opacity-40"
           >
             {saving ? "…" : "Save"}
           </button>
@@ -80,19 +80,19 @@ export default function RenameButton({ projectId, initialName }: Props) {
               setError("");
             }}
             disabled={saving}
-            className="px-3 py-1.5 rounded-lg border border-white/15 text-xs font-bold disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg border border-black/15 text-xs font-bold disabled:opacity-40"
           >
             Cancel
           </button>
         </div>
-        {error && <p className="text-[11px] text-red-400">{error}</p>}
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
       </div>
     );
   }
 
   return (
     <button onClick={() => setEditing(true)} className="text-left" title="Click to rename">
-      <span className="font-medium line-clamp-2 hover:underline decoration-white/30">{initialName}</span>
+      <span className="font-medium line-clamp-2 hover:underline decoration-black/20">{initialName}</span>
     </button>
   );
 }

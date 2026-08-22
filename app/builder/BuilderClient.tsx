@@ -611,12 +611,12 @@ export default function BuilderClient({
     projectId && typeof window !== "undefined" ? `${window.location.origin}/publish/${projectId}` : "";
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] relative overflow-x-hidden">
       {/* Soft ambient glow behind the whole page -- same violet/fuchsia
           identity as the marketing site, so the builder doesn't feel like
           a separate, plainer tool bolted onto a polished landing page. */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full bg-gradient-to-r from-violet-600/10 to-fuchsia-600/10 blur-[120px]" />
       </div>
 
       {showToast && (
@@ -640,7 +640,7 @@ export default function BuilderClient({
       )}
 
       <div className="max-w-6xl mx-auto p-6 relative">
-        <div className="flex justify-between items-center py-4 border-b border-white/10 mb-8">
+        <div className="flex justify-between items-center py-4 border-b border-black/10 mb-8">
           <h1 className="text-2xl font-black">
             GYSM<span className="text-fuchsia-500">.IO</span>
           </h1>
@@ -662,15 +662,15 @@ export default function BuilderClient({
                   setImageDataUrl(null);
                   setImageError("");
                 }}
-                className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition"
+                className="text-[12px] font-medium text-black/50 hover:text-black hover:bg-black/[0.05] px-3 py-1.5 rounded-full transition"
               >
                 New build
               </button>
             )}
-            <a href="/buildguild" className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition">
+            <a href="/buildguild" className="text-[12px] font-medium text-black/50 hover:text-black hover:bg-black/[0.05] px-3 py-1.5 rounded-full transition">
               BuildGuild
             </a>
-            <a href="/dashboard" className="text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-full transition">
+            <a href="/dashboard" className="text-[12px] font-medium text-black/50 hover:text-black hover:bg-black/[0.05] px-3 py-1.5 rounded-full transition">
               My Builds
             </a>
             <div className="ml-1">
@@ -679,7 +679,7 @@ export default function BuilderClient({
                 afterSelectOrganizationUrl="/dashboard"
                 afterSelectPersonalUrl="/dashboard"
                 afterLeaveOrganizationUrl="/dashboard"
-                appearance={{ elements: { organizationSwitcherTrigger: "text-white" } }}
+                appearance={{ elements: { organizationSwitcherTrigger: "text-black" } }}
               />
             </div>
             <div className="ml-1">
@@ -690,25 +690,25 @@ export default function BuilderClient({
 
         {!html && !isLoading && (
           <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-400/90 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
               Prompt to product
             </div>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05]">
               What do you want to{" "}
-              <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">build</span>?
+              <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">build</span>?
             </h2>
           </div>
         )}
 
         <div className="relative rounded-[26px] p-[1.5px] bg-gradient-to-r from-violet-600/40 via-fuchsia-500/40 to-violet-600/40">
-          <div className="bg-[#0A0A0A] border border-white/5 rounded-[24.5px] p-4 flex flex-col gap-3">
+          <div className="bg-white border border-black/5 rounded-[24.5px] p-4 flex flex-col gap-3 shadow-sm">
             {imageDataUrl && (
-              <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 rounded-2xl px-3 py-2 self-start">
+              <div className="flex items-center gap-3 bg-black/[0.03] border border-black/10 rounded-2xl px-3 py-2 self-start">
                 <img src={imageDataUrl} alt="Attached reference" className="w-12 h-12 rounded-xl object-cover" />
-                <span className="text-[12px] text-white/50">Reference image attached</span>
+                <span className="text-[12px] text-black/50">Reference image attached</span>
                 <button
                   onClick={() => setImageDataUrl(null)}
-                  className="text-white/40 hover:text-white text-[13px] font-bold px-2"
+                  className="text-black/40 hover:text-black text-[13px] font-bold px-2"
                   aria-label="Remove attached image"
                 >
                   ✕
@@ -730,7 +730,7 @@ export default function BuilderClient({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isLoading}
                   title="Attach a photo or illustration for reference"
-                  className="h-[48px] w-[48px] sm:h-[56px] sm:w-[56px] shrink-0 grid place-items-center rounded-full bg-white/[0.06] border border-white/10 hover:bg-white/10 disabled:opacity-40 transition"
+                  className="h-[48px] w-[48px] sm:h-[56px] sm:w-[56px] shrink-0 grid place-items-center rounded-full bg-black/[0.04] border border-black/10 hover:bg-black/[0.08] disabled:opacity-40 transition"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
@@ -741,7 +741,7 @@ export default function BuilderClient({
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && generate()}
                   placeholder="What do you want to build? e.g. a food delivery app with 6 dishes"
-                  className="min-w-0 flex-1 h-[48px] sm:h-[56px] bg-black rounded-full px-5 sm:px-6 outline-none border border-white/10 focus:border-fuchsia-500/40 transition"
+                  className="min-w-0 flex-1 h-[48px] sm:h-[56px] bg-white rounded-full px-5 sm:px-6 outline-none border border-black/10 focus:border-fuchsia-500/40 transition"
                   disabled={isLoading}
                 />
               </div>
@@ -754,7 +754,7 @@ export default function BuilderClient({
                   className={`h-[48px] w-[48px] sm:h-[56px] sm:w-[56px] shrink-0 grid place-items-center rounded-full border transition disabled:opacity-40 ${
                     isRecording
                       ? "bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300 animate-pulse"
-                      : "bg-white/[0.06] border-white/10 hover:bg-white/10"
+                      : "bg-black/[0.04] border-black/10 hover:bg-black/[0.08]"
                   }`}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -767,27 +767,27 @@ export default function BuilderClient({
               <button
                 onClick={() => generate()}
                 disabled={isLoading || !prompt.trim()}
-                className="w-full sm:w-auto h-[48px] sm:h-[56px] px-6 sm:px-8 rounded-full bg-white text-black font-black disabled:opacity-40 shrink-0 hover:bg-fuchsia-50 transition"
+                className="w-full sm:w-auto h-[48px] sm:h-[56px] px-6 sm:px-8 rounded-full bg-black text-white font-black disabled:opacity-40 shrink-0 hover:opacity-90 transition"
               >
                 {isLoading ? "Building…" : html ? "Rebuild →" : "Generate →"}
               </button>
             </div>
-            {imageError && <p className="text-[12px] text-red-400 px-2">{imageError}</p>}
+            {imageError && <p className="text-[12px] text-red-600 px-2">{imageError}</p>}
           </div>
         </div>
 
         <div className={projectId ? "flex gap-4 items-start" : undefined}>
         {projectId && (
-          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] mt-6 rounded-[20px] border border-white/10 bg-white/[0.03] overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/10 shrink-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">Conversation</div>
+          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] mt-6 rounded-[20px] border border-black/10 bg-white shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-black/10 shrink-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-black/40">Conversation</div>
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
               {historyVersions.length === 0 && !historyLoading && (
-                <p className="text-[12px] text-white/30 px-1">Your edits will show up here as you go.</p>
+                <p className="text-[12px] text-black/40 px-1">Your edits will show up here as you go.</p>
               )}
               {historyLoading && historyVersions.length === 0 && (
-                <p className="text-[12px] text-white/30 px-1">Loading…</p>
+                <p className="text-[12px] text-black/40 px-1">Loading…</p>
               )}
               {historyVersions
                 .slice()
@@ -798,21 +798,21 @@ export default function BuilderClient({
                     onClick={() => openVersion(v.id)}
                     className={`text-left px-3 py-2 rounded-xl border text-[12px] transition ${
                       v.id === projectId
-                        ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-white"
-                        : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/[0.06] hover:text-white/90"
+                        ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-black"
+                        : "border-black/10 bg-black/[0.02] text-black/60 hover:bg-black/[0.05] hover:text-black/90"
                     }`}
                   >
                     <div className="line-clamp-2">{v.prompt}</div>
-                    <div className="text-[10px] text-white/30 mt-1">
+                    <div className="text-[10px] text-black/40 mt-1">
                       {new Date(v.created_at).toLocaleString()}
                       {v.id === projectId ? " • current" : ""}
                     </div>
                   </button>
                 ))}
               {isLoading && (
-                <div className="px-3 py-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-[12px] text-fuchsia-200 animate-pulse">
+                <div className="px-3 py-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-[12px] text-fuchsia-700 animate-pulse">
                   <div className="line-clamp-2">{lastPromptRef.current}</div>
-                  <div className="text-[10px] text-fuchsia-300/60 mt-1">Building…</div>
+                  <div className="text-[10px] text-fuchsia-600/70 mt-1">Building…</div>
                 </div>
               )}
             </div>
@@ -820,7 +820,7 @@ export default function BuilderClient({
         )}
         <div className="flex-1 min-w-0">
         {status === "error" && (
-          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 flex items-center justify-between gap-4">
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 flex items-center justify-between gap-4">
             <span>{errorMsg}</span>
             <button
               onClick={() => generate(lastPromptRef.current)}
@@ -869,7 +869,7 @@ export default function BuilderClient({
           </div>
         )}
 
-        <div className="mt-6 rounded-[20px] overflow-hidden border border-white/10 bg-white min-h-[600px] shadow-[0_0_60px_-15px_rgba(217,70,239,0.15)]">
+        <div className="mt-6 rounded-[20px] overflow-hidden border border-black/10 bg-white min-h-[600px] shadow-[0_0_60px_-15px_rgba(217,70,239,0.12)]">
           {!isLoading && html && (
             <>
               <div className="flex items-center justify-between px-4 py-2 bg-zinc-100 border-b border-black/10">
@@ -1239,7 +1239,7 @@ export default function BuilderClient({
                 <button
                   key={s}
                   onClick={() => generate(s, { asEdit: true })}
-                  className="px-4 py-2 rounded-full border border-white/15 bg-white/[0.04] hover:bg-white/10 text-[13px] font-medium transition"
+                  className="px-4 py-2 rounded-full border border-black/10 bg-black/[0.03] hover:bg-black/[0.06] text-[13px] font-medium transition"
                 >
                   {s}
                 </button>

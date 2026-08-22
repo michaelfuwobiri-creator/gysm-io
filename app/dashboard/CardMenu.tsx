@@ -29,13 +29,13 @@ export default function CardMenu({ children }: { children: React.ReactNode }) {
         onClick={() => setOpen((v) => !v)}
         aria-label="More actions"
         className={`w-8 h-8 grid place-items-center rounded-lg border text-sm transition ${
-          open ? "bg-white text-black border-white" : "border-white/15 text-white/50 hover:bg-white/5 hover:text-white"
+          open ? "bg-black text-white border-black" : "border-black/15 text-black/50 hover:bg-black/5 hover:text-black"
         }`}
       >
         ···
       </button>
       {open && (
-        <div className="absolute right-0 z-10 mt-2 w-64 rounded-xl border border-white/10 bg-[#0A0A0A] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.6)] p-2 flex flex-col gap-2">
+        <div className="absolute right-0 z-10 mt-2 w-64 rounded-xl border border-black/10 bg-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] p-2 flex flex-col gap-2">
           {children}
         </div>
       )}

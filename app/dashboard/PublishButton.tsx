@@ -66,26 +66,26 @@ export default function PublishButton({ projectId, initialIsPublic, initialTitle
         Share to BuildGuild
       </button>
       {open && (
-        <div className="mt-2 flex flex-col gap-2 p-3 rounded-lg bg-white/[0.05] border border-white/10">
+        <div className="mt-2 flex flex-col gap-2 p-3 rounded-lg bg-black/[0.03] border border-black/10">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
             maxLength={120}
-            className="w-full h-8 px-3 rounded-full bg-black border border-white/10 text-white text-[12px] outline-none"
+            className="w-full h-8 px-3 rounded-full bg-white border border-black/10 text-black text-[12px] outline-none"
           />
           <input
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}
             placeholder="Tagline (optional)"
             maxLength={200}
-            className="w-full h-8 px-3 rounded-full bg-black border border-white/10 text-white text-[12px] outline-none"
+            className="w-full h-8 px-3 rounded-full bg-white border border-black/10 text-black text-[12px] outline-none"
           />
-          {error && <p className="text-[11px] text-red-400">{error}</p>}
+          {error && <p className="text-[11px] text-red-600">{error}</p>}
           <button
             onClick={publish}
             disabled={!title.trim() || publishing}
-            className="px-3 py-1.5 rounded-full text-xs font-bold bg-white text-black disabled:opacity-40"
+            className="px-3 py-1.5 rounded-full text-xs font-bold bg-black text-white disabled:opacity-40"
           >
             {publishing ? "Publishing…" : "Publish"}
           </button>

@@ -3,9 +3,9 @@
 // leave the dashboard entirely via the sidebar's "Templates" link. This
 // surfaces a handful of real, curated templates (same is_template=true
 // rows /templates uses -- see app/templates/page.tsx) inline, with a
-// "Browse all" link to the full gallery for everything else. Reuses
-// GYSM's existing dark violet/fuchsia card styling rather than
-// introducing a new visual pattern.
+// "Browse all" link to the full gallery for everything else. Uses
+// GYSM's light card styling -- same as the public homepage -- rather
+// than introducing a new visual pattern.
 export type TemplateStripItem = {
   id: string;
   name: string | null;
@@ -20,8 +20,8 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
   return (
     <div className="mb-10">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-white/40 uppercase tracking-wider">Start from a template</h2>
-        <a href="/templates" className="text-[13px] font-bold text-fuchsia-400 hover:text-fuchsia-300 shrink-0">
+        <h2 className="text-sm font-bold text-black/40 uppercase tracking-wider">Start from a template</h2>
+        <a href="/templates" className="text-[13px] font-bold text-fuchsia-600 hover:text-fuchsia-700 shrink-0">
           Browse all →
         </a>
       </div>
@@ -33,9 +33,9 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
             <a
               key={t.id}
               href={`/builder?template=${t.id}`}
-              className="group w-[220px] shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden flex flex-col transition hover:border-fuchsia-500/40 hover:bg-white/[0.05] hover:shadow-[0_0_40px_-15px_rgba(217,70,239,0.35)]"
+              className="group w-[220px] shrink-0 rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-fuchsia-500/30 hover:shadow-md"
             >
-              <div className="relative h-[120px] bg-white overflow-hidden pointer-events-none">
+              <div className="relative h-[120px] bg-white overflow-hidden pointer-events-none border-b border-black/5">
                 <div
                   style={{
                     width: "166.7%",
@@ -54,8 +54,8 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
                 </div>
               </div>
               <div className="p-3 flex flex-col gap-1">
-                <div className="font-bold text-[13px] text-white line-clamp-1">{title}</div>
-                <div className="text-white/45 text-[12px] line-clamp-2">{description}</div>
+                <div className="font-bold text-[13px] text-black line-clamp-1">{title}</div>
+                <div className="text-black/45 text-[12px] line-clamp-2">{description}</div>
               </div>
             </a>
           );

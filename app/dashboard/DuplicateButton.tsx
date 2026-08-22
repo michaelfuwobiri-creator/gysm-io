@@ -41,11 +41,11 @@ export default function DuplicateButton({ projectId }: Props) {
       <button
         onClick={duplicate}
         disabled={loading}
-        className="w-full text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold hover:bg-white/5 disabled:opacity-40"
+        className="w-full text-center px-3 py-2 rounded-lg border border-black/10 text-xs font-bold hover:bg-black/[0.03] disabled:opacity-40"
       >
         {loading ? "Duplicating…" : "Duplicate"}
       </button>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }

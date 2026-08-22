@@ -50,7 +50,7 @@ export default function DeleteButton({ projectId }: Props) {
         <button
           onClick={() => setConfirming(false)}
           disabled={deleting}
-          className="px-3 py-2 rounded-lg border border-white/15 text-xs font-bold disabled:opacity-40"
+          className="px-3 py-2 rounded-lg border border-black/10 text-xs font-bold disabled:opacity-40"
         >
           Cancel
         </button>
@@ -62,11 +62,11 @@ export default function DeleteButton({ projectId }: Props) {
     <div className="w-full">
       <button
         onClick={() => setConfirming(true)}
-        className="w-full text-center px-3 py-2 rounded-lg border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/10"
+        className="w-full text-center px-3 py-2 rounded-lg border border-red-300 text-red-600 text-xs font-bold hover:bg-red-50"
       >
         Delete
       </button>
-      {error && <p className="mt-1 text-[11px] text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }

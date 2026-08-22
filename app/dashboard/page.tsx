@@ -87,17 +87,17 @@ export default async function DashboardPage() {
 
         {list.length > 0 && (
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-white/40 uppercase tracking-wider">
+            <h2 className="text-sm font-bold text-black/40 uppercase tracking-wider">
               {user.orgId ? "Team builds" : "Your builds"}
             </h2>
-            <a href="/builder" className="text-[13px] font-bold text-fuchsia-400 hover:text-fuchsia-300">
+            <a href="/builder" className="text-[13px] font-bold text-fuchsia-600 hover:text-fuchsia-700">
               + New build
             </a>
           </div>
         )}
 
         {list.length === 0 ? (
-          <div className="text-white/50 p-10 border border-dashed border-white/10 rounded-2xl text-center">
+          <div className="text-black/50 p-10 border border-dashed border-black/10 rounded-2xl text-center bg-white">
             {user.orgId
               ? "No team builds yet. Generate one from the prompt box above while this org is active, or ask a teammate to."
               : "No builds yet -- describe what you want above and GYSM.IO will build it."}
@@ -105,15 +105,15 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {list.map((p) => (
-              <div key={p.id} className="bg-white/[0.05] border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
-                <div className="bg-white rounded-lg h-[180px] overflow-hidden pointer-events-none">
+              <div key={p.id} className="bg-white border border-black/5 shadow-sm rounded-2xl p-4 flex flex-col gap-3">
+                <div className="bg-white rounded-lg h-[180px] overflow-hidden pointer-events-none border border-black/5">
                   <iframe srcDoc={p.html} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} />
                 </div>
 
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <RenameButton projectId={p.id} initialName={p.name || p.prompt} />
-                    <div className="text-[11px] text-white/40 mt-0.5">
+                    <div className="text-[11px] text-black/40 mt-0.5">
                       {new Date(p.created_at).toLocaleDateString()}
                       {p.is_public && <> • {p.views ?? 0} views</>}
                     </div>
@@ -129,7 +129,7 @@ export default async function DashboardPage() {
                       href={`/publish/${p.id}/app-stores`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-400 text-xs font-bold hover:bg-violet-500/10"
+                      className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-700 text-xs font-bold hover:bg-violet-50"
                     >
                       Publish to App Store / Play Store
                     </a>
@@ -137,12 +137,12 @@ export default async function DashboardPage() {
                       <DuplicateButton projectId={p.id} />
                       <a
                         href={`/api/projects/${p.id}/download`}
-                        className="flex-1 text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold hover:bg-white/5"
+                        className="flex-1 text-center px-3 py-2 rounded-lg border border-black/10 text-xs font-bold hover:bg-black/[0.03]"
                       >
                         Download
                       </a>
                     </div>
-                    <div className="pt-1 border-t border-white/10">
+                    <div className="pt-1 border-t border-black/10">
                       <DeleteButton projectId={p.id} />
                     </div>
                   </CardMenu>
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
                 <div className="flex gap-2">
                   <a
                     href={`/builder?projectId=${p.id}`}
-                    className="flex-1 text-center px-3 py-2 rounded-lg bg-white text-black text-xs font-bold"
+                    className="flex-1 text-center px-3 py-2 rounded-lg bg-black text-white text-xs font-bold"
                   >
                     Open in builder
                   </a>
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
                     href={`/publish/${p.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold"
+                    className="flex-1 text-center px-3 py-2 rounded-lg border border-black/10 text-xs font-bold hover:bg-black/[0.03]"
                   >
                     View live
                   </a>
