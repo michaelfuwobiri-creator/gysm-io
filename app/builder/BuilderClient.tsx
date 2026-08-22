@@ -244,13 +244,8 @@ export default function BuilderClient({
     setBackend({ status: "disconnected" });
   }, [projectId]);
 
-  const toggleHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async () => {
     if (!projectId) return;
-    if (historyOpen) {
-      setHistoryOpen(false);
-      return;
-    }
-    setHistoryOpen(true);
     setHistoryLoading(true);
     setHistoryError("");
     try {
@@ -263,7 +258,19 @@ export default function BuilderClient({
     } finally {
       setHistoryLoading(false);
     }
-  }, [projectId, historyOpen]);
+  }, [projectId]);
+
+  // Keeps the always-visible conversation sidebar populated -- previously
+  // this only fetched on-demand when the "History" button was clicked, so
+  // the running thread of past prompts wasn't visible by default the way
+  // Lovable's chat panel is.
+  useEffect(() => {
+    if (projectId) fetchHistory();
+  }, [projectId, fetchHistory]);
+
+  const toggleHistory = useCallback(() => {
+    setHistoryOpen((v) => !v);
+  }, []);
 
   // Jump the builder to an earlier version -- doesn't delete or overwrite
   // anything; it just loads that version's saved html/prompt into view.
@@ -769,6 +776,49 @@ export default function BuilderClient({
           </div>
         </div>
 
+        <div className={projectId ? "flex gap-4 items-start" : undefined}>
+        {projectId && (
+          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] mt-6 rounded-[20px] border border-white/10 bg-white/[0.03] overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/10 shrink-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">Conversation</div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+              {historyVersions.length === 0 && !historyLoading && (
+                <p className="text-[12px] text-white/30 px-1">Your edits will show up here as you go.</p>
+              )}
+              {historyLoading && historyVersions.length === 0 && (
+                <p className="text-[12px] text-white/30 px-1">Loading…</p>
+              )}
+              {historyVersions
+                .slice()
+                .reverse()
+                .map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => openVersion(v.id)}
+                    className={`text-left px-3 py-2 rounded-xl border text-[12px] transition ${
+                      v.id === projectId
+                        ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-white"
+                        : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/[0.06] hover:text-white/90"
+                    }`}
+                  >
+                    <div className="line-clamp-2">{v.prompt}</div>
+                    <div className="text-[10px] text-white/30 mt-1">
+                      {new Date(v.created_at).toLocaleString()}
+                      {v.id === projectId ? " • current" : ""}
+                    </div>
+                  </button>
+                ))}
+              {isLoading && (
+                <div className="px-3 py-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-[12px] text-fuchsia-200 animate-pulse">
+                  <div className="line-clamp-2">{lastPromptRef.current}</div>
+                  <div className="text-[10px] text-fuchsia-300/60 mt-1">Building…</div>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+        <div className="flex-1 min-w-0">
         {status === "error" && (
           <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 flex items-center justify-between gap-4">
             <span>{errorMsg}</span>
@@ -1197,6 +1247,9 @@ export default function BuilderClient({
             </div>
           </div>
         )}
+
+        </div>
+        </div>
 
         <div className="h-20" />
       </div>
