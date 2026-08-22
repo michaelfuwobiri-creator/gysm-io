@@ -365,10 +365,11 @@ export default function Page() {
             </div>
             <div>
               <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Company</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-medium">
-                <li><a href="/support" className="text-black/60 hover:text-black">Support</a></li>
-                <li><a href="/terms" className="text-black/60 hover:text-black">Terms</a></li>
-                <li><a href="/privacy" className="text-black/60 hover:text-black">Privacy</a></li>
+              <ul className="flex flex-col gap-2 text-[13px] font-bold">
+                <li><a href="mailto:support@gysm.io?subject=Work%20with%20us" className="text-black/80 hover:text-black">Work with us</a></li>
+                <li><a href="/support" className="text-black/80 hover:text-black">Support</a></li>
+                <li><a href="/terms" className="text-black/80 hover:text-black">Terms</a></li>
+                <li><a href="/privacy" className="text-black/80 hover:text-black">Privacy</a></li>
               </ul>
             </div>
           </div>
