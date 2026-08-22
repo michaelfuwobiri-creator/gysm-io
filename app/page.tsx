@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
@@ -89,17 +89,15 @@ export default function Page() {
   const { isLoaded, isSignedIn } = useUser();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
-  // Clerk's useUser() can resolve isLoaded/isSignedIn before React's first
-  // client render commits, which makes that first client render diverge
-  // from the server-rendered HTML (server always renders "logged out").
-  // Gating on `mounted` (only ever true after the initial commit, via
-  // useEffect) keeps the first client render identical to the server
-  // render, so hydration never mismatches -- the nav then swaps to the
-  // signed-in state a tick later, same as any client-only UI.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // middleware.ts runs clerkMiddleware on every request, so Clerk embeds
+  // the real auth state into the SSR payload -- isLoaded/isSignedIn are
+  // already correct (not "loading") on the very first render, matching
+  // between server and client with no async resolution gap. An earlier
+  // `mounted` gate here (forcing the first client paint to always show
+  // "logged out" regardless of actual state) assumed the opposite and
+  // caused a hydration mismatch of its own for signed-in visitors: the
+  // server correctly rendered the signed-in nav while the gate forced the
+  // client's first pass to show "Log in" anyway.
 
   function startBuilding(promptText?: string) {
     const p = (promptText ?? prompt).trim();
@@ -154,7 +152,7 @@ export default function Page() {
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
-            {mounted && isLoaded && isSignedIn ? (
+            {isLoaded && isSignedIn ? (
               <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
             ) : (
               <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>

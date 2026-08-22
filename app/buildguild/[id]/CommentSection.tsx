@@ -15,14 +15,13 @@ type Comment = {
 // (auth-gated server-side -- the SignInButton fallback here is just UX,
 // not the actual gate).
 export default function CommentSection({ projectId }: { projectId: string }) {
+  // middleware.ts runs clerkMiddleware on every request, so Clerk embeds
+  // the real auth state into the SSR payload -- isLoaded/isSignedIn are
+  // already correct on the very first render, matching between server
+  // and client with no async resolution gap to guard against (see the
+  // longer note in app/page.tsx, which had the same unnecessary gate
+  // causing its own hydration mismatch for signed-in visitors).
   const { isLoaded, isSignedIn } = useUser();
-  // Same hydration-mismatch guard as the homepage nav: Clerk can resolve
-  // isLoaded/isSignedIn before the first client render commits, which
-  // would make that render diverge from the server-rendered HTML.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -95,7 +94,7 @@ export default function CommentSection({ projectId }: { projectId: string }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-black/5">
-        {!mounted || !isLoaded ? null : isSignedIn ? (
+        {!isLoaded ? null : isSignedIn ? (
           <div className="flex flex-col gap-2">
             <textarea
               value={draft}
