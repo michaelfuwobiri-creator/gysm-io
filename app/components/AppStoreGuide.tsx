@@ -374,18 +374,18 @@ export default function AppStoreGuide({
 
   const accent =
     platform.accentClass === "violet"
-      ? { bg: "bg-violet-600", text: "text-violet-400", border: "border-violet-500/30", bar: "bg-violet-500" }
-      : { bg: "bg-fuchsia-600", text: "text-fuchsia-400", border: "border-fuchsia-500/30", bar: "bg-fuchsia-500" };
+      ? { bg: "bg-violet-600", text: "text-violet-600", border: "border-violet-500/30", bar: "bg-violet-500" }
+      : { bg: "bg-fuchsia-600", text: "text-fuchsia-600", border: "border-fuchsia-500/30", bar: "bg-fuchsia-500" };
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A]">
       <div className="max-w-3xl mx-auto px-5 py-10">
-        <a href={`/builder?projectId=${projectId}`} className="text-[13px] text-white/40 hover:text-white/70">
+        <a href={`/builder?projectId=${projectId}`} className="text-[13px] text-black/40 hover:text-black/70">
           &larr; Back to builder
         </a>
 
         <h1 className="text-2xl md:text-3xl font-black mt-3">Publish "{appName}" to the app stores</h1>
-        <p className="text-white/50 mt-2 text-[14px] max-w-xl">
+        <p className="text-black/50 mt-2 text-[14px] max-w-xl">
           Everything Apple and Google require before they'll let this build go live, in order. Check items off as
           you finish them -- your progress is saved on this device.
         </p>
@@ -397,7 +397,7 @@ export default function AppStoreGuide({
               key={p.id}
               onClick={() => setPlatformId(p.id)}
               className={`px-4 py-2 rounded-full text-[13px] font-bold transition ${
-                p.id === platformId ? "bg-white text-black" : "bg-white/[0.06] text-white/60 hover:bg-white/10"
+                p.id === platformId ? "bg-black text-white" : "bg-black/[0.04] text-black/60 hover:bg-black/[0.08]"
               }`}
             >
               {p.name}
@@ -405,17 +405,17 @@ export default function AppStoreGuide({
           ))}
         </div>
 
-        <p className="text-white/40 text-[12px] mt-3">{platform.tagline}</p>
+        <p className="text-black/40 text-[12px] mt-3">{platform.tagline}</p>
 
         {/* Progress */}
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="mt-4 rounded-2xl border border-black/10 bg-white shadow-sm p-4">
           <div className="flex items-center justify-between text-[12px] mb-2">
-            <span className="font-semibold text-white/70">
+            <span className="font-semibold text-black/70">
               {done} of {total} steps checked off ({requiredDone}/{requiredTotal} required)
             </span>
-            <span className="text-white/40">{Math.round((requiredDone / Math.max(requiredTotal, 1)) * 100)}%</span>
+            <span className="text-black/40">{Math.round((requiredDone / Math.max(requiredTotal, 1)) * 100)}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+          <div className="h-1.5 w-full rounded-full bg-black/10 overflow-hidden">
             <div
               className={`h-full ${accent.bar} transition-all`}
               style={{ width: `${(requiredDone / Math.max(requiredTotal, 1)) * 100}%` }}
@@ -429,19 +429,19 @@ export default function AppStoreGuide({
             href={platform.account.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:bg-white/[0.06] transition"
+            className="rounded-xl border border-black/10 bg-white shadow-sm p-3 hover:bg-black/[0.02] transition"
           >
-            <div className="text-[11px] text-white/40 uppercase tracking-wide font-bold">Account</div>
+            <div className="text-[11px] text-black/40 uppercase tracking-wide font-bold">Account</div>
             <div className="text-[13px] font-semibold mt-1">{platform.account.label}</div>
-            <div className="text-[12px] text-white/50">{platform.account.cost}</div>
+            <div className="text-[12px] text-black/50">{platform.account.cost}</div>
           </a>
           <a
             href={platform.console.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl border border-white/10 bg-white/[0.03] p-3 hover:bg-white/[0.06] transition"
+            className="rounded-xl border border-black/10 bg-white shadow-sm p-3 hover:bg-black/[0.02] transition"
           >
-            <div className="text-[11px] text-white/40 uppercase tracking-wide font-bold">Console</div>
+            <div className="text-[11px] text-black/40 uppercase tracking-wide font-bold">Console</div>
             <div className="text-[13px] font-semibold mt-1">{platform.console.label} &rarr;</div>
           </a>
         </div>
@@ -450,13 +450,13 @@ export default function AppStoreGuide({
         <div className="mt-8 flex flex-col gap-6">
           {platform.sections.map((section) => (
             <div key={section.title}>
-              <div className="text-[13px] font-bold text-white/80 mb-2">{section.title}</div>
+              <div className="text-[13px] font-bold text-black/80 mb-2">{section.title}</div>
               <div className="flex flex-col gap-2">
                 {section.items.map((item) => (
                   <label
                     key={item.id}
                     className={`flex gap-3 items-start rounded-xl border p-3 cursor-pointer transition ${
-                      checked[item.id] ? `${accent.border} bg-white/[0.04]` : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+                      checked[item.id] ? `${accent.border} bg-black/[0.03]` : "border-black/10 bg-white hover:bg-black/[0.02]"
                     }`}
                   >
                     <input
@@ -467,20 +467,20 @@ export default function AppStoreGuide({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[13px] font-semibold ${checked[item.id] ? "line-through text-white/40" : ""}`}>
+                        <span className={`text-[13px] font-semibold ${checked[item.id] ? "line-through text-black/40" : ""}`}>
                           {item.label}
                         </span>
                         {item.required ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-500/15 text-red-600">
                             Required
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-white/10 text-white/40">
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-black/5 text-black/40">
                             Optional
                           </span>
                         )}
                       </div>
-                      <p className="text-[12px] text-white/50 mt-0.5">{item.detail}</p>
+                      <p className="text-[12px] text-black/50 mt-0.5">{item.detail}</p>
                       {item.spec && (
                         <p className={`text-[12px] mt-1 font-mono ${accent.text}`}>{item.spec}</p>
                       )}
@@ -490,7 +490,7 @@ export default function AppStoreGuide({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[12px] text-white/40 hover:text-white/70 underline underline-offset-2 mt-1 inline-block"
+                          className="text-[12px] text-black/40 hover:text-black/70 underline underline-offset-2 mt-1 inline-block"
                         >
                           Official docs &rarr;
                         </a>

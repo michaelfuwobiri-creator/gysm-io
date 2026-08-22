@@ -20,9 +20,9 @@ export default function PricingPage({
   const monthly = PRICING_PLANS.filter((p) => p.interval === "month");
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A]">
       <div className="max-w-6xl mx-auto p-6">
-        <div className="flex justify-between items-center py-4 border-b border-white/10 mb-10">
+        <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
             GYSM<span className="text-fuchsia-500">.IO</span>
           </a>
@@ -32,12 +32,12 @@ export default function PricingPage({
         </div>
 
         {searchParams.reason === "no_credits" && (
-          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
+          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-black/10 bg-white shadow-sm p-4 text-sm">
             You're out of credits — pick a plan below to keep building.
           </div>
         )}
         {searchParams.canceled === "true" && (
-          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
+          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-black/10 bg-white shadow-sm p-4 text-sm">
             Checkout canceled — no charge was made.
           </div>
         )}
@@ -61,7 +61,7 @@ export default function PricingPage({
             <div
               key={plan.id}
               className={`rounded-3xl p-6 border ${
-                plan.highlight ? "bg-white text-black border-white" : "bg-white/5 border-white/10"
+                plan.highlight ? "bg-black text-white border-black" : "bg-white border-black/10 shadow-sm"
               }`}
             >
               <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
@@ -84,7 +84,7 @@ export default function PricingPage({
             <div
               key={plan.id}
               className={`rounded-3xl p-6 border ${
-                plan.highlight ? "bg-white text-black border-white" : "bg-white/5 border-white/10"
+                plan.highlight ? "bg-black text-white border-black" : "bg-white border-black/10 shadow-sm"
               }`}
             >
               <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
@@ -98,7 +98,7 @@ export default function PricingPage({
             </div>
           ))}
 
-          <div className="rounded-3xl p-6 border border-white/10 bg-white/5">
+          <div className="rounded-3xl p-6 border border-black/10 bg-white shadow-sm">
             <div className="text-xs opacity-50 uppercase tracking-widest">Enterprise</div>
             <div className="flex gap-1 items-baseline mt-2">
               <span className="text-4xl font-black">Custom</span>
@@ -107,7 +107,7 @@ export default function PricingPage({
             <p className="mt-1 text-xs opacity-50">Starting around $999/mo</p>
             <a
               href="mailto:sales@gysm.io?subject=Enterprise%20plan"
-              className="mt-4 block w-full rounded-full py-2.5 text-center text-sm font-semibold border border-white/20 hover:bg-white hover:text-black transition"
+              className="mt-4 block w-full rounded-full py-2.5 text-center text-sm font-semibold border border-black/15 hover:bg-black hover:text-white transition"
             >
               Contact sales
             </a>
