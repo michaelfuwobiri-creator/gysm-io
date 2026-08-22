@@ -112,6 +112,15 @@ export default function BuilderClient({
   // client should decide on its own.
   const [isTemplate, setIsTemplate] = useState(false);
   const [templateLoading, setTemplateLoading] = useState(false);
+  // Curated gallery metadata for a featured template (see
+  // app/templates/page.tsx): `name` reuses the existing rename column
+  // (0004_project_extras.sql) via PATCH /api/projects/[id]; `blurb` is a
+  // template-specific one-liner (0008_template_metadata.sql) saved
+  // through the template route alongside `featured`.
+  const [templateName, setTemplateName] = useState("");
+  const [templateBlurb, setTemplateBlurb] = useState("");
+  const [templateMetaSaving, setTemplateMetaSaving] = useState(false);
+  const [templateMetaSaved, setTemplateMetaSaved] = useState(false);
 
   const lastPromptRef = useRef("");
 
@@ -304,7 +313,11 @@ export default function BuilderClient({
       try {
         const res = await fetch(`/api/projects/${projectId}/template`);
         const data = await res.json();
-        if (!cancelled && res.ok) setIsTemplate(Boolean(data.isTemplate));
+        if (!cancelled && res.ok) {
+          setIsTemplate(Boolean(data.isTemplate));
+          setTemplateName(data.name || "");
+          setTemplateBlurb(data.blurb || "");
+        }
       } catch {
         // non-critical -- toggle just won't reflect state until next load
       }
@@ -333,6 +346,39 @@ export default function BuilderClient({
       setTemplateLoading(false);
     }
   }, [projectId, isTemplate, templateLoading]);
+
+  // Saves the curated display name + one-line blurb for a featured
+  // template. Name goes through the existing owner-scoped rename route;
+  // blurb (and re-affirming featured=true) goes through the template
+  // route. Both are admin-only actions gated upstream by the UI only
+  // rendering this when isAdmin && isTemplate.
+  const saveTemplateMeta = useCallback(async () => {
+    if (!projectId || templateMetaSaving) return;
+    setTemplateMetaSaving(true);
+    setTemplateMetaSaved(false);
+    try {
+      await Promise.all([
+        templateName.trim()
+          ? fetch(`/api/projects/${projectId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: templateName.trim() }),
+            })
+          : Promise.resolve(),
+        fetch(`/api/projects/${projectId}/template`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ featured: true, blurb: templateBlurb }),
+        }),
+      ]);
+      setTemplateMetaSaved(true);
+      setTimeout(() => setTemplateMetaSaved(false), 2000);
+    } catch {
+      // non-critical -- fields just keep their unsaved values on failure
+    } finally {
+      setTemplateMetaSaving(false);
+    }
+  }, [projectId, templateName, templateBlurb, templateMetaSaving]);
 
   // Prompt typed on the logged-out landing page, carried across sign-up via
   // localStorage (see app/page.tsx). Skipped if we're resuming a saved build.
@@ -903,6 +949,42 @@ export default function BuilderClient({
               {published && (
                 <div className="px-4 py-2.5 bg-emerald-50 border-b border-black/10 text-emerald-700 text-[12px] font-semibold">
                   Live on BuildGuild — anyone can view and comment on it now.
+                </div>
+              )}
+
+              {isAdmin && isTemplate && (
+                <div className="px-4 py-4 bg-fuchsia-50 border-b border-black/10">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-2">
+                    Template gallery details
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="Display name (shown on the template card)"
+                      maxLength={120}
+                      className="w-full h-10 px-4 rounded-full border border-black/10 text-black text-[13px] outline-none"
+                    />
+                    <input
+                      value={templateBlurb}
+                      onChange={(e) => setTemplateBlurb(e.target.value)}
+                      placeholder="One-line description (optional)"
+                      maxLength={160}
+                      className="w-full h-10 px-4 rounded-full border border-black/10 text-black text-[13px] outline-none"
+                    />
+                    <div className="flex justify-end items-center gap-3">
+                      {templateMetaSaved && (
+                        <span className="text-[12px] text-fuchsia-700 font-semibold">Saved</span>
+                      )}
+                      <button
+                        onClick={saveTemplateMeta}
+                        disabled={templateMetaSaving}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold bg-black text-white disabled:opacity-40"
+                      >
+                        {templateMetaSaving ? "Saving…" : "Save details"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 

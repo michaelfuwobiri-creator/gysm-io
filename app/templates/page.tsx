@@ -1,8 +1,14 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
+import TemplatesGallery from "./TemplatesGallery";
 
 // Queries real projects flagged is_template = true in Neon, per
-// db/migrations/0001_init.sql.
+// db/migrations/0001_init.sql. Display name comes from the `name` column
+// (0004_project_extras.sql, reused rather than duplicated -- see
+// app/api/projects/[id]/template/route.ts) and the one-line description
+// from `template_blurb` (0008_template_metadata.sql); both are set from
+// the builder's "Feature as template" panel and fall back gracefully to
+// the raw prompt below if an admin hasn't filled them in yet.
 //
 // This page kept showing "No templates published yet" even after real
 // rows were flagged is_template=true (verified directly in Neon and via
@@ -18,53 +24,28 @@ import { sql } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+export type TemplateCard = {
+  id: string;
+  name: string | null;
+  prompt: string;
+  blurb: string | null;
+  html: string;
+  created_at: string;
+};
+
 export default async function TemplatesPage() {
   noStore();
-  let list: any[] = [];
+  let list: TemplateCard[] = [];
   try {
-    list = await sql`
-      select id, prompt, html, created_at from projects
+    list = (await sql`
+      select id, name, prompt, template_blurb as blurb, html, created_at from projects
       where is_template = true
       order by created_at desc
       limit 24
-    `;
+    `) as TemplateCard[];
   } catch (error: any) {
     console.error("[templates] failed to load:", error.message);
   }
 
-  return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Templates</h1>
-          <a href="/builder" className="px-4 py-2 bg-white text-black rounded-lg font-semibold">
-            Start from scratch
-          </a>
-        </div>
-
-        {list.length === 0 ? (
-          <div className="text-white/50 p-8 border border-dashed border-white/10 rounded-xl text-center">
-            No templates published yet.
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {list.map((t) => (
-              <div key={t.id} className="bg-white/[0.05] border border-white/10 rounded-xl p-4 flex flex-col gap-3">
-                <div className="font-medium line-clamp-2">{t.prompt}</div>
-                <div className="bg-white rounded-lg h-[200px] overflow-hidden pointer-events-none">
-                  <iframe srcDoc={t.html} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={t.prompt} />
-                </div>
-                <a
-                  href={`/builder?template=${t.id}`}
-                  className="text-center py-2 bg-white text-black rounded-lg text-sm font-semibold"
-                >
-                  Use this template
-                </a>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <TemplatesGallery templates={list} />;
 }
