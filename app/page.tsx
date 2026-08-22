@@ -114,7 +114,14 @@ export default function Page() {
 
   return (
     <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-violet-600 selection:text-white">
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style>
+      {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
+          text content (the apostrophes here become &#x27;), and CSS's
+          @import doesn't decode HTML entities, so the old <style> version
+          was literally fetching a broken URL (".../&#x27;https://fonts...")
+          and silently falling back to system fonts on every load. A
+          link's href attribute is properly entity-decoded by the HTML
+          parser, so this actually loads Inter. */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
 
       {/* SoftwareApplication structured data for GYSM.IO itself -- helps AI
           answer engines and search rich results describe what this product

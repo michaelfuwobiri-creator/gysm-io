@@ -49,7 +49,14 @@ export default function UseCaseLanding({
 
   return (
     <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-violet-600 selection:text-white">
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style>
+      {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
+          text content (the apostrophes here become &#x27;), and CSS's
+          @import doesn't decode HTML entities, so the old <style> version
+          was literally fetching a broken URL (".../&#x27;https://fonts...")
+          and silently falling back to system fonts on every load. A
+          link's href attribute is properly entity-decoded by the HTML
+          parser, so this actually loads Inter. */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
 
       {/* NAV */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
