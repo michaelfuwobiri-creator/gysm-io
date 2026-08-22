@@ -68,7 +68,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
-        <ClerkProvider>
+        {/* `dynamic` makes ClerkProvider await real per-request auth data
+            (via next/headers) and embed it as `initialState` for the client
+            tree. Without it, `initialState` is always null and Clerk's
+            client-side hooks bootstrap purely from browser-only signals
+            (the `__client_uat` cookie) with nothing server-rendered to
+            match against -- a mismatch that happens *inside Clerk's own
+            internals*, not in any of our own isSignedIn branches, which is
+            why patching app/page.tsx's local render logic three times
+            (2d69de5, 06d7288, 2419a99) never actually fixed the homepage's
+            hydration errors (#418/#423/#425). Confirmed by reading
+            @clerk/nextjs's ClerkProvider source directly: generateStatePromise/
+            generateNonce return null/"" unless `dynamic` is set. This also
+            correctly opts "/" out of static prerendering, which is the
+            right trade-off for a nav that has to reflect real auth state. */}
+        <ClerkProvider dynamic>
           {children}
           <PWARegister />
         </ClerkProvider>
