@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import PromptHero from "./PromptHero";
+import TemplatesStrip, { TemplateStripItem } from "./TemplatesStrip";
 import AppShell from "../components/AppShell";
 import CardMenu from "./CardMenu";
 import PublishButton from "./PublishButton";
@@ -51,6 +52,22 @@ export default async function DashboardPage() {
     console.error("[dashboard] failed to load projects:", error.message);
   }
 
+  // Curated templates shown in the dashboard's "Start from a template"
+  // strip -- same is_template=true rows /templates uses (see
+  // app/templates/page.tsx). Best-effort: a failure here shouldn't take
+  // down the rest of the dashboard, so it just renders no strip.
+  let templates: TemplateStripItem[] = [];
+  try {
+    templates = (await sql`
+      select id, name, prompt, template_blurb as blurb, html from projects
+      where is_template = true
+      order by created_at desc
+      limit 6
+    `) as TemplateStripItem[];
+  } catch (error: any) {
+    console.error("[dashboard] failed to load templates:", error.message);
+  }
+
   // Best-effort first name for the PromptHero greeting -- falls back to
   // null (renders "Ready to build?" with no name) rather than showing a
   // raw email or user id.
@@ -65,6 +82,8 @@ export default async function DashboardPage() {
         </div>
 
         <PromptHero greetingName={greetingName} />
+
+        <TemplatesStrip templates={templates} />
 
         {list.length > 0 && (
           <div className="flex items-center justify-between mb-4">
