@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
+import PromptHero from "./PromptHero";
+import CardMenu from "./CardMenu";
 import PublishButton from "./PublishButton";
 import DeleteButton from "./DeleteButton";
 import RenameButton from "./RenameButton";
@@ -49,10 +51,15 @@ export default async function DashboardPage() {
     console.error("[dashboard] failed to load projects:", error.message);
   }
 
+  // Best-effort first name for the PromptHero greeting -- falls back to
+  // null (renders "Ready to build?" with no name) rather than showing a
+  // raw email or user id.
+  const greetingName = user.name ? user.name.split(" ")[0].split("@")[0] : null;
+
   return (
     <div className="min-h-screen bg-black text-white p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
+        <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
           <h1 className="text-2xl font-bold">{user.orgId ? "Team Builds" : "My Builds"}</h1>
           <div className="flex items-center gap-4">
             <OrganizationSwitcher
@@ -62,34 +69,81 @@ export default async function DashboardPage() {
               afterLeaveOrganizationUrl="/dashboard"
               appearance={{ elements: { organizationSwitcherTrigger: "text-white" } }}
             />
+            <a href="/templates" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
+              Templates
+            </a>
             <a href="/buildguild" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
               BuildGuild
-            </a>
-            <a href="/builder" className="px-4 py-2 bg-white text-black rounded-lg font-semibold">
-              + New Build
             </a>
             <UserButton afterSignOutUrl="/" />
           </div>
         </div>
 
+        <PromptHero greetingName={greetingName} />
+
+        {list.length > 0 && (
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-white/40 uppercase tracking-wider">
+              {user.orgId ? "Team builds" : "Your builds"}
+            </h2>
+            <a href="/builder" className="text-[13px] font-bold text-fuchsia-400 hover:text-fuchsia-300">
+              + New build
+            </a>
+          </div>
+        )}
+
         {list.length === 0 ? (
-          <div className="text-white/50 p-8 border border-dashed border-white/10 rounded-xl text-center">
+          <div className="text-white/50 p-10 border border-dashed border-white/10 rounded-2xl text-center">
             {user.orgId
-              ? "No team builds yet. Generate one from the builder while this org is active, or ask a teammate to."
-              : "No builds yet. Head to the builder and generate your first one."}
+              ? "No team builds yet. Generate one from the prompt box above while this org is active, or ask a teammate to."
+              : "No builds yet -- describe what you want above and GYSM.IO will build it."}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {list.map((p) => (
-              <div key={p.id} className="bg-white/[0.05] border border-white/10 rounded-xl p-4 flex flex-col gap-3">
-                <div className="text-xs text-white/40 flex items-center justify-between gap-2">
-                  <span>{new Date(p.created_at).toLocaleString()} • {String(p.id).slice(0, 8)}</span>
-                  {p.is_public && <span>{p.views ?? 0} views</span>}
-                </div>
-                <RenameButton projectId={p.id} initialName={p.name || p.prompt} />
-                <div className="bg-white rounded-lg h-[200px] overflow-hidden pointer-events-none">
+              <div key={p.id} className="bg-white/[0.05] border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+                <div className="bg-white rounded-lg h-[180px] overflow-hidden pointer-events-none">
                   <iframe srcDoc={p.html} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} />
                 </div>
+
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <RenameButton projectId={p.id} initialName={p.name || p.prompt} />
+                    <div className="text-[11px] text-white/40 mt-0.5">
+                      {new Date(p.created_at).toLocaleDateString()}
+                      {p.is_public && <> • {p.views ?? 0} views</>}
+                    </div>
+                  </div>
+                  <CardMenu>
+                    <PublishButton
+                      projectId={p.id}
+                      initialIsPublic={!!p.is_public}
+                      initialTitle={p.title || ""}
+                      defaultTitle={p.prompt.slice(0, 80)}
+                    />
+                    <a
+                      href={`/publish/${p.id}/app-stores`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-400 text-xs font-bold hover:bg-violet-500/10"
+                    >
+                      Publish to App Store / Play Store
+                    </a>
+                    <div className="flex gap-2">
+                      <DuplicateButton projectId={p.id} />
+                      <a
+                        href={`/api/projects/${p.id}/download`}
+                        className="flex-1 text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold hover:bg-white/5"
+                      >
+                        Download
+                      </a>
+                    </div>
+                    <div className="pt-1 border-t border-white/10">
+                      <DeleteButton projectId={p.id} />
+                    </div>
+                  </CardMenu>
+                </div>
+
                 <div className="flex gap-2">
                   <a
                     href={`/builder?projectId=${p.id}`}
@@ -106,30 +160,6 @@ export default async function DashboardPage() {
                     View live
                   </a>
                 </div>
-                <a
-                  href={`/publish/${p.id}/app-stores`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-400 text-xs font-bold hover:bg-violet-500/10"
-                >
-                  Publish to App Store / Play Store
-                </a>
-                <PublishButton
-                  projectId={p.id}
-                  initialIsPublic={!!p.is_public}
-                  initialTitle={p.title || ""}
-                  defaultTitle={p.prompt.slice(0, 80)}
-                />
-                <div className="flex gap-2">
-                  <DuplicateButton projectId={p.id} />
-                  <a
-                    href={`/api/projects/${p.id}/download`}
-                    className="flex-1 text-center px-3 py-2 rounded-lg border border-white/15 text-xs font-bold hover:bg-white/5"
-                  >
-                    Download
-                  </a>
-                </div>
-                <DeleteButton projectId={p.id} />
               </div>
             ))}
           </div>
