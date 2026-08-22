@@ -151,6 +151,7 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Templates</a>
+            <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
             {mounted && isLoaded && isSignedIn ? (
@@ -331,9 +332,49 @@ export default function Page() {
               <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
             </div>
           </div>
-          <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM<span className="text-fuchsia-500">.IO</span> — built for founders who ship</div>
         </div>
       </section>
+
+      {/* FOOTER -- real sitemap only, no fabricated "trusted by" logos or
+          usage stats. Every link below points to a page that actually
+          exists in this app. */}
+      <footer className="mt-16 md:mt-24 border-t border-black/[0.06]">
+        <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-12 md:py-16">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-6">
+            <div className="col-span-2 md:col-span-1">
+              <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span>
+              <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">The AI no-code app builder for founders who ship.</p>
+            </div>
+            <div>
+              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Product</div>
+              <ul className="flex flex-col gap-2 text-[13px] font-medium">
+                <li><a href="/templates" className="text-black/60 hover:text-black">Templates</a></li>
+                <li><a href="/connectors" className="text-black/60 hover:text-black">Connectors</a></li>
+                <li><a href="/marketplace" className="text-black/60 hover:text-black">Marketplace</a></li>
+                <li><a href="/buildguild" className="text-black/60 hover:text-black">BuildGuild</a></li>
+                <li><a href="/pricing" className="text-black/60 hover:text-black">Pricing</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Account</div>
+              <ul className="flex flex-col gap-2 text-[13px] font-medium">
+                <li><a href="/dashboard" className="text-black/60 hover:text-black">Dashboard</a></li>
+                <li><a href="/sign-in" className="text-black/60 hover:text-black">Log in</a></li>
+                <li><a href="/sign-up" className="text-black/60 hover:text-black">Sign up</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Company</div>
+              <ul className="flex flex-col gap-2 text-[13px] font-medium">
+                <li><a href="/support" className="text-black/60 hover:text-black">Support</a></li>
+                <li><a href="/terms" className="text-black/60 hover:text-black">Terms</a></li>
+                <li><a href="/privacy" className="text-black/60 hover:text-black">Privacy</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-10 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-fuchsia-500">.IO</span> — built for founders who ship</div>
+        </div>
+      </footer>
     </div>
   )
 }

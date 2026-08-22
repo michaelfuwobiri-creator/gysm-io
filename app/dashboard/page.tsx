@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import PromptHero from "./PromptHero";
+import AppShell from "../components/AppShell";
 import CardMenu from "./CardMenu";
 import PublishButton from "./PublishButton";
 import DeleteButton from "./DeleteButton";
@@ -57,26 +57,11 @@ export default async function DashboardPage() {
   const greetingName = user.name ? user.name.split(" ")[0].split("@")[0] : null;
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <AppShell active="dashboard">
+      <div className="p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
           <h1 className="text-2xl font-bold">{user.orgId ? "Team Builds" : "My Builds"}</h1>
-          <div className="flex items-center gap-4">
-            <OrganizationSwitcher
-              afterCreateOrganizationUrl="/dashboard"
-              afterSelectOrganizationUrl="/dashboard"
-              afterSelectPersonalUrl="/dashboard"
-              afterLeaveOrganizationUrl="/dashboard"
-              appearance={{ elements: { organizationSwitcherTrigger: "text-white" } }}
-            />
-            <a href="/templates" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
-              Templates
-            </a>
-            <a href="/buildguild" className="px-4 py-2 border border-white/15 rounded-lg font-semibold">
-              BuildGuild
-            </a>
-            <UserButton afterSignOutUrl="/" />
-          </div>
         </div>
 
         <PromptHero greetingName={greetingName} />
@@ -165,6 +150,7 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </AppShell>
   );
 }

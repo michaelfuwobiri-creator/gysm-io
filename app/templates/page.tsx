@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
 import TemplatesGallery from "./TemplatesGallery";
+import AppShell from "../components/AppShell";
 
 // Queries real projects flagged is_template = true in Neon, per
 // db/migrations/0001_init.sql. Display name comes from the `name` column
@@ -47,5 +48,9 @@ export default async function TemplatesPage() {
     console.error("[templates] failed to load:", error.message);
   }
 
-  return <TemplatesGallery templates={list} />;
+  return (
+    <AppShell active="templates">
+      <TemplatesGallery templates={list} />
+    </AppShell>
+  );
 }
