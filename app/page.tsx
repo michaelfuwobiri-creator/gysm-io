@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
@@ -89,15 +89,22 @@ export default function Page() {
   const { isLoaded, isSignedIn } = useUser();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
-  // middleware.ts runs clerkMiddleware on every request, so Clerk embeds
-  // the real auth state into the SSR payload -- isLoaded/isSignedIn are
-  // already correct (not "loading") on the very first render, matching
-  // between server and client with no async resolution gap. An earlier
-  // `mounted` gate here (forcing the first client paint to always show
-  // "logged out" regardless of actual state) assumed the opposite and
-  // caused a hydration mismatch of its own for signed-in visitors: the
-  // server correctly rendered the signed-in nav while the gate forced the
-  // client's first pass to show "Log in" anyway.
+  // `/` is statically prerendered at build time (confirmed via `next build`'s
+  // route summary: "○ /" = Static) -- there is no per-request SSR here at
+  // all, so the frozen build-time HTML always bakes in a logged-out nav
+  // ("/sign-in" link), regardless of who requests the page or what
+  // clerkMiddleware does (middleware only runs against /builder and
+  // /dashboard anyway, never against "/"). Clerk resolves the real
+  // isLoaded/isSignedIn state client-side only, so the very first client
+  // render must still match that frozen "logged out" HTML or React throws
+  // a hydration-mismatch error (#418/#423/#425) -- gating on `mounted`
+  // (only ever true after the initial commit, via useEffect) guarantees
+  // that first client render is identical to the static server HTML; the
+  // nav swaps to the signed-in state a tick later like any client-only UI.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function startBuilding(promptText?: string) {
     const p = (promptText ?? prompt).trim();
@@ -152,7 +159,7 @@ export default function Page() {
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
-            {isLoaded && isSignedIn ? (
+            {mounted && isLoaded && isSignedIn ? (
               <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
             ) : (
               <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>

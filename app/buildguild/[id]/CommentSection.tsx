@@ -15,18 +15,23 @@ type Comment = {
 // (auth-gated server-side -- the SignInButton fallback here is just UX,
 // not the actual gate).
 export default function CommentSection({ projectId }: { projectId: string }) {
-  // middleware.ts runs clerkMiddleware on every request, so Clerk embeds
-  // the real auth state into the SSR payload -- isLoaded/isSignedIn are
-  // already correct on the very first render, matching between server
-  // and client with no async resolution gap to guard against (see the
-  // longer note in app/page.tsx, which had the same unnecessary gate
-  // causing its own hydration mismatch for signed-in visitors).
+  // This route (/buildguild/[id]) is dynamically server-rendered per
+  // request, unlike the homepage (see app/page.tsx's longer note), so it
+  // likely already gets Clerk's real per-request auth state baked into its
+  // SSR HTML via clerkMiddleware. Still gating on `mounted` here too --
+  // cheap, matches Clerk's own recommended pattern for any useUser()-based
+  // branch, and removes any doubt without needing to prove the dynamic-SSR
+  // path is airtight.
   const { isLoaded, isSignedIn } = useUser();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +99,7 @@ export default function CommentSection({ projectId }: { projectId: string }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-black/5">
-        {!isLoaded ? null : isSignedIn ? (
+        {!mounted || !isLoaded ? null : isSignedIn ? (
           <div className="flex flex-col gap-2">
             <textarea
               value={draft}
