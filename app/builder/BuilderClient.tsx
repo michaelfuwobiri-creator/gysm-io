@@ -68,6 +68,48 @@ export default function BuilderClient({
   const [imageError, setImageError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Voice dictation for the prompt box -- browser-native Web Speech API,
+  // no server round-trip or new API cost. Feature-detected on mount since
+  // it's Chrome/Edge/Safari only (no Firefox support as of this writing);
+  // the mic button simply doesn't render when unsupported rather than
+  // showing a broken control.
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setVoiceSupported(!!SpeechRecognition);
+  }, []);
+
+  function toggleVoice() {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript));
+      }
+    };
+    recognition.onerror = () => setIsRecording(false);
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    setIsRecording(true);
+    recognition.start();
+  }
+
   // "Connect database" -- links this build to a real Supabase project
   // (the user's own, via OAuth) so it gets a real Postgres database and
   // real auth instead of the mocked/in-memory state every build starts
@@ -696,6 +738,25 @@ export default function BuilderClient({
                   disabled={isLoading}
                 />
               </div>
+              {voiceSupported && (
+                <button
+                  type="button"
+                  onClick={toggleVoice}
+                  disabled={isLoading}
+                  title={isRecording ? "Stop dictating" : "Dictate your prompt"}
+                  className={`h-[48px] w-[48px] sm:h-[56px] sm:w-[56px] shrink-0 grid place-items-center rounded-full border transition disabled:opacity-40 ${
+                    isRecording
+                      ? "bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300 animate-pulse"
+                      : "bg-white/[0.06] border-white/10 hover:bg-white/10"
+                  }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => generate()}
                 disabled={isLoading || !prompt.trim()}
