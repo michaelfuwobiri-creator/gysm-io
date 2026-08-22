@@ -347,20 +347,20 @@ export default function Page() {
             </div>
             <div>
               <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Product</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-medium">
-                <li><a href="/templates" className="text-black/60 hover:text-black">Templates</a></li>
-                <li><a href="/connectors" className="text-black/60 hover:text-black">Connectors</a></li>
-                <li><a href="/marketplace" className="text-black/60 hover:text-black">Marketplace</a></li>
-                <li><a href="/buildguild" className="text-black/60 hover:text-black">BuildGuild</a></li>
-                <li><a href="/pricing" className="text-black/60 hover:text-black">Pricing</a></li>
+              <ul className="flex flex-col gap-2 text-[13px] font-bold">
+                <li><a href="/templates" className="text-black/80 hover:text-black">Templates</a></li>
+                <li><a href="/connectors" className="text-black/80 hover:text-black">Connectors</a></li>
+                <li><a href="/marketplace" className="text-black/80 hover:text-black">Marketplace</a></li>
+                <li><a href="/buildguild" className="text-black/80 hover:text-black">BuildGuild</a></li>
+                <li><a href="/pricing" className="text-black/80 hover:text-black">Pricing</a></li>
               </ul>
             </div>
             <div>
               <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Account</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-medium">
-                <li><a href="/dashboard" className="text-black/60 hover:text-black">Dashboard</a></li>
-                <li><a href="/sign-in" className="text-black/60 hover:text-black">Log in</a></li>
-                <li><a href="/sign-up" className="text-black/60 hover:text-black">Sign up</a></li>
+              <ul className="flex flex-col gap-2 text-[13px] font-bold">
+                <li><a href="/dashboard" className="text-black/80 hover:text-black">Dashboard</a></li>
+                <li><a href="/sign-in" className="text-black/80 hover:text-black">Log in</a></li>
+                <li><a href="/sign-up" className="text-black/80 hover:text-black">Sign up</a></li>
               </ul>
             </div>
             <div>
