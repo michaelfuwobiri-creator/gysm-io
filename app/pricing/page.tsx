@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { PRICING_PLANS } from "@/lib/stripe";
 import CheckoutButton from "./CheckoutButton";
+
+// ssr:false island for the 3 optional query-string banners (?reason=,
+// ?canceled=, ?upsell=) -- see PricingBanners.tsx for why: reading
+// `searchParams` directly on this page forced the whole route into
+// fully-dynamic per-request rendering (confirmed live: x-vercel-cache MISS,
+// age 0 on every load, vs the homepage's cached HIT), and that was the one
+// structural difference left between "/" (confirmed clean, twice) and
+// "/pricing" (still throwing #418/#423/#425 on every load) after every
+// other fix had already landed. Moving the searchParams read client-side
+// lets this page go back to being static like the homepage.
+const PricingBanners = dynamic(() => import("./PricingBanners"), { ssr: false });
 
 export const metadata: Metadata = {
   title: "Pricing | GYSM.IO",
@@ -11,11 +23,7 @@ export const metadata: Metadata = {
 // Split into "pay as you go" (one_time) and "monthly" (month) sections to
 // match the tiering in lib/stripe.ts, plus a hardcoded Enterprise card since
 // Enterprise is a custom quote, not a purchasable Stripe Price.
-export default function PricingPage({
-  searchParams,
-}: {
-  searchParams: { reason?: string; canceled?: string; upsell?: string };
-}) {
+export default function PricingPage() {
   const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time");
   const monthly = PRICING_PLANS.filter((p) => p.interval === "month");
 
@@ -31,21 +39,7 @@ export default function PricingPage({
           </a>
         </div>
 
-        {searchParams.reason === "no_credits" && (
-          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-black/10 bg-white shadow-sm p-4 text-sm">
-            You're out of credits — pick a plan below to keep building.
-          </div>
-        )}
-        {searchParams.canceled === "true" && (
-          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-black/10 bg-white shadow-sm p-4 text-sm">
-            Checkout canceled — no charge was made.
-          </div>
-        )}
-        {searchParams.upsell === "connect_database" && (
-          <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm">
-            "Connect database" links a build to your own Supabase project for real data and real auth — available on any monthly plan below.
-          </div>
-        )}
+        <PricingBanners />
 
         <h1 className="text-4xl md:text-6xl font-black text-center tracking-tighter mb-3">
           Simple pricing
