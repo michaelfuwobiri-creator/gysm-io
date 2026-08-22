@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { getPlanById } from "@/lib/stripe";
 
+// No useUser() here -- see app/components/NavAuthLink.tsx for why. This
+// component only ever needed the user for an imperative check inside a
+// click handler (never during render), so reading Clerk's own global
+// object directly avoids calling the hook at all, sidestepping the
+// hydration mismatch calling useUser() from any SSR-participating
+// component was causing (confirmed live: this exact component, unused
+// result and all, was one of the three reproductions).
 export default function CheckoutButton({
   planId,
   label,
@@ -15,7 +21,6 @@ export default function CheckoutButton({
   highlight?: boolean;
 }) {
   const router = useRouter();
-  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,7 +34,8 @@ export default function CheckoutButton({
       // using the existing Stripe checkout below unchanged.
       const { isNativeIOSApp } = await import("@/lib/iap-client");
       if (await isNativeIOSApp()) {
-        if (!user) {
+        const clerkUser = (window as any).Clerk?.user;
+        if (!clerkUser) {
           router.push(`/sign-in?redirect_url=${encodeURIComponent("/pricing")}`);
           return;
         }
@@ -37,7 +43,7 @@ export default function CheckoutButton({
         if (!plan) throw new Error(`Unknown plan "${planId}".`);
 
         const { purchasePlanNative } = await import("@/lib/iap-client");
-        await purchasePlanNative(plan, user.id);
+        await purchasePlanNative(plan, clerkUser.id);
         router.push("/builder?success=true&source=iap");
         return;
       }

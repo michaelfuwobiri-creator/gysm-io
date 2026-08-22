@@ -68,21 +68,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
-        {/* `dynamic` makes ClerkProvider await real per-request auth data
-            (via next/headers) and embed it as `initialState` for the client
-            tree. Without it, `initialState` is always null and Clerk's
-            client-side hooks bootstrap purely from browser-only signals
-            (the `__client_uat` cookie) with nothing server-rendered to
-            match against -- a mismatch that happens *inside Clerk's own
-            internals*, not in any of our own isSignedIn branches, which is
-            why patching app/page.tsx's local render logic three times
-            (2d69de5, 06d7288, 2419a99) never actually fixed the homepage's
-            hydration errors (#418/#423/#425). Confirmed by reading
-            @clerk/nextjs's ClerkProvider source directly: generateStatePromise/
-            generateNonce return null/"" unless `dynamic` is set. This also
-            correctly opts "/" out of static prerendering, which is the
-            right trade-off for a nav that has to reflect real auth state. */}
-        <ClerkProvider dynamic>
+        {/* Deliberately NOT passing `dynamic` here. It was tried as a fix
+            for the #418/#423/#425 hydration errors (making ClerkProvider
+            embed real per-request auth state via next/headers) and it does
+            work as documented -- confirmed live that both "/" and
+            "/pricing" switched from a cached static response to a genuine
+            per-request MISS with it on. But it had zero effect on the
+            actual bug: the real cause turned out to be calling
+            @clerk/nextjs's useUser() at all from any component that
+            participates in SSR (see app/components/NavAuthLink.tsx),
+            unrelated to static-vs-dynamic rendering. With that fixed at
+            the actual source, there's no reason to pay the static-caching
+            cost across the whole app for this prop anymore. */}
+        <ClerkProvider>
           {children}
           <PWARegister />
         </ClerkProvider>

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import dynamic from "next/dynamic";
+
+const CommentComposer = dynamic(() => import("./CommentComposer"), { ssr: false });
 
 type Comment = {
   id: string;
@@ -12,26 +14,15 @@ type Comment = {
 
 // Client-side discussion thread for one BuildGuild app. Loads existing
 // comments on mount, posts new ones via /api/projects/[id]/comments
-// (auth-gated server-side -- the SignInButton fallback here is just UX,
-// not the actual gate).
+// (auth-gated server-side). The auth-dependent composer footer lives in
+// its own component (CommentComposer.tsx), loaded with ssr:false -- see
+// app/components/NavAuthLink.tsx for why calling useUser() from anything
+// that participates in SSR isn't safe here, confirmed live across three
+// unrelated pages regardless of static/dynamic rendering or how the
+// mounted/isLoaded/isSignedIn branch itself was written.
 export default function CommentSection({ projectId }: { projectId: string }) {
-  // This route (/buildguild/[id]) is dynamically server-rendered per
-  // request, unlike the homepage (see app/page.tsx's longer note), so it
-  // likely already gets Clerk's real per-request auth state baked into its
-  // SSR HTML via clerkMiddleware. Still gating on `mounted` here too --
-  // cheap, matches Clerk's own recommended pattern for any useUser()-based
-  // branch, and removes any doubt without needing to prove the dynamic-SSR
-  // path is airtight.
-  const { isLoaded, isSignedIn } = useUser();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [draft, setDraft] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,31 +39,6 @@ export default function CommentSection({ projectId }: { projectId: string }) {
       cancelled = true;
     };
   }, [projectId]);
-
-  async function submit() {
-    const body = draft.trim();
-    if (!body || posting) return;
-    setPosting(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || "Failed to post comment.");
-        return;
-      }
-      setComments((prev) => [...prev, data.comment]);
-      setDraft("");
-    } catch {
-      setError("Failed to post comment. Check your connection and try again.");
-    } finally {
-      setPosting(false);
-    }
-  }
 
   return (
     <div className="rounded-[20px] border border-black/5 bg-white p-5 h-fit lg:sticky lg:top-[80px]">
@@ -99,31 +65,7 @@ export default function CommentSection({ projectId }: { projectId: string }) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-black/5">
-        {!mounted || !isLoaded ? null : isSignedIn ? (
-          <div className="flex flex-col gap-2">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Share feedback or ask a question…"
-              rows={3}
-              className="w-full text-[13px] rounded-[12px] border border-black/10 p-3 resize-none focus:outline-none focus:border-black/30"
-            />
-            {error && <p className="text-[12px] text-red-600">{error}</p>}
-            <button
-              onClick={submit}
-              disabled={!draft.trim() || posting}
-              className="self-end px-4 py-2 rounded-full bg-black text-white text-[12px] font-bold disabled:opacity-40"
-            >
-              {posting ? "Posting…" : "Post comment"}
-            </button>
-          </div>
-        ) : (
-          <SignInButton mode="modal">
-            <button className="w-full px-4 py-2.5 rounded-full border border-black/10 text-[13px] font-semibold hover:bg-black/[0.02]">
-              Sign in to join the discussion
-            </button>
-          </SignInButton>
-        )}
+        <CommentComposer projectId={projectId} onPosted={(c) => setComments((prev) => [...prev, c])} />
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import dynamic from "next/dynamic";
+
+const NavAuthLink = dynamic(() => import("./components/NavAuthLink"), { ssr: false });
 
 const FEATURES = [
   { icon: "✦", title: "Prompt to product", body: "Type what you want. Get a real, working app — not a mockup you have to rebuild." },
@@ -86,34 +88,24 @@ const FAQ = [
 
 export default function Page() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
-  // `/` is statically prerendered at build time (confirmed via `next build`'s
-  // route summary: "○ /" = Static) -- there is no per-request SSR here at
-  // all, so the frozen build-time HTML always bakes in a logged-out nav
-  // ("/sign-in" link), regardless of who requests the page or what
-  // clerkMiddleware does (middleware only runs against /builder and
-  // /dashboard anyway, never against "/"). Clerk resolves the real
-  // isLoaded/isSignedIn state client-side only, so the very first client
-  // render must still match that frozen "logged out" HTML or React throws
-  // a hydration-mismatch error (#418/#423/#425) -- gating on `mounted`
-  // (only ever true after the initial commit, via useEffect) guarantees
-  // that first client render is identical to the static server HTML; the
-  // nav swaps to the signed-in state a tick later like any client-only UI.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
+  // No useUser() call in this component at all -- see NavAuthLink.tsx for
+  // why. For this click handler (only ever invoked post-hydration, by a
+  // real user click) we read Clerk's own global object imperatively
+  // instead of a hook, which needs no render participation and therefore
+  // can't diverge between server and client: window.Clerk is the same
+  // documented singleton @clerk/nextjs's hooks read from internally.
   function startBuilding(promptText?: string) {
     const p = (promptText ?? prompt).trim();
     setStarting(true);
     if (p) {
       window.localStorage.setItem("gysm_pending_prompt", p);
     }
-    if (!isLoaded) return;
-    if (isSignedIn) {
+    const clerk = (window as any).Clerk;
+    if (!clerk?.loaded) return;
+    if (clerk.user) {
       router.push("/builder");
     } else {
       router.push(`/sign-up?redirect_url=${encodeURIComponent("/builder")}`);
@@ -159,11 +151,7 @@ export default function Page() {
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
-            {mounted && isLoaded && isSignedIn ? (
-              <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
-            ) : (
-              <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>
-            )}
+            <NavAuthLink />
             <button onClick={() => startBuilding()} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">Start Building</button>
           </div>
         </div>

@@ -1,6 +1,5 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 
 export type UseCasePoint = { title: string; body: string };
 
@@ -32,12 +31,16 @@ export default function UseCaseLanding({
   faqNote,
 }: UseCaseLandingProps) {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
 
+  // No useUser() here -- see app/components/NavAuthLink.tsx for why.
+  // isLoaded/isSignedIn were only ever read inside this click handler
+  // (never during render), so window.Clerk's own global object gives the
+  // same answer without calling the hook at all.
   function startBuilding(promptText: string) {
     window.localStorage.setItem("gysm_pending_prompt", promptText);
-    if (!isLoaded) return;
-    if (isSignedIn) {
+    const clerk = (window as any).Clerk;
+    if (!clerk?.loaded) return;
+    if (clerk.user) {
       router.push("/builder");
     } else {
       router.push(`/sign-up?redirect_url=${encodeURIComponent("/builder")}`);
