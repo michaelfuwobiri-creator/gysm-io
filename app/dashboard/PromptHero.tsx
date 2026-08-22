@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import GradientMesh from "../components/GradientMesh";
 
 // Prompt-first entry point at the top of the dashboard -- previously the
 // only way to start a new build from here was the small "+ New Build"
@@ -22,8 +23,8 @@ export default function PromptHero({ greetingName }: { greetingName: string | nu
   }
 
   return (
-    <div className="relative mb-10 rounded-[28px] overflow-hidden border border-black/5 bg-white p-8 sm:p-10 shadow-sm">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(124,58,237,0.06),transparent_60%)]" />
+    <div className="relative mb-10 rounded-[28px] overflow-hidden border border-black/5 bg-[#FCFCF9] p-8 sm:p-10 shadow-sm">
+      <GradientMesh />
       <div className="relative max-w-2xl mx-auto text-center">
         <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
           Ready to build{greetingName ? `, ${greetingName}` : ""}?

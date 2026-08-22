@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import PromptHero from "./PromptHero";
 import TemplatesStrip, { TemplateStripItem } from "./TemplatesStrip";
 import AppShell from "../components/AppShell";
+import { toThumbnailHtml } from "@/lib/thumbnailHtml";
 import CardMenu from "./CardMenu";
 import PublishButton from "./PublishButton";
 import DeleteButton from "./DeleteButton";
@@ -107,7 +108,7 @@ export default async function DashboardPage() {
             {list.map((p) => (
               <div key={p.id} className="bg-white border border-black/5 shadow-sm rounded-2xl p-4 flex flex-col gap-3">
                 <div className="bg-white rounded-lg h-[180px] overflow-hidden pointer-events-none border border-black/5">
-                  <iframe srcDoc={p.html} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} />
+                  <iframe srcDoc={toThumbnailHtml(p.html)} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} scrolling="no" tabIndex={-1} />
                 </div>
 
                 <div className="flex items-start justify-between gap-2">

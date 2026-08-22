@@ -6,6 +6,8 @@
 // "Browse all" link to the full gallery for everything else. Uses
 // GYSM's light card styling -- same as the public homepage -- rather
 // than introducing a new visual pattern.
+import { toThumbnailHtml } from "@/lib/thumbnailHtml";
+
 export type TemplateStripItem = {
   id: string;
   name: string | null;
@@ -45,11 +47,12 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
                   }}
                 >
                   <iframe
-                    srcDoc={t.html}
+                    srcDoc={toThumbnailHtml(t.html)}
                     className="w-full h-full border-0"
                     sandbox="allow-scripts allow-same-origin"
                     title={title}
                     tabIndex={-1}
+                    scrolling="no"
                   />
                 </div>
               </div>

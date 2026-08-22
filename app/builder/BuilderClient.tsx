@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import ShareButton from "@/app/components/ShareButton";
+import GradientMesh from "@/app/components/GradientMesh";
 
 type Status = "idle" | "loading" | "error";
 type View = "preview" | "code";
@@ -689,14 +690,17 @@ export default function BuilderClient({
         </div>
 
         {!html && !isLoading && (
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
-              Prompt to product
+          <div className="relative text-center mb-6 py-8 -my-8 rounded-[28px] overflow-hidden">
+            <GradientMesh />
+            <div className="relative">
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
+                Prompt to product
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05]">
+                What do you want to{" "}
+                <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">build</span>?
+              </h2>
             </div>
-            <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05]">
-              What do you want to{" "}
-              <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">build</span>?
-            </h2>
           </div>
         )}
 

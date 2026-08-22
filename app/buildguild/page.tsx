@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { toThumbnailHtml } from "@/lib/thumbnailHtml";
 
 // BuildGuild -- public gallery of every app users have opted to publish
 // (projects.is_public = true, set via POST /api/projects/[id]/publish).
@@ -79,11 +80,12 @@ export default async function BuildGuildPage() {
               >
                 <div className="h-[160px] bg-[#FCFCF9] pointer-events-none overflow-hidden border-b border-black/5">
                   <iframe
-                    srcDoc={app.html}
+                    srcDoc={toThumbnailHtml(app.html)}
                     className="w-full h-full border-0 scale-100"
                     sandbox="allow-scripts allow-same-origin"
                     title={app.title || "Published app"}
                     tabIndex={-1}
+                    scrolling="no"
                   />
                 </div>
                 <div className="p-4 flex flex-col gap-1.5">
