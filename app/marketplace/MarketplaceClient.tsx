@@ -75,7 +75,26 @@ export default function MarketplaceClient() {
 
   return (
     <div className="marketplace-root">
-      <style>{`
+      <style
+        // dangerouslySetInnerHTML, not JSX children -- this is the actual
+        // root cause of /marketplace's #418/#423/#425 hydration errors.
+        // React HTML-escapes plain text children uniformly, so the quoted
+        // font names below (font-family: 'Inter', 'Instrument Serif') got
+        // rendered server-side as font-family: &#x27;Inter&#x27;, ... . But
+        // <style> is a "raw text" element per the HTML spec -- browsers do
+        // NOT decode entities inside <style>/<script>, so the DOM's actual
+        // text content after the browser parses that HTML is the literal,
+        // still-escaped string. On hydration, React re-renders this exact
+        // JSX fresh on the client, computes the *unescaped* string (a real
+        // apostrophe), compares it to that already-escaped DOM text content,
+        // finds a mismatch, and throws. Exact same underlying mechanism as
+        // the Google Fonts @import bug fixed earlier (HTML-escaping vs. a
+        // context that never decodes it) -- different content, same root
+        // cause. dangerouslySetInnerHTML sets raw text with zero escaping,
+        // matching what the browser stores, so there's nothing left to
+        // mismatch.
+        dangerouslySetInnerHTML={{
+          __html: `
         .marketplace-root {
           --cream: #fffbf0;
           --ink: #16130f;
@@ -158,7 +177,9 @@ export default function MarketplaceClient() {
           border-top: 1px solid var(--line); padding: 22px 32px; text-align: center;
           font-size: 12.5px; color: rgba(22,19,15,0.45);
         }
-      `}</style>
+      `,
+        }}
+      />
 
       <header className="mp-header">
         <span className="mp-serif" style={{ fontSize: 20 }}>GYSM Marketplace</span>

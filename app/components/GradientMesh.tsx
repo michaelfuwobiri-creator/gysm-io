@@ -15,7 +15,21 @@ export default function GradientMesh() {
         <div className="gysm-blob gysm-blob-b absolute -top-1/4 right-[4%] w-[50%] h-[130%] rounded-full bg-fuchsia-500/[0.14] blur-[90px]" />
         <div className="gysm-blob gysm-blob-c absolute top-0 left-[32%] w-[40%] h-[120%] rounded-full bg-amber-300/[0.10] blur-[90px]" />
       </div>
-      <style>{`
+      <style
+        // dangerouslySetInnerHTML, not JSX children -- React HTML-escapes
+        // plain text children uniformly (turning e.g. a literal ' into
+        // &#x27;), but <style> is a "raw text" element per the HTML spec:
+        // browsers do NOT decode entities inside <style>/<script>, so any
+        // escaped character ends up literally inside the applied CSS. That's
+        // exactly what broke app/marketplace/MarketplaceClient.tsx's quoted
+        // font-family values (see the fix there) and, separately, broke
+        // Google Fonts site-wide via a mangled @import url(). This has no
+        // quotes today, but dangerouslySetInnerHTML sets raw text with zero
+        // escaping -- like Next's own pattern for the JSON-LD script in
+        // app/layout.tsx -- so it can never regress into that bug class no
+        // matter what CSS gets added here later.
+        dangerouslySetInnerHTML={{
+          __html: `
         @keyframes gysm-drift-a { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(4%,-3%) scale(1.05)} }
         @keyframes gysm-drift-b { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-5%,3%) scale(1.04)} }
         @keyframes gysm-drift-c { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(2%,4%) scale(1.06)} }
@@ -25,7 +39,9 @@ export default function GradientMesh() {
         @media (prefers-reduced-motion: reduce){
           .gysm-blob-a,.gysm-blob-b,.gysm-blob-c{animation:none}
         }
-      `}</style>
+      `,
+        }}
+      />
     </>
   );
 }
