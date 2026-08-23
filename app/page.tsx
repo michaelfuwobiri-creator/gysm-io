@@ -353,6 +353,8 @@ export default function Page() {
                 <li><a href="/marketplace" className="text-black/80 hover:text-black">Marketplace</a></li>
                 <li><a href="/buildguild" className="text-black/80 hover:text-black">BuildGuild</a></li>
                 <li><a href="/pricing" className="text-black/80 hover:text-black">Pricing</a></li>
+                <li><a href="/roadmap" className="text-black/80 hover:text-black">Roadmap</a></li>
+                <li><a href="/changelog" className="text-black/80 hover:text-black">Changelog</a></li>
               </ul>
             </div>
             <div>

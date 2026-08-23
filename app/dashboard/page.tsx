@@ -11,6 +11,7 @@ import DeleteButton from "./DeleteButton";
 import RenameButton from "./RenameButton";
 import DuplicateButton from "./DuplicateButton";
 import DeployVercelButton from "./DeployVercelButton";
+import { getUsageStats } from "@/lib/usage";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
@@ -75,12 +76,36 @@ export default async function DashboardPage() {
   // raw email or user id.
   const greetingName = user.name ? user.name.split(" ")[0].split("@")[0] : null;
 
+  // Real usage snapshot, not a fabricated metric -- see lib/usage.ts for
+  // exactly what this counts and why it doesn't include a spend-over-time
+  // chart (no transaction ledger exists yet, only a current balance).
+  const usage = await getUsageStats(user.orgId ?? user.id);
+
   return (
     <AppShell active="dashboard">
       <div className="p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
           <h1 className="text-2xl font-bold">{user.orgId ? "Team Builds" : "My Builds"}</h1>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-1">Total builds</div>
+            <div className="text-2xl font-black">{usage.totalBuilds}</div>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-1">This month</div>
+            <div className="text-2xl font-black">{usage.builtThisMonth}</div>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-1">Published</div>
+            <div className="text-2xl font-black">{usage.publishedCount}</div>
+          </div>
+          <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-black/40 mb-1">Total views</div>
+            <div className="text-2xl font-black">{usage.totalViews}</div>
+          </div>
         </div>
 
         <PromptHero greetingName={greetingName} />
@@ -116,7 +141,7 @@ export default async function DashboardPage() {
                   <div className="min-w-0">
                     <RenameButton projectId={p.id} initialName={p.name || p.prompt} />
                     <div className="text-[11px] text-black/40 mt-0.5">
-                      {new Date(p.created_at).toLocaleDateString()}
+                      {new Date(p.created_at).toLocaleDateString("en-US", { timeZone: "UTC" })}
                       {p.is_public && <> • {p.views ?? 0} views</>}
                     </div>
                   </div>

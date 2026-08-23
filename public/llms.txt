@@ -10,6 +10,12 @@ GYSM.IO uses a two-model AI pipeline (a structure/content pass followed by a vis
 - [Pricing](https://www.gysm.io/pricing): credit packs and subscription plans.
 - [Builder](https://www.gysm.io/builder): the app-generation tool itself (requires a free account).
 - [BuildGuild](https://www.gysm.io/buildguild): a public gallery of apps other users have built and published with GYSM.IO, open for comments and discussion.
+- [Roadmap](https://www.gysm.io/roadmap): what's planned, in progress, and shipped -- users can vote on what gets built next.
+- [Changelog](https://www.gysm.io/changelog): a real log of what's shipped recently.
+
+## API access
+
+GYSM.IO has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call costs the same credits as a build made in the builder UI and returns the generated app's HTML plus a public share URL.
 
 ## Notable apps built with GYSM.IO
 

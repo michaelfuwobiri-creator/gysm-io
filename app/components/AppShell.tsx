@@ -32,7 +32,18 @@ const NAV_GROUPS: {
   },
   {
     title: "Community",
-    items: [{ key: "buildguild", label: "BuildGuild", href: "/buildguild", icon: "users" }],
+    items: [
+      { key: "buildguild", label: "BuildGuild", href: "/buildguild", icon: "users" },
+      { key: "roadmap", label: "Roadmap", href: "/roadmap", icon: "map" },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { key: "billing", label: "Billing", href: "/billing", icon: "card" },
+      { key: "team", label: "Team", href: "/team", icon: "team" },
+      { key: "api-keys", label: "API Keys", href: "/settings/api-keys", icon: "key" },
+    ],
   },
 ];
 
@@ -73,6 +84,43 @@ function NavIcon({ name }: { name: string }) {
         <path d="M15 2v6" />
         <path d="M6 8h12v3a6 6 0 01-12 0V8z" />
         <path d="M12 17v5" />
+      </svg>
+    );
+  }
+  if (name === "map") {
+    return (
+      <svg {...common}>
+        <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" />
+        <path d="M9 4v14" />
+        <path d="M15 6v14" />
+      </svg>
+    );
+  }
+  if (name === "card") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <path d="M2 10h20" />
+      </svg>
+    );
+  }
+  if (name === "team") {
+    return (
+      <svg {...common}>
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M2.5 19c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" />
+        <circle cx="18" cy="8.5" r="2.4" />
+        <path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3" />
+      </svg>
+    );
+  }
+  if (name === "key") {
+    return (
+      <svg {...common}>
+        <circle cx="7.5" cy="15.5" r="4.5" />
+        <path d="M10.6 12.4L20 3" />
+        <path d="M15 8l3 3" />
+        <path d="M18 5l3 3" />
       </svg>
     );
   }
