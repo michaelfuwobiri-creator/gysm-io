@@ -155,7 +155,7 @@ export default async function AppShell({
             <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center text-white font-black text-sm shrink-0">
               G
             </div>
-            <span className="font-black tracking-tight">GYSM.IO</span>
+            <span className="font-black tracking-tight">GYSM<span className="text-fuchsia-500">.IO</span></span>
           </a>
 
           {/* Identity row -- who's signed in, at a glance, above the nav
