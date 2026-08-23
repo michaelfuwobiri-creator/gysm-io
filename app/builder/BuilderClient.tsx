@@ -661,38 +661,56 @@ export default function BuilderClient({
 
   // Wires up the click-to-edit overlay directly on the loaded iframe
   // document -- called on toggle-on and again on every iframe reload
-  // while quick edit is active. Plain click + type edits text in place
-  // via contentEditable (browser-native, no custom text-editing code
-  // needed); alt/option-click selects an element instead, surfaced in
-  // the swatch bar below the preview so recoloring doesn't need any
-  // floating-popup coordinate math against the iframe's viewport.
+  // while quick edit is active. Plain click scopes contentEditable to
+  // just the clicked element (not the whole document -- an earlier
+  // version used `document.designMode = "on"`, which makes the entire
+  // page one giant editable canvas; a plain Ctrl+A + keystroke there
+  // selects and overwrites the whole body, which is exactly what
+  // happened in testing and would have silently destroyed a user's
+  // build with no undo). Alt/option-click selects an element for
+  // recoloring instead, surfaced in the swatch bar below the preview so
+  // that doesn't need any floating-popup coordinate math against the
+  // iframe's viewport.
   function activateQuickEdit() {
     const doc = previewIframeRef.current?.contentDocument;
     if (!doc || !doc.body) return;
-    try {
-      (doc as any).designMode = "on";
-    } catch {}
+
+    let editingEl: HTMLElement | null = null;
+    const stopEditing = () => {
+      if (editingEl) {
+        editingEl.removeAttribute("contenteditable");
+        editingEl = null;
+      }
+    };
 
     const onClick = (e: MouseEvent) => {
-      if (!e.altKey) return;
       const target = e.target as HTMLElement;
       if (!target || target === doc.body || target === doc.documentElement) return;
-      e.preventDefault();
-      e.stopPropagation();
-      quickEditSelectedRef.current = target;
-      const computed = doc.defaultView?.getComputedStyle(target);
-      setQuickEditSelection({
-        tag: target.tagName.toLowerCase() + (target.className && typeof target.className === "string" ? `.${target.className.split(" ")[0]}` : ""),
-        color: rgbToHex(computed?.color || "rgb(0,0,0)"),
-        background: rgbToHex(computed?.backgroundColor || "rgb(255,255,255)"),
-      });
+
+      if (e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        stopEditing();
+        quickEditSelectedRef.current = target;
+        const computed = doc.defaultView?.getComputedStyle(target);
+        setQuickEditSelection({
+          tag: target.tagName.toLowerCase() + (target.className && typeof target.className === "string" ? `.${target.className.split(" ")[0]}` : ""),
+          color: rgbToHex(computed?.color || "rgb(0,0,0)"),
+          background: rgbToHex(computed?.backgroundColor || "rgb(255,255,255)"),
+        });
+        return;
+      }
+
+      if (target === editingEl) return; // already editing this one, let the click place the caret normally
+      stopEditing();
+      target.setAttribute("contenteditable", "true");
+      editingEl = target;
+      target.focus();
     };
     doc.addEventListener("click", onClick, true);
     quickEditCleanupRef.current = () => {
       doc.removeEventListener("click", onClick, true);
-      try {
-        (doc as any).designMode = "off";
-      } catch {}
+      stopEditing();
     };
   }
 
