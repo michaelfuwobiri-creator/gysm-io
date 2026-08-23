@@ -10,9 +10,7 @@ const REQUESTABLE_CONNECTORS = new Set([
   "stripe",
   "gmail",
   "slack",
-  "google-sheets",
   "notion",
-  "airtable",
 ]);
 
 // Signed-in only: records that the current user wants a given connector

@@ -4,6 +4,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import ShareButton from "@/app/components/ShareButton";
+import GitHubPushPanel from "./GitHubPushPanel";
+import DataImportPanel from "./DataImportPanel";
+import IntegrationsPanel from "./IntegrationsPanel";
 import GradientMesh from "@/app/components/GradientMesh";
 
 type Status = "idle" | "loading" | "error";
@@ -68,6 +71,60 @@ export default function BuilderClient({
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // "Quick edit" -- click-to-edit overlay directly on the live preview,
+  // for the common case of a one-word copy fix or a color tweak that
+  // doesn't need a full AI re-generation. Plain click + type edits text
+  // in place (browser-native contentEditable); alt/option-click selects
+  // an element to recolor via the swatch bar below the preview. Saves
+  // in place via /api/projects/[id]/quick-edit, which does NOT create a
+  // new History version the way a normal AI edit does. See that route's
+  // comment for why.
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const quickEditSelectedRef = useRef<HTMLElement | null>(null);
+  const quickEditCleanupRef = useRef<(() => void) | null>(null);
+  const [quickEdit, setQuickEdit] = useState(false);
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
+  const [quickEditMsg, setQuickEditMsg] = useState("");
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
+  const [quickEditSelection, setQuickEditSelection] = useState<{ tag: string; color: string; background: string } | null>(null);
+  const [githubPanelOpen, setGithubPanelOpen] = useState(false);
+  const [dataImportOpen, setDataImportOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
+  // Formatted as a block to prepend to the very next prompt sent to
+  // /api/generate -- see app/builder/DataImportPanel.tsx and
+  // app/api/connectors/data/*. Cleared after that one generation so a
+  // user's later, unrelated edits don't keep re-sending the whole
+  // dataset on every request.
+  const [pendingDataBlock, setPendingDataBlock] = useState<string | null>(null);
+
+  function handleDataConnected(provider: "airtable" | "google_sheets", rows: Record<string, string>[]) {
+    if (!rows.length) {
+      setPendingDataBlock(null);
+      return;
+    }
+    setPendingDataBlock(
+      `REAL DATA (imported from ${provider === "airtable" ? "Airtable" : "Google Sheets"}, ${rows.length} row${rows.length === 1 ? "" : "s"}) -- use these exact records as the app's real content instead of inventing placeholder items:\n${JSON.stringify(rows)}`
+    );
+  }
+
+  // Picks up a reference image attached on the dashboard's PromptHero
+  // before this build existed (see app/dashboard/PromptHero.tsx) -- a
+  // data: URL is too large for the ?prompt= query string, so it's handed
+  // off via sessionStorage instead and read exactly once here.
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem("gysm:pendingImage");
+      if (pending) {
+        setImageDataUrl(pending);
+        sessionStorage.removeItem("gysm:pendingImage");
+      }
+    } catch {
+      // Storage access can throw in some private-browsing contexts --
+      // non-critical, the build just proceeds without the image.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Voice dictation for the prompt box -- browser-native Web Speech API,
   // no server round-trip or new API cost. Feature-detected on mount since
@@ -497,8 +554,14 @@ export default function BuilderClient({
             previousHtml: opts?.asEdit ? html : undefined,
             image: imageDataUrl ?? undefined,
             projectId: opts?.asEdit ? projectId : undefined,
+            // A connected data source (see DataImportPanel) is sent as a
+            // separate field, once, so the server can fold it into what
+            // the AI sees without it ever polluting the saved prompt/title
+            // or the History panel with a wall of imported JSON.
+            dataContext: pendingDataBlock ?? undefined,
           }),
         });
+        if (pendingDataBlock) setPendingDataBlock(null);
 
         if (res.status === 401) {
           router.push("/sign-in?redirect_url=/builder");
@@ -564,7 +627,7 @@ export default function BuilderClient({
         setStatus("error");
       }
     },
-    [prompt, html, router, imageDataUrl]
+    [prompt, html, router, imageDataUrl, pendingDataBlock]
   );
 
   // Fire the initial generate automatically only if a pending prompt was
@@ -582,6 +645,117 @@ export default function BuilderClient({
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     });
+  }
+
+  function rgbToHex(rgb: string): string {
+    const m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return "#000000";
+    const [r, g, b] = m.map(Number);
+    return "#" + [r, g, b].map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0")).join("");
+  }
+
+  // Wires up the click-to-edit overlay directly on the loaded iframe
+  // document -- called on toggle-on and again on every iframe reload
+  // while quick edit is active. Plain click + type edits text in place
+  // via contentEditable (browser-native, no custom text-editing code
+  // needed); alt/option-click selects an element instead, surfaced in
+  // the swatch bar below the preview so recoloring doesn't need any
+  // floating-popup coordinate math against the iframe's viewport.
+  function activateQuickEdit() {
+    const doc = previewIframeRef.current?.contentDocument;
+    if (!doc || !doc.body) return;
+    try {
+      (doc as any).designMode = "on";
+    } catch {}
+
+    const onClick = (e: MouseEvent) => {
+      if (!e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (!target || target === doc.body || target === doc.documentElement) return;
+      e.preventDefault();
+      e.stopPropagation();
+      quickEditSelectedRef.current = target;
+      const computed = doc.defaultView?.getComputedStyle(target);
+      setQuickEditSelection({
+        tag: target.tagName.toLowerCase() + (target.className && typeof target.className === "string" ? `.${target.className.split(" ")[0]}` : ""),
+        color: rgbToHex(computed?.color || "rgb(0,0,0)"),
+        background: rgbToHex(computed?.backgroundColor || "rgb(255,255,255)"),
+      });
+    };
+    doc.addEventListener("click", onClick, true);
+    quickEditCleanupRef.current = () => {
+      doc.removeEventListener("click", onClick, true);
+      try {
+        (doc as any).designMode = "off";
+      } catch {}
+    };
+  }
+
+  function deactivateQuickEdit() {
+    quickEditCleanupRef.current?.();
+    quickEditCleanupRef.current = null;
+    quickEditSelectedRef.current = null;
+    setQuickEditSelection(null);
+  }
+
+  function applySelectionColor(kind: "color" | "background", hex: string) {
+    const el = quickEditSelectedRef.current;
+    if (!el) return;
+    el.style[kind === "color" ? "color" : "backgroundColor"] = hex;
+    setQuickEditSelection((prev) => (prev ? { ...prev, [kind === "color" ? "color" : "background"]: hex } : prev));
+  }
+
+  function toggleQuickEdit() {
+    setQuickEdit((prev) => {
+      const next = !prev;
+      if (next) {
+        // Iframe is already loaded at this point (button only shows once
+        // html exists) -- activate immediately rather than waiting for
+        // an onLoad that won't fire again.
+        setTimeout(activateQuickEdit, 0);
+      } else {
+        deactivateQuickEdit();
+      }
+      return next;
+    });
+  }
+
+  function discardQuickEdit() {
+    deactivateQuickEdit();
+    setQuickEdit(false);
+    // Force the iframe to remount from the original, unedited html --
+    // any DOM changes made while quick-editing only ever lived in the
+    // iframe's live document, never in React state, so remounting
+    // discards them for free.
+    setPreviewReloadKey((k) => k + 1);
+  }
+
+  async function saveQuickEdit() {
+    const doc = previewIframeRef.current?.contentDocument;
+    if (!doc || !projectId || quickEditSaving) return;
+    setQuickEditSaving(true);
+    deactivateQuickEdit();
+    try {
+      const newHtml = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+      const res = await fetch(`/api/projects/${projectId}/quick-edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: newHtml }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setHtml(newHtml);
+        setQuickEdit(false);
+        setQuickEditMsg(data.checkStatus === "pass" ? "Saved" : "Saved -- a couple of checks flagged, see Publish page");
+      } else {
+        setQuickEditMsg(data.error || "Failed to save.");
+      }
+    } catch {
+      setQuickEditMsg("Failed to save. Check your connection and try again.");
+    } finally {
+      setQuickEditSaving(false);
+      setTimeout(() => setQuickEditMsg(""), 4000);
+    }
   }
 
   async function publishToBuildGuild() {
@@ -894,6 +1068,36 @@ export default function BuilderClient({
                   >
                     Code
                   </button>
+                  {view === "preview" && projectId && !quickEdit && (
+                    <button
+                      onClick={toggleQuickEdit}
+                      title="Click text to edit it directly, or alt/option-click an element to recolor it"
+                      className="px-3 py-1.5 rounded-full text-xs font-bold border border-black/15 text-black/70 hover:bg-black/5 transition"
+                    >
+                      Quick edit
+                    </button>
+                  )}
+                  {view === "preview" && quickEdit && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">
+                        Editing -- click text to edit, alt-click to recolor
+                      </span>
+                      <button
+                        onClick={saveQuickEdit}
+                        disabled={quickEditSaving}
+                        className="px-3 py-1.5 rounded-full text-xs font-bold bg-black text-white disabled:opacity-40"
+                      >
+                        {quickEditSaving ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        onClick={discardQuickEdit}
+                        disabled={quickEditSaving}
+                        className="px-3 py-1.5 rounded-full text-xs font-bold border border-black/15 text-black/60 hover:bg-black/5 disabled:opacity-40"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {view === "code" && (
@@ -916,6 +1120,34 @@ export default function BuilderClient({
                   )}
                   {projectId && shareUrl && (
                     <ShareButton url={shareUrl} title={prompt} variant="light" />
+                  )}
+                  {projectId && (
+                    <button
+                      onClick={() => setGithubPanelOpen(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold border border-black/15 text-black/70 hover:bg-black/5 transition"
+                    >
+                      Push to GitHub
+                    </button>
+                  )}
+                  {projectId && (
+                    <button
+                      onClick={() => setDataImportOpen(true)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                        pendingDataBlock
+                          ? "border-emerald-600/30 text-emerald-700 bg-emerald-50"
+                          : "border-black/15 text-black/70 hover:bg-black/5"
+                      }`}
+                    >
+                      {pendingDataBlock ? "Data ready \u2713" : "Import data"}
+                    </button>
+                  )}
+                  {projectId && (
+                    <button
+                      onClick={() => setIntegrationsOpen(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold border border-black/15 text-black/70 hover:bg-black/5 transition"
+                    >
+                      Integrations
+                    </button>
                   )}
                   {projectId && (
                     <button
@@ -1205,12 +1437,45 @@ export default function BuilderClient({
               )}
 
               {view === "preview" ? (
-                <iframe
-                  srcDoc={html}
-                  sandbox="allow-scripts allow-same-origin"
-                  className="w-full h-[700px] border-0 bg-white"
-                  title="Generated app preview"
-                />
+                <>
+                  <iframe
+                    key={previewReloadKey}
+                    ref={previewIframeRef}
+                    srcDoc={html}
+                    sandbox="allow-scripts allow-same-origin"
+                    className="w-full h-[700px] border-0 bg-white"
+                    title="Generated app preview"
+                    onLoad={() => {
+                      if (quickEdit) activateQuickEdit();
+                    }}
+                  />
+                  {quickEdit && quickEditSelection && (
+                    <div className="flex items-center gap-4 px-4 py-2.5 bg-fuchsia-50 border-t border-fuchsia-100 text-xs">
+                      <span className="font-mono text-fuchsia-700/70">{quickEditSelection.tag}</span>
+                      <label className="flex items-center gap-1.5 font-bold text-black/60">
+                        Text
+                        <input
+                          type="color"
+                          value={quickEditSelection.color}
+                          onChange={(e) => applySelectionColor("color", e.target.value)}
+                          className="w-6 h-6 rounded border border-black/10 cursor-pointer"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5 font-bold text-black/60">
+                        Background
+                        <input
+                          type="color"
+                          value={quickEditSelection.background}
+                          onChange={(e) => applySelectionColor("background", e.target.value)}
+                          className="w-6 h-6 rounded border border-black/10 cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {quickEditMsg && (
+                    <div className="px-4 py-2 bg-black text-white text-xs font-bold">{quickEditMsg}</div>
+                  )}
+                </>
               ) : (
                 <pre className="w-full h-[700px] overflow-auto bg-zinc-950 text-zinc-200 text-[12px] leading-[1.6] p-5 m-0">
                   <code>{html}</code>
@@ -1257,6 +1522,15 @@ export default function BuilderClient({
 
         <div className="h-20" />
       </div>
+      {githubPanelOpen && projectId && (
+        <GitHubPushPanel projectId={projectId} onClose={() => setGithubPanelOpen(false)} />
+      )}
+      {dataImportOpen && projectId && (
+        <DataImportPanel projectId={projectId} onClose={() => setDataImportOpen(false)} onConnected={handleDataConnected} />
+      )}
+      {integrationsOpen && projectId && (
+        <IntegrationsPanel projectId={projectId} onClose={() => setIntegrationsOpen(false)} />
+      )}
     </div>
   );
 }

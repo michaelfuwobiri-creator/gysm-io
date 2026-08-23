@@ -5,6 +5,7 @@ import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/cre
 import { generateWebsite, editWebsite, BuildStage, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { buildSuggestions } from "@/lib/suggestions";
 import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
+import { runPreflightCheck } from "@/lib/preflightCheck";
 import { runSql } from "@/lib/supabaseBackend";
 
 // This route runs two sequential AI calls (an OpenAI structure pass, then
@@ -47,11 +48,22 @@ export async function POST(req: NextRequest) {
   let previousHtml: string | null = null;
   let image: string | undefined;
   let projectId: string | undefined;
+  let dataContext: string | undefined;
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
     projectId = typeof body?.projectId === "string" && body.projectId ? body.projectId : undefined;
+    // Optional snapshot from a connected Airtable/Google Sheets data
+    // source (see DataImportPanel + /api/connectors/data/*) -- folded
+    // into what the AI sees for THIS generation only, but never saved as
+    // the project's prompt/title, so a dashboard card never ends up
+    // showing a wall of imported JSON. Capped generously; the client
+    // already caps rows at import time (lib/dataConnectors.ts).
+    const rawDataContext = typeof body?.dataContext === "string" ? body.dataContext : undefined;
+    if (rawDataContext && rawDataContext.length <= 200_000) {
+      dataContext = rawDataContext;
+    }
     // Optional reference photo/illustration a user attaches to show the
     // builder what they want, sent as a data: URL from BuilderClient's
     // FileReader. Kept under a hard size cap here too (not just client
@@ -106,9 +118,40 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // PostHog/Resend connectors (see /api/connectors/integrations/*)
+        // are per-project and, unlike the Airtable/Sheets data import,
+        // apply automatically on every generation for a project that has
+        // them connected -- not just "the next one" -- since embedding an
+        // analytics snippet or wiring a contact form is a standing fact
+        // about the build, not a one-time data drop.
+        let integrationContext = "";
+        if (projectId) {
+          try {
+            const connectorRows = await sql`
+              select provider, config from project_connectors
+              where project_id = ${projectId} and provider in ('posthog', 'resend') and status = 'active'
+            `;
+            for (const row of connectorRows as any[]) {
+              if (row.provider === "posthog") {
+                integrationContext += `\n\nANALYTICS -- this build has PostHog connected. Add this exact snippet right before </head>, unmodified:\n<script>!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);posthog.init('${row.config.apiKey}',{api_host:'${row.config.host}'})</script>\nThis is the ONLY analytics snippet to include -- do not invent a different one.`;
+              } else if (row.provider === "resend") {
+                integrationContext += `\n\nCONTACT FORM EMAIL -- this build has email delivery connected. If the app has (or should have) a contact/feedback form, wire its submit handler to: fetch("/api/connectors/email/send", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ projectId: "${projectId}", subject: <a short subject from the form>, message: <the form's message field>, replyTo: <the sender's email field, if the form collects one> }) }). Show a real success/error state based on the response -- don't fake it. This endpoint is public and already knows where to deliver the message; the form does not need (and should not ask for) a recipient address.`;
+              }
+            }
+          } catch (error: any) {
+            console.error("[generate] failed to load project connectors:", error.message);
+          }
+        }
+
+        // dataContext (if present) and integrationContext (if present) are
+        // folded into the instruction text sent to the model, but `prompt`
+        // itself -- used below for saving and for buildSuggestions() --
+        // stays exactly what the user typed.
+        const generationText = `${dataContext ? dataContext + "\n\n" : ""}${prompt}${integrationContext}`;
+
         const result = previousHtml
-          ? await editWebsite(previousHtml, prompt, onStage, image, backendContext)
-          : await generateWebsite(prompt, onStage, image, backendContext);
+          ? await editWebsite(previousHtml, generationText, onStage, image, backendContext)
+          : await generateWebsite(generationText, onStage, image, backendContext);
 
         if (!result.ok) {
           const failure = result as Extract<typeof result, { ok: false }>;
@@ -170,11 +213,16 @@ export async function POST(req: NextRequest) {
 
         // Best-effort: a save failure shouldn't take away a build the user
         // already paid a credit for, but it's logged loudly so it's caught.
+        // Automated pre-publish check (see lib/preflightCheck.ts) -- a
+        // fast structural scan, not a full autonomous test run. Computed
+        // up front so it saves in the same insert as everything else.
+        const preflight = runPreflightCheck(htmlToSave);
+
         let newProjectId: string | null = null;
         try {
           const rows = await sql`
-            insert into projects (user_id, prompt, html, root_project_id, org_id)
-            values (${user.id}, ${prompt}, ${htmlToSave}, ${rootProjectId}, ${orgIdForSave})
+            insert into projects (user_id, prompt, html, root_project_id, org_id, check_status, check_results, check_run_at)
+            values (${user.id}, ${prompt}, ${htmlToSave}, ${rootProjectId}, ${orgIdForSave}, ${preflight.status}, ${JSON.stringify(preflight.issues)}, ${preflight.checkedAt})
             returning id
           `;
           newProjectId = (rows[0] as any)?.id ?? null;
@@ -225,6 +273,7 @@ export async function POST(req: NextRequest) {
           html: htmlToSave,
           projectId: newProjectId,
           suggestions: buildSuggestions(prompt),
+          preflight: { status: preflight.status, issues: preflight.issues },
         });
       } catch (err: any) {
         console.error("[generate] stream failed:", err?.message || err);

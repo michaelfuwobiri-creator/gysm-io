@@ -60,13 +60,13 @@ export default async function PublishedProjectPage({
 }: {
   params: { id: string };
 }) {
-  let project: { id: string; prompt: string; html: string } | null = null;
+  let project: { id: string; prompt: string; html: string; check_status: string | null } | null = null;
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (UUID_RE.test(params.id)) {
     try {
       const rows = await sql`
-        select id, prompt, html from projects where id = ${params.id} limit 1
+        select id, prompt, html, check_status from projects where id = ${params.id} limit 1
       `;
       project = (rows[0] as any) ?? null;
       // Best-effort view count -- fire-and-forget, never blocks or fails
@@ -131,6 +131,15 @@ export default async function PublishedProjectPage({
           </a>
           — describe an app, get a real one
         </div>
+        {project.check_status === "pass" && (
+          <span
+            title="Passed GYSM.IO's automated pre-publish check -- no broken internal links, no unclosed tags, no leftover placeholder text."
+            className="hidden sm:inline-flex items-center gap-1 text-emerald-600/70 shrink-0"
+          >
+            <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0l-3.5-3.5a1 1 0 111.4-1.4l2.8 2.8 6.8-6.8a1 1 0 011.4 0z" clipRule="evenodd" /></svg>
+            Checked
+          </span>
+        )}
         <ShareButton
           url={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/publish/${project.id}`}
           title={project.prompt}
