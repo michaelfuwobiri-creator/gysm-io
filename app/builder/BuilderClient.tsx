@@ -687,6 +687,16 @@ export default function BuilderClient({
       const target = e.target as HTMLElement;
       if (!target || target === doc.body || target === doc.documentElement) return;
 
+      // Always prevent the browser's default action first. Generated
+      // builds routinely wrap headings/logos/nav items in <a href="...">
+      // or put buttons in <form>s -- without this, a plain click during
+      // quick edit would fall through to real navigation (confirmed live:
+      // clicking a logo link whose href="/" navigated the preview iframe
+      // to gysm.io's own homepage instead of entering edit mode, since
+      // "/" resolves against the parent app's origin) or a form submit,
+      // instead of just editing the clicked element in place.
+      e.preventDefault();
+
       if (e.altKey) {
         e.preventDefault();
         e.stopPropagation();
