@@ -70,6 +70,10 @@ export default function BuilderClient({
   // the vision-capable model in lib/ai/orchestrator.ts.
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
+  // Model tier -- "fast" (Terra, default) or "best" (Sol, costs 2x
+  // credits). Kept in component state rather than a URL/localStorage
+  // setting since it's a per-build choice, not a standing preference.
+  const [tier, setTier] = useState<"fast" | "best">("fast");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // "Quick edit" -- click-to-edit overlay directly on the live preview,
@@ -559,6 +563,7 @@ export default function BuilderClient({
             // the AI sees without it ever polluting the saved prompt/title
             // or the History panel with a wall of imported JSON.
             dataContext: pendingDataBlock ?? undefined,
+            tier,
           }),
         });
         if (pendingDataBlock) setPendingDataBlock(null);
@@ -627,7 +632,7 @@ export default function BuilderClient({
         setStatus("error");
       }
     },
-    [prompt, html, router, imageDataUrl, pendingDataBlock]
+    [prompt, html, router, imageDataUrl, pendingDataBlock, tier]
   );
 
   // Fire the initial generate automatically only if a pending prompt was
@@ -942,6 +947,33 @@ export default function BuilderClient({
                   </svg>
                 </button>
               )}
+              <div
+                role="group"
+                aria-label="Model quality"
+                title="Fast: default model, 1 credit. Best: flagship model, 2 credits -- for prompts that need a stronger attempt."
+                className="hidden sm:flex items-center h-[56px] shrink-0 rounded-full border border-black/10 bg-black/[0.03] p-1 gap-0.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setTier("fast")}
+                  disabled={isLoading}
+                  className={`h-[40px] px-4 rounded-full text-[13px] font-bold transition disabled:opacity-40 ${
+                    tier === "fast" ? "bg-white shadow-sm text-black" : "text-black/40 hover:text-black/70"
+                  }`}
+                >
+                  Fast
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTier("best")}
+                  disabled={isLoading}
+                  className={`h-[40px] px-4 rounded-full text-[13px] font-bold transition disabled:opacity-40 ${
+                    tier === "best" ? "bg-white shadow-sm text-black" : "text-black/40 hover:text-black/70"
+                  }`}
+                >
+                  Best · 2×
+                </button>
+              </div>
               <button
                 onClick={() => generate()}
                 disabled={isLoading || !prompt.trim()}
@@ -951,6 +983,9 @@ export default function BuilderClient({
               </button>
             </div>
             {imageError && <p className="text-[12px] text-red-600 px-2">{imageError}</p>}
+            {tier === "best" && (
+              <p className="text-[11px] text-black/35 px-2">Best quality uses the flagship model and costs 2× credits for this build.</p>
+            )}
           </div>
         </div>
 

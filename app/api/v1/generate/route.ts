@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiKey } from "@/lib/apiKeys";
-import { getCreditBalance, deductCredit, CREDIT_COST_PER_BUILD } from "@/lib/credits";
-import { generateWebsite, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
+import { getCreditBalance, deductCredit, CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST } from "@/lib/credits";
+import { generateWebsite, ModelTier, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { sql } from "@/lib/db";
 
 // Public, API-key-authenticated generation endpoint -- see
@@ -29,9 +29,13 @@ export async function POST(req: NextRequest) {
   }
 
   let prompt = "";
+  let tier: ModelTier = "fast";
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
+    // Optional: {"tier": "best"} uses the flagship model for 2x credits.
+    // Anything else (including omitted) is the default "fast" tier.
+    tier = body?.tier === "best" ? "best" : "fast";
   } catch {
     return NextResponse.json({ error: "Invalid request body. Expected JSON: {\"prompt\": \"...\"}." }, { status: 400 });
   }
@@ -39,18 +43,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "\"prompt\" is required." }, { status: 400 });
   }
 
+  const buildCost = tier === "best" ? CREDIT_COST_PER_BUILD_BEST : CREDIT_COST_PER_BUILD;
+
   const balance = await getCreditBalance(auth.userId);
-  if (balance < CREDIT_COST_PER_BUILD) {
+  if (balance < buildCost) {
     return NextResponse.json({ error: "Out of credits.", code: "NO_CREDITS" }, { status: 402 });
   }
 
-  const result = await generateWebsite(prompt);
+  const result = await generateWebsite(prompt, undefined, undefined, undefined, tier);
   if (!result.ok) {
     const failure = result as Extract<typeof result, { ok: false }>;
     return NextResponse.json({ error: failure.error }, { status: failure.status || 500 });
   }
 
-  const deducted = await deductCredit(auth.userId);
+  const deducted = await deductCredit(auth.userId, buildCost);
   if (!deducted) {
     return NextResponse.json({ error: "Out of credits.", code: "NO_CREDITS" }, { status: 402 });
   }

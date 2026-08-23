@@ -15,7 +15,7 @@ GYSM.IO uses a two-model AI pipeline (a structure/content pass followed by a vis
 
 ## API access
 
-GYSM.IO has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call costs the same credits as a build made in the builder UI and returns the generated app's HTML plus a public share URL.
+GYSM.IO has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. An optional `"tier": "best"` field switches the generation model from the default fast tier to the flagship tier, for 2x the credit cost. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call costs the same credits as a build made in the builder UI and returns the generated app's HTML plus a public share URL.
 
 ## Notable apps built with GYSM.IO
 

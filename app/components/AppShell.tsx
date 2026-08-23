@@ -28,6 +28,7 @@ const NAV_GROUPS: {
       { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "grid" },
       { key: "templates", label: "Templates", href: "/templates", icon: "layout" },
       { key: "connectors", label: "Connectors", href: "/connectors", icon: "plug" },
+      { key: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: "chart" },
     ],
   },
   {
@@ -121,6 +122,14 @@ function NavIcon({ name }: { name: string }) {
         <path d="M10.6 12.4L20 3" />
         <path d="M15 8l3 3" />
         <path d="M18 5l3 3" />
+      </svg>
+    );
+  }
+  if (name === "chart") {
+    return (
+      <svg {...common}>
+        <path d="M3 3v18h18" />
+        <path d="M7 16l4-5 3 3 5-7" />
       </svg>
     );
   }

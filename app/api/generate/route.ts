@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { CREDIT_COST_PER_BUILD, getCreditBalance, deductCredit } from "@/lib/credits";
-import { generateWebsite, editWebsite, BuildStage, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
+import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, getCreditBalance, deductCredit } from "@/lib/credits";
+import { generateWebsite, editWebsite, BuildStage, ModelTier, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { buildSuggestions } from "@/lib/suggestions";
 import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
 import { runPreflightCheck } from "@/lib/preflightCheck";
@@ -49,11 +49,17 @@ export async function POST(req: NextRequest) {
   let image: string | undefined;
   let projectId: string | undefined;
   let dataContext: string | undefined;
+  let tier: ModelTier = "fast";
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
     projectId = typeof body?.projectId === "string" && body.projectId ? body.projectId : undefined;
+    // Optional model tier -- "best" (Sol) costs more credits than the
+    // default "fast" (Terra); see CREDIT_COST_PER_BUILD_BEST. Anything
+    // other than exactly "best" falls back to "fast" rather than erroring,
+    // since this is a nice-to-have toggle, not a required field.
+    tier = body?.tier === "best" ? "best" : "fast";
     // Optional snapshot from a connected Airtable/Google Sheets data
     // source (see DataImportPanel + /api/connectors/data/*) -- folded
     // into what the AI sees for THIS generation only, but never saved as
@@ -84,10 +90,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Describe what you want to build." }, { status: 400 });
   }
 
+  const buildCost = tier === "best" ? CREDIT_COST_PER_BUILD_BEST : CREDIT_COST_PER_BUILD;
+
   const balance = await getCreditBalance(user.id);
-  if (balance < CREDIT_COST_PER_BUILD) {
+  if (balance < buildCost) {
     return Response.json(
-      { error: "You're out of credits.", code: "NO_CREDITS" },
+      { error: tier === "best" ? "Not enough credits for Best quality on this build." : "You're out of credits.", code: "NO_CREDITS" },
       { status: 402 }
     );
   }
@@ -150,8 +158,8 @@ export async function POST(req: NextRequest) {
         const generationText = `${dataContext ? dataContext + "\n\n" : ""}${prompt}${integrationContext}`;
 
         const result = previousHtml
-          ? await editWebsite(previousHtml, generationText, onStage, image, backendContext)
-          : await generateWebsite(generationText, onStage, image, backendContext);
+          ? await editWebsite(previousHtml, generationText, onStage, image, backendContext, tier)
+          : await generateWebsite(generationText, onStage, image, backendContext, tier);
 
         if (!result.ok) {
           const failure = result as Extract<typeof result, { ok: false }>;
@@ -163,7 +171,7 @@ export async function POST(req: NextRequest) {
         // Deduct only after a successful generation -- atomic, so a
         // concurrent request from the same user can't both pass the
         // earlier balance check and both ship a free build.
-        const deducted = await deductCredit(user.id);
+        const deducted = await deductCredit(user.id, buildCost);
         if (!deducted) {
           send({ type: "error", error: "You're out of credits.", code: "NO_CREDITS" });
           controller.close();
@@ -274,6 +282,8 @@ export async function POST(req: NextRequest) {
           projectId: newProjectId,
           suggestions: buildSuggestions(prompt),
           preflight: { status: preflight.status, issues: preflight.issues },
+          tier,
+          creditsSpent: buildCost,
         });
       } catch (err: any) {
         console.error("[generate] stream failed:", err?.message || err);

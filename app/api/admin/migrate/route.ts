@@ -67,6 +67,91 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
     id: "0011_api_keys_key_hash_idx",
     run: () => sql`create index if not exists api_keys_key_hash_idx on api_keys (key_hash) where revoked_at is null`,
   },
+  // 0012_gap_features.sql -- github push, generic project connectors
+  // (Airtable/Sheets/Resend/PostHog), and the automated pre-publish
+  // check columns. Copied verbatim; wasn't in this runner yet even
+  // though the code that depends on it already shipped, so adding it
+  // now to make sure the underlying tables actually exist.
+  {
+    id: "0012_github_connections",
+    run: () => sql`
+      create table if not exists github_connections (
+        id                uuid primary key default gen_random_uuid(),
+        project_id        uuid not null references projects(id) on delete cascade,
+        user_id           text not null,
+        owner             text not null,
+        repo              text not null,
+        branch            text not null default 'main',
+        token_encrypted   text not null,
+        status            text not null default 'connected',
+        error_message     text,
+        last_pushed_at    timestamptz,
+        last_commit_url   text,
+        created_at        timestamptz not null default now(),
+        updated_at        timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0012_github_connections_project_id_idx",
+    run: () => sql`create unique index if not exists github_connections_project_id_idx on github_connections (project_id)`,
+  },
+  {
+    id: "0012_github_connections_user_id_idx",
+    run: () => sql`create index if not exists github_connections_user_id_idx on github_connections (user_id)`,
+  },
+  {
+    id: "0012_project_connectors",
+    run: () => sql`
+      create table if not exists project_connectors (
+        id                 uuid primary key default gen_random_uuid(),
+        project_id         uuid not null references projects(id) on delete cascade,
+        user_id            text not null,
+        provider           text not null,
+        config             jsonb not null default '{}'::jsonb,
+        secret_encrypted   text,
+        status             text not null default 'active',
+        error_message      text,
+        last_synced_at     timestamptz,
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now(),
+        unique (project_id, provider)
+      )
+    `,
+  },
+  {
+    id: "0012_project_connectors_user_id_idx",
+    run: () => sql`create index if not exists project_connectors_user_id_idx on project_connectors (user_id)`,
+  },
+  {
+    id: "0012_projects_check_status_col",
+    run: () => sql`alter table projects add column if not exists check_status text`,
+  },
+  {
+    id: "0012_projects_check_results_col",
+    run: () => sql`alter table projects add column if not exists check_results jsonb`,
+  },
+  {
+    id: "0012_projects_check_run_at_col",
+    run: () => sql`alter table projects add column if not exists check_run_at timestamptz`,
+  },
+  // 0013_view_events.sql -- per-build analytics (views over time + top
+  // referrers), additive alongside the existing `views` counter.
+  {
+    id: "0013_project_view_events",
+    run: () => sql`
+      create table if not exists project_view_events (
+        id          uuid primary key default gen_random_uuid(),
+        project_id  uuid not null references projects(id) on delete cascade,
+        viewed_at   timestamptz not null default now(),
+        referrer    text
+      )
+    `,
+  },
+  {
+    id: "0013_project_view_events_idx",
+    run: () => sql`create index if not exists project_view_events_project_id_idx on project_view_events (project_id, viewed_at desc)`,
+  },
 ];
 
 export async function POST(_req: NextRequest) {

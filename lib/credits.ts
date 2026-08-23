@@ -3,8 +3,8 @@ import { sql } from "@/lib/db";
 // here (for local use below) and re-exported so existing `@/lib/credits`
 // importers keep working -- see that file for why the split exists
 // (client-bundle DB leak fix).
-import { CREDIT_COST_PER_BUILD, BUILDS_PER_PLAN, CREDITS_PER_PLAN } from "@/lib/credits-constants";
-export { CREDIT_COST_PER_BUILD, BUILDS_PER_PLAN, CREDITS_PER_PLAN };
+import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, BUILDS_PER_PLAN, CREDITS_PER_PLAN } from "@/lib/credits-constants";
+export { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, BUILDS_PER_PLAN, CREDITS_PER_PLAN };
 
 export async function getCreditBalance(userId: string): Promise<number> {
   try {

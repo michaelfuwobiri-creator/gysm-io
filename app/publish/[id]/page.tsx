@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import ShareButton from "@/app/components/ShareButton";
 
@@ -76,6 +77,15 @@ export default async function PublishedProjectPage({
       if (project) {
         sql`update projects set views = views + 1 where id = ${params.id}`.catch((error: any) => {
           console.error("[publish] failed to bump view count:", error.message);
+        });
+        // Richer signal alongside the plain counter above -- one row per
+        // view with when it happened and where it came from, so
+        // /dashboard/analytics can show a real trend and top referrers
+        // instead of just a lifetime total. Same fire-and-forget posture:
+        // never blocks or fails the page render.
+        const referrer = headers().get("referer") || null;
+        sql`insert into project_view_events (project_id, referrer) values (${params.id}, ${referrer})`.catch((error: any) => {
+          console.error("[publish] failed to log view event:", error.message);
         });
       }
     } catch (error: any) {

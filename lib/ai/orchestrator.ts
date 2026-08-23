@@ -81,6 +81,21 @@ export type BackendContext = { url: string; anonKey: string };
 export type BuildStage = "structure" | "structure_done" | "design" | "design_done";
 export type StageCallback = (stage: BuildStage) => void;
 
+// Model choice -- "fast" is the default Terra tier (cheap, competitive on
+// straightforward one-shot generation). "best" switches the structure
+// pass to Sol, the flagship tier of the same gpt-5.6 family, for users
+// who want a stronger attempt at a complex prompt and are willing to
+// spend more credits for it. Costs more (see CREDIT_COST_PER_BUILD_BEST
+// in lib/credits-constants.ts) because Sol's output-token cost is
+// meaningfully higher than Terra's -- that cost difference is passed
+// through honestly rather than eaten silently or charged flat regardless
+// of which model actually ran.
+export type ModelTier = "fast" | "best";
+
+function structureModelFor(tier: ModelTier): string {
+  return tier === "best" ? "gpt-5.6-sol" : "gpt-5.6-terra";
+}
+
 export type GenerateResult =
   | { ok: true; html: string }
   | { ok: false; error: string; status: number };
@@ -110,10 +125,11 @@ export async function generateWebsite(
   prompt: string,
   onStage?: StageCallback,
   imageDataUrl?: string,
-  backendContext?: BackendContext
+  backendContext?: BackendContext,
+  tier: ModelTier = "fast"
 ): Promise<GenerateResult> {
   onStage?.("structure");
-  const structure = await generateStructure(prompt, imageDataUrl, backendContext);
+  const structure = await generateStructure(prompt, imageDataUrl, backendContext, tier);
   if (!structure.ok) return structure;
   onStage?.("structure_done");
 
@@ -135,7 +151,8 @@ export async function editWebsite(
   instruction: string,
   onStage?: StageCallback,
   imageDataUrl?: string,
-  backendContext?: BackendContext
+  backendContext?: BackendContext,
+  tier: ModelTier = "fast"
 ): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
@@ -160,7 +177,7 @@ export async function editWebsite(
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: structureModelFor(tier),
       messages: [
         { role: "system", content: editSystemPrompt },
         { role: "user", content: editUserContent },
@@ -192,7 +209,8 @@ export async function editWebsite(
 async function generateStructure(
   prompt: string,
   imageDataUrl?: string,
-  backendContext?: BackendContext
+  backendContext?: BackendContext,
+  tier: ModelTier = "fast"
 ): Promise<GenerateResult> {
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
@@ -217,7 +235,7 @@ async function generateStructure(
   let raw: string;
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.6-terra",
+      model: structureModelFor(tier),
       messages: [
         { role: "system", content: structureSystemPrompt },
         { role: "user", content: structureUserContent },
