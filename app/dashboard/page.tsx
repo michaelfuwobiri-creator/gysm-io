@@ -10,6 +10,7 @@ import PublishButton from "./PublishButton";
 import DeleteButton from "./DeleteButton";
 import RenameButton from "./RenameButton";
 import DuplicateButton from "./DuplicateButton";
+import DeployVercelButton from "./DeployVercelButton";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
@@ -143,6 +144,7 @@ export default async function DashboardPage() {
                         Download
                       </a>
                     </div>
+                    <DeployVercelButton projectId={p.id} />
                     <div className="pt-1 border-t border-black/10">
                       <DeleteButton projectId={p.id} />
                     </div>
