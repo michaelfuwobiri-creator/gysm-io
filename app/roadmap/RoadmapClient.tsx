@@ -57,8 +57,14 @@ function VoteButton({ item, signedIn, onToggle }: { item: Item; signedIn: boolea
   );
 }
 
-export default function RoadmapClient({ initialItems, signedIn }: { initialItems: Item[]; signedIn: boolean }) {
+export default function RoadmapClient({ initialItems, signedIn, isAdmin }: { initialItems: Item[]; signedIn: boolean; isAdmin?: boolean }) {
   const [items, setItems] = useState(initialItems);
+
+  async function remove(id: string) {
+    if (!confirm("Delete this roadmap item?")) return;
+    await fetch(`/api/roadmap/${id}`, { method: "DELETE" });
+    setItems((prev) => prev.filter((it) => it.id !== id));
+  }
 
   function toggle(id: string) {
     setItems((prev) =>
@@ -77,7 +83,7 @@ export default function RoadmapClient({ initialItems, signedIn }: { initialItems
       {items.map((item) => (
         <div key={item.id} className="flex items-start gap-4 rounded-2xl border border-black/10 bg-white p-5">
           <VoteButton item={item} signedIn={signedIn} onToggle={toggle} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-[15px]">{item.title}</h3>
               <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${STATUS_STYLE[item.status]}`}>
@@ -86,6 +92,14 @@ export default function RoadmapClient({ initialItems, signedIn }: { initialItems
             </div>
             {item.description && <p className="mt-1 text-[13px] text-black/50">{item.description}</p>}
           </div>
+          {isAdmin && (
+            <button
+              onClick={() => remove(item.id)}
+              className="shrink-0 text-[11px] font-bold text-black/30 hover:text-red-600"
+            >
+              Delete
+            </button>
+          )}
         </div>
       ))}
     </div>

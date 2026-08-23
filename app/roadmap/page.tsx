@@ -54,7 +54,7 @@ export default async function RoadmapPage() {
 
         {isAdmin && <RoadmapAdminForm />}
 
-        <RoadmapClient initialItems={items} signedIn={!!user} />
+        <RoadmapClient initialItems={items} signedIn={!!user} isAdmin={isAdmin} />
 
         <div className="h-16" />
       </div>
