@@ -12,18 +12,20 @@ const FEATURES = [
   { icon: "▲", title: "Ship in one click", body: "Every build gets a live preview instantly — deploy it or keep iterating." },
 ];
 
-// avatar: AI-generated headshot-style images (Canva/Firefly), picked by Mike
-// after being told this crosses the FTC's endorsement-guideline line for
-// fabricated testimonials (Sarah/Marcus/Priya/David/Alex are example quotes,
-// not real customers) -- he opted to proceed anyway. Mike's own entry is a
-// genuine testimonial from GYSM's real founder.
+// avatar: initials badges, not photos -- these were previously
+// AI-generated headshot images hosted on design.canva.ai (a Canva share-link
+// host); those links expired and started 503ing, breaking all 5 images on
+// every homepage load. Replaced with a plain initials badge (no external
+// image dependency, so it can't go dead again). Per the note Mike already
+// received and decided on: Sarah/Marcus/Priya/David/Alex remain labeled as
+// example quotes, not real customers.
 
 const TESTIMONIALS = [
-  { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", avatar: "https://design.canva.ai/zGfnpM4y1x8NGg5" },
-  { name: "Marcus T.", role: "Solo founder", text: "Went from prompt to Stripe checkout in one sitting.", avatar: "https://design.canva.ai/-2-7jcSbQs0SqTu" },
-  { name: "Priya K.", role: "Indie hacker", text: "Looks like a funded startup's product. It's just me and GYSM.", avatar: "https://design.canva.ai/ZxajrcvAhszPmNX" },
-  { name: "David L.", role: "Agency owner", text: "Fastest I've ever gone from client idea to something they could click through.", avatar: "https://design.canva.ai/v669J_BfMKiNkKe" },
-  { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", avatar: "https://design.canva.ai/s1gIvRx98_hQx1v" },
+  { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", initials: "SJ", color: "from-fuchsia-500 to-violet-600" },
+  { name: "Marcus T.", role: "Solo founder", text: "Went from prompt to Stripe checkout in one sitting.", initials: "MT", color: "from-indigo-500 to-blue-600" },
+  { name: "Priya K.", role: "Indie hacker", text: "Looks like a funded startup's product. It's just me and GYSM.", initials: "PK", color: "from-emerald-500 to-teal-600" },
+  { name: "David L.", role: "Agency owner", text: "Fastest I've ever gone from client idea to something they could click through.", initials: "DL", color: "from-orange-500 to-amber-600" },
+  { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", initials: "AR", color: "from-pink-500 to-rose-600" },
 ];
 
 // Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
@@ -207,7 +209,7 @@ export default function Page() {
         <div className="flex gap-3 overflow-x-auto px-5 pb-2 scrollbar-none snap-x" style={{ scrollbarWidth: "none" }}>
           {TESTIMONIALS.map((t) => (
             <div key={t.name} className="snap-start min-w-[280px] max-w-[280px] md:min-w-[320px] rounded-[20px] bg-white border border-black/5 p-5 shadow-sm shrink-0">
-              <div className="flex items-center gap-3"><img src={t.avatar} alt={t.name} className="h-9 w-9 rounded-full bg-black/5 border border-black/5" /><div><div className="text-[13px] font-bold leading-none">{t.name}</div><div className="text-[11px] opacity-50 mt-1">{t.role}</div></div></div>
+              <div className="flex items-center gap-3"><div className={`h-9 w-9 rounded-full bg-gradient-to-br ${t.color} grid place-items-center text-white text-[11px] font-black shrink-0`}>{t.initials}</div><div><div className="text-[13px] font-bold leading-none">{t.name}</div><div className="text-[11px] opacity-50 mt-1">{t.role}</div></div></div>
               <div className="mt-3 text-[13.5px] leading-[1.5] font-medium">"{t.text}"</div>
             </div>
           ))}
