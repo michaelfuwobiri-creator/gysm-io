@@ -125,7 +125,7 @@ export default function ConnectorsClient({ initialRequested }: { initialRequeste
                   </span>
                 </div>
                 <p className="text-black/45 text-[13px] mt-0.5">
-                  Import real rows from a base or a published sheet -- connect it from that build's toolbar (\u201cImport data\u201d).
+                  Import real rows from a base or a published sheet -- connect it from that build's toolbar (“Import data”).
                 </p>
               </div>
             </div>
@@ -149,7 +149,7 @@ export default function ConnectorsClient({ initialRequested }: { initialRequeste
                   </span>
                 </div>
                 <p className="text-black/45 text-[13px] mt-0.5">
-                  Push any build to a repo you own, and re-push after edits -- connect it from that build's toolbar (\u201cPush to GitHub\u201d).
+                  Push any build to a repo you own, and re-push after edits -- connect it from that build's toolbar (“Push to GitHub”).
                 </p>
               </div>
             </div>
@@ -173,7 +173,7 @@ export default function ConnectorsClient({ initialRequested }: { initialRequeste
                   </span>
                 </div>
                 <p className="text-black/45 text-[13px] mt-0.5">
-                  Wire real product analytics into a build -- connect it from that build's toolbar (\u201cIntegrations\u201d).
+                  Wire real product analytics into a build -- connect it from that build's toolbar (“Integrations”).
                 </p>
               </div>
             </div>
@@ -197,7 +197,7 @@ export default function ConnectorsClient({ initialRequested }: { initialRequeste
                   </span>
                 </div>
                 <p className="text-black/45 text-[13px] mt-0.5">
-                  Give a build a working contact form that actually emails you -- connect it from that build's toolbar (\u201cIntegrations\u201d).
+                  Give a build a working contact form that actually emails you -- connect it from that build's toolbar (“Integrations”).
                 </p>
               </div>
             </div>
