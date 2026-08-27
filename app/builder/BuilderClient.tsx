@@ -819,7 +819,7 @@ export default function BuilderClient({
     projectId && typeof window !== "undefined" ? `${window.location.origin}/publish/${projectId}` : "";
 
   return (
-    <div className="min-h-screen bg-white text-[#0A0A0A] relative overflow-x-hidden">
+    <div className="h-screen flex flex-col bg-white text-[#0A0A0A] overflow-hidden">
       {/* Soft ambient glow behind the whole page -- same violet/fuchsia
           identity as the marketing site, so the builder doesn't feel like
           a separate, plainer tool bolted onto a polished landing page. */}
@@ -847,8 +847,8 @@ export default function BuilderClient({
         </div>
       )}
 
-      <div className="max-w-[1600px] mx-auto p-6 relative">
-        <div className="flex justify-between items-center py-4 border-b border-black/10 mb-8">
+      {/* Top bar -- full width, fixed height, sits above the two-pane body */}
+        <div className="flex justify-between items-center h-14 px-6 border-b border-black/10">
           <h1 className="text-2xl font-black">
             GYSM<span className="text-fuchsia-500">.IO</span>
           </h1>
@@ -896,14 +896,19 @@ export default function BuilderClient({
           </div>
         </div>
 
+      {/* Two-pane body, Bolt/Lovable-style: chat + composer on the left,
+          live preview/code filling the rest of the viewport on the right. */}
+      <div className="flex-1 min-h-0 flex relative">
+        {/* LEFT PANE -- conversation history + prompt composer */}
+        <div className="w-full lg:w-[440px] shrink-0 flex flex-col border-r border-black/10 min-h-0 bg-white relative z-10">
         {!html && !isLoading && (
-          <div className="relative text-center mb-6 py-8 -my-8 rounded-[28px] overflow-hidden">
+          <div className="relative text-center px-5 pt-6 pb-2 rounded-[20px] overflow-hidden">
             <GradientMesh />
             <div className="relative">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-500/10 border border-fuchsia-500/20 rounded-full px-3 py-1 mb-4">
                 Prompt to product
               </div>
-              <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-[1.05]">
+              <h2 className="text-2xl font-black tracking-tight leading-[1.05]">
                 What do you want to{" "}
                 <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent">build</span>?
               </h2>
@@ -911,6 +916,118 @@ export default function BuilderClient({
           </div>
         )}
 
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 px-1 mb-1">Conversation</div>
+        {status === "error" && (
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 flex items-center justify-between gap-4">
+            <span>{errorMsg}</span>
+            <button
+              onClick={() => generate(lastPromptRef.current)}
+              className="shrink-0 px-4 py-2 rounded-full bg-white text-black text-xs font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Live build log -- shown while generating, replaces the old plain spinner */}
+        {isLoading && (
+          <div className="mt-6 rounded-[20px] border border-white/10 bg-zinc-950 p-5 font-mono text-[13px]">
+            <div className="flex items-center justify-between mb-3 text-white/40">
+              <span>{elapsed}s elapsed</span>
+              {elapsed > 15 && (
+                <span className="text-white/30">Full builds can take up to ~90s — still working</span>
+              )}
+            </div>
+            <ul className="space-y-2">
+              {STAGE_ORDER.map((key) => {
+                const label = STAGE_LABELS[key];
+                const idx = log.indexOf(label);
+                const isDone = idx !== -1 && idx < log.length - 1;
+                const isActive = idx === log.length - 1 && idx !== -1;
+                const isPending = idx === -1;
+                return (
+                  <li
+                    key={key}
+                    className={
+                      isPending
+                        ? "text-white/25"
+                        : isActive
+                        ? "text-white"
+                        : "text-white/50"
+                    }
+                  >
+                    <span className="inline-block w-5">
+                      {isDone ? "✓" : isActive ? "…" : "·"}
+                    </span>
+                    {label}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+            <div className="px-4 py-3 border-b border-black/10 shrink-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-black/40">Conversation</div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+              {historyVersions.length === 0 && !historyLoading && (
+                <p className="text-[12px] text-black/40 px-1">Your edits will show up here as you go.</p>
+              )}
+              {historyLoading && historyVersions.length === 0 && (
+                <p className="text-[12px] text-black/40 px-1">Loading…</p>
+              )}
+              {historyVersions
+                .slice()
+                .reverse()
+                .map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => openVersion(v.id)}
+                    className={`text-left px-3 py-2 rounded-xl border text-[12px] transition ${
+                      v.id === projectId
+                        ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-black"
+                        : "border-black/10 bg-black/[0.02] text-black/60 hover:bg-black/[0.05] hover:text-black/90"
+                    }`}
+                  >
+                    <div className="line-clamp-2">{v.prompt}</div>
+                    <div className="text-[10px] text-black/40 mt-1">
+                      {new Date(v.created_at).toLocaleString()}
+                      {v.id === projectId ? " • current" : ""}
+                    </div>
+                  </button>
+                ))}
+              {isLoading && (
+                <div className="px-3 py-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-[12px] text-fuchsia-700 animate-pulse">
+                  <div className="line-clamp-2">{lastPromptRef.current}</div>
+                  <div className="text-[10px] text-fuchsia-600/70 mt-1">Building…</div>
+                </div>
+              )}
+            </div>
+        {/* Post-build "what's next" suggestions -- click one to iterate on
+            this exact build (edit pass) instead of starting from scratch. */}
+        {!isLoading && html && suggestions.length > 0 && (
+          <div className="mt-6">
+            <div className="text-[11px] font-bold uppercase tracking-wider opacity-40 mb-3">
+              What do you want to add next?
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => generate(s, { asEdit: true })}
+                  className="px-4 py-2 rounded-full border border-black/10 bg-black/[0.03] hover:bg-black/[0.06] text-[13px] font-medium transition"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+          </div>
+
+          {/* Composer -- pinned at the bottom of the left pane, chat-app style */}
+          <div className="shrink-0 border-t border-black/10 p-4">
         <div className="relative rounded-[26px] p-[1.5px] bg-gradient-to-r from-violet-600/40 via-fuchsia-500/40 to-violet-600/40">
           <div className="bg-white border border-black/5 rounded-[24.5px] p-4 flex flex-col gap-3 shadow-sm">
             {imageDataUrl && (
@@ -927,7 +1044,7 @@ export default function BuilderClient({
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-3">
               <div className="flex gap-3 min-w-0">
                 <input
                   type="file"
@@ -1015,106 +1132,16 @@ export default function BuilderClient({
               <p className="text-[11px] text-black/35 px-2">Best quality uses the flagship model and costs 2× credits for this build.</p>
             )}
           </div>
+          </div>
         </div>
 
-        <div className={projectId ? "flex gap-4 items-start" : undefined}>
-        {projectId && (
-          <aside className="hidden lg:flex flex-col w-[280px] shrink-0 sticky top-6 max-h-[calc(100vh-3rem)] mt-6 rounded-[20px] border border-black/10 bg-white shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-black/10 shrink-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-black/40">Conversation</div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
-              {historyVersions.length === 0 && !historyLoading && (
-                <p className="text-[12px] text-black/40 px-1">Your edits will show up here as you go.</p>
-              )}
-              {historyLoading && historyVersions.length === 0 && (
-                <p className="text-[12px] text-black/40 px-1">Loading…</p>
-              )}
-              {historyVersions
-                .slice()
-                .reverse()
-                .map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => openVersion(v.id)}
-                    className={`text-left px-3 py-2 rounded-xl border text-[12px] transition ${
-                      v.id === projectId
-                        ? "border-fuchsia-500/40 bg-fuchsia-500/10 text-black"
-                        : "border-black/10 bg-black/[0.02] text-black/60 hover:bg-black/[0.05] hover:text-black/90"
-                    }`}
-                  >
-                    <div className="line-clamp-2">{v.prompt}</div>
-                    <div className="text-[10px] text-black/40 mt-1">
-                      {new Date(v.created_at).toLocaleString()}
-                      {v.id === projectId ? " • current" : ""}
-                    </div>
-                  </button>
-                ))}
-              {isLoading && (
-                <div className="px-3 py-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/5 text-[12px] text-fuchsia-700 animate-pulse">
-                  <div className="line-clamp-2">{lastPromptRef.current}</div>
-                  <div className="text-[10px] text-fuchsia-600/70 mt-1">Building…</div>
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-        <div className="flex-1 min-w-0">
-        {status === "error" && (
-          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-700 flex items-center justify-between gap-4">
-            <span>{errorMsg}</span>
-            <button
-              onClick={() => generate(lastPromptRef.current)}
-              className="shrink-0 px-4 py-2 rounded-full bg-white text-black text-xs font-bold"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Live build log -- shown while generating, replaces the old plain spinner */}
-        {isLoading && (
-          <div className="mt-6 rounded-[20px] border border-white/10 bg-zinc-950 p-5 font-mono text-[13px]">
-            <div className="flex items-center justify-between mb-3 text-white/40">
-              <span>{elapsed}s elapsed</span>
-              {elapsed > 15 && (
-                <span className="text-white/30">Full builds can take up to ~90s — still working</span>
-              )}
-            </div>
-            <ul className="space-y-2">
-              {STAGE_ORDER.map((key) => {
-                const label = STAGE_LABELS[key];
-                const idx = log.indexOf(label);
-                const isDone = idx !== -1 && idx < log.length - 1;
-                const isActive = idx === log.length - 1 && idx !== -1;
-                const isPending = idx === -1;
-                return (
-                  <li
-                    key={key}
-                    className={
-                      isPending
-                        ? "text-white/25"
-                        : isActive
-                        ? "text-white"
-                        : "text-white/50"
-                    }
-                  >
-                    <span className="inline-block w-5">
-                      {isDone ? "✓" : isActive ? "…" : "·"}
-                    </span>
-                    {label}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        <div className="mt-6 rounded-[20px] overflow-hidden border border-black/10 bg-white min-h-[calc(100vh-260px)] shadow-[0_0_60px_-15px_rgba(217,70,239,0.12)]">
+        {/* RIGHT PANE -- live preview / code, fills remaining height */}
+        <div className="hidden lg:flex flex-1 min-w-0 min-h-0 flex-col bg-white">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {!isLoading && html && (
             <>
-              <div className="flex items-center justify-between px-4 py-2 bg-zinc-100 border-b border-black/10">
-                <div className="flex gap-1">
+              <div className="flex items-center justify-between gap-2 px-4 py-2 bg-zinc-100 border-b border-black/10 flex-wrap">
+                <div className="flex gap-1 flex-wrap">
                   <button
                     onClick={() => setView("preview")}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold ${
@@ -1162,7 +1189,7 @@ export default function BuilderClient({
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   {view === "code" && (
                     <button
                       onClick={copyCode}
@@ -1506,7 +1533,7 @@ export default function BuilderClient({
                     ref={previewIframeRef}
                     srcDoc={html}
                     sandbox="allow-scripts allow-same-origin"
-                    className="w-full h-[700px] border-0 bg-white"
+                    className="w-full flex-1 min-h-0 border-0 bg-white"
                     title="Generated app preview"
                     onLoad={() => {
                       if (quickEdit) activateQuickEdit();
@@ -1540,7 +1567,7 @@ export default function BuilderClient({
                   )}
                 </>
               ) : (
-                <pre className="w-full h-[700px] overflow-auto bg-zinc-950 text-zinc-200 text-[12px] leading-[1.6] p-5 m-0">
+                <pre className="w-full flex-1 min-h-0 overflow-auto bg-zinc-950 text-zinc-200 text-[12px] leading-[1.6] p-5 m-0">
                   <code>{html}</code>
                 </pre>
               )}
@@ -1548,7 +1575,7 @@ export default function BuilderClient({
           )}
 
           {!isLoading && !html && (
-            <div className="h-[750px] flex flex-col items-center justify-center text-black/30 text-sm px-8 text-center gap-3">
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-black/30 text-sm px-8 text-center gap-3">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-20">
                 <rect x="3" y="3" width="18" height="18" rx="4" />
                 <path d="M3 15l4.5-4.5a2 2 0 012.8 0L15 15" />
@@ -1557,34 +1584,10 @@ export default function BuilderClient({
               Your preview shows up here once you generate something.
             </div>
           )}
-        </div>
-
-        {/* Post-build "what's next" suggestions -- click one to iterate on
-            this exact build (edit pass) instead of starting from scratch. */}
-        {!isLoading && html && suggestions.length > 0 && (
-          <div className="mt-6">
-            <div className="text-[11px] font-bold uppercase tracking-wider opacity-40 mb-3">
-              What do you want to add next?
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => generate(s, { asEdit: true })}
-                  className="px-4 py-2 rounded-full border border-black/10 bg-black/[0.03] hover:bg-black/[0.06] text-[13px] font-medium transition"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
-        )}
-
         </div>
-        </div>
-
-        <div className="h-20" />
       </div>
+    </div>
       {githubPanelOpen && projectId && (
         <GitHubPushPanel projectId={projectId} onClose={() => setGithubPanelOpen(false)} />
       )}
