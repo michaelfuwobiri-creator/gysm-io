@@ -819,7 +819,7 @@ export default function BuilderClient({
     projectId && typeof window !== "undefined" ? `${window.location.origin}/publish/${projectId}` : "";
 
   return (
-    <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] relative overflow-x-hidden">
+    <div className="min-h-screen bg-white text-[#0A0A0A] relative overflow-x-hidden">
       {/* Soft ambient glow behind the whole page -- same violet/fuchsia
           identity as the marketing site, so the builder doesn't feel like
           a separate, plainer tool bolted onto a polished landing page. */}
@@ -847,7 +847,7 @@ export default function BuilderClient({
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto p-6 relative">
+      <div className="max-w-[1600px] mx-auto p-6 relative">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-8">
           <h1 className="text-2xl font-black">
             GYSM<span className="text-fuchsia-500">.IO</span>
@@ -1110,7 +1110,7 @@ export default function BuilderClient({
           </div>
         )}
 
-        <div className="mt-6 rounded-[20px] overflow-hidden border border-black/10 bg-white min-h-[600px] shadow-[0_0_60px_-15px_rgba(217,70,239,0.12)]">
+        <div className="mt-6 rounded-[20px] overflow-hidden border border-black/10 bg-white min-h-[calc(100vh-260px)] shadow-[0_0_60px_-15px_rgba(217,70,239,0.12)]">
           {!isLoading && html && (
             <>
               <div className="flex items-center justify-between px-4 py-2 bg-zinc-100 border-b border-black/10">
