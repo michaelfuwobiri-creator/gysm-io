@@ -967,10 +967,7 @@ export default function BuilderClient({
             </ul>
           </div>
         )}
-            <div className="px-4 py-3 border-b border-black/10 shrink-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-black/40">Conversation</div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               {historyVersions.length === 0 && !historyLoading && (
                 <p className="text-[12px] text-black/40 px-1">Your edits will show up here as you go.</p>
               )}
@@ -1134,6 +1131,8 @@ export default function BuilderClient({
           </div>
           </div>
         </div>
+        </div>
+        {/* end LEFT PANE */}
 
         {/* RIGHT PANE -- live preview / code, fills remaining height */}
         <div className="hidden lg:flex flex-1 min-w-0 min-h-0 flex-col bg-white">
@@ -1587,7 +1586,6 @@ export default function BuilderClient({
           </div>
         </div>
       </div>
-    </div>
       {githubPanelOpen && projectId && (
         <GitHubPushPanel projectId={projectId} onClose={() => setGithubPanelOpen(false)} />
       )}
