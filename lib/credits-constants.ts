@@ -12,10 +12,11 @@
 // vars are ever inlined client-side), breaking checkout for every visitor.
 export const CREDIT_COST_PER_BUILD = 500;
 
-// "Best quality" tier (Sol model, see lib/ai/orchestrator.ts) costs more
-// credits than the default Terra tier -- 2x, matching roughly the real
-// output-token cost gap between the two models rather than an arbitrary
-// number. Charged only when a user explicitly opts into it in the
+// Non-default model tiers ("best" = Sol, "claude" = Claude Sonnet 5, see
+// lib/ai/orchestrator.ts) cost more credits than the default Terra tier --
+// 2x, matching roughly the real output-token cost gap between the
+// default model and either stronger option, rather than an arbitrary
+// number. Charged only when a user explicitly opts into one in the
 // builder; every existing flow (default generate, public API) keeps
 // costing CREDIT_COST_PER_BUILD exactly as it always has.
 export const CREDIT_COST_PER_BUILD_BEST = CREDIT_COST_PER_BUILD * 2;

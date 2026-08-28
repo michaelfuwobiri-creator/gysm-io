@@ -55,11 +55,12 @@ export async function POST(req: NextRequest) {
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
     projectId = typeof body?.projectId === "string" && body.projectId ? body.projectId : undefined;
-    // Optional model tier -- "best" (Sol) costs more credits than the
-    // default "fast" (Terra); see CREDIT_COST_PER_BUILD_BEST. Anything
-    // other than exactly "best" falls back to "fast" rather than erroring,
-    // since this is a nice-to-have toggle, not a required field.
-    tier = body?.tier === "best" ? "best" : "fast";
+    // Optional model tier -- "best" (Sol) or "claude" (Claude Sonnet 5)
+    // both cost more credits than the default "fast" (Terra); see
+    // CREDIT_COST_PER_BUILD_BEST. Anything other than exactly "best" or
+    // "claude" falls back to "fast" rather than erroring, since this is a
+    // nice-to-have toggle, not a required field.
+    tier = body?.tier === "best" ? "best" : body?.tier === "claude" ? "claude" : "fast";
     // Optional snapshot from a connected Airtable/Google Sheets data
     // source (see DataImportPanel + /api/connectors/data/*) -- folded
     // into what the AI sees for THIS generation only, but never saved as
@@ -90,12 +91,12 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Describe what you want to build." }, { status: 400 });
   }
 
-  const buildCost = tier === "best" ? CREDIT_COST_PER_BUILD_BEST : CREDIT_COST_PER_BUILD;
+  const buildCost = tier === "fast" ? CREDIT_COST_PER_BUILD : CREDIT_COST_PER_BUILD_BEST;
 
   const balance = await getCreditBalance(user.id);
   if (balance < buildCost) {
     return Response.json(
-      { error: tier === "best" ? "Not enough credits for Best quality on this build." : "You're out of credits.", code: "NO_CREDITS" },
+      { error: tier !== "fast" ? "Not enough credits for that model on this build." : "You're out of credits.", code: "NO_CREDITS" },
       { status: 402 }
     );
   }

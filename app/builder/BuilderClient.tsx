@@ -70,10 +70,11 @@ export default function BuilderClient({
   // the vision-capable model in lib/ai/orchestrator.ts.
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
-  // Model tier -- "fast" (Terra, default) or "best" (Sol, costs 2x
-  // credits). Kept in component state rather than a URL/localStorage
-  // setting since it's a per-build choice, not a standing preference.
-  const [tier, setTier] = useState<"fast" | "best">("fast");
+  // Model tier -- "fast" (Terra, default), "best" (Sol), or "claude"
+  // (Claude Sonnet 5) -- the latter two cost 2x credits. Kept in
+  // component state rather than a URL/localStorage setting since it's a
+  // per-build choice, not a standing preference.
+  const [tier, setTier] = useState<"fast" | "best" | "claude">("fast");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // "Quick edit" -- click-to-edit overlay directly on the live preview,
@@ -1092,7 +1093,7 @@ export default function BuilderClient({
               <div
                 role="group"
                 aria-label="Model quality"
-                title="Fast: default model, 1 credit. Best: flagship model, 2 credits -- for prompts that need a stronger attempt."
+                title="Fast: default model, 1 credit. Best: flagship model, 2 credits. Claude: Claude Sonnet 5, 2 credits -- for prompts that want Claude's reasoning specifically."
                 className="hidden sm:flex items-center h-[56px] shrink-0 rounded-full border border-black/10 bg-black/[0.03] p-1 gap-0.5"
               >
                 <button
@@ -1115,6 +1116,16 @@ export default function BuilderClient({
                 >
                   Best · 2×
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTier("claude")}
+                  disabled={isLoading}
+                  className={`h-[40px] px-4 rounded-full text-[13px] font-bold transition disabled:opacity-40 ${
+                    tier === "claude" ? "bg-white shadow-sm text-black" : "text-black/40 hover:text-black/70"
+                  }`}
+                >
+                  Claude · 2×
+                </button>
               </div>
               <button
                 onClick={() => generate()}
@@ -1127,6 +1138,9 @@ export default function BuilderClient({
             {imageError && <p className="text-[12px] text-red-600 px-2">{imageError}</p>}
             {tier === "best" && (
               <p className="text-[11px] text-black/35 px-2">Best quality uses the flagship model and costs 2× credits for this build.</p>
+            )}
+            {tier === "claude" && (
+              <p className="text-[11px] text-black/35 px-2">Claude uses Anthropic's Claude Sonnet 5 and costs 2× credits for this build.</p>
             )}
           </div>
           </div>

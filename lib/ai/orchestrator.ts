@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM.IO builder. Generate ONE complete, production-quality HTML document for the user's request.
 
@@ -90,7 +91,25 @@ export type StageCallback = (stage: BuildStage) => void;
 // meaningfully higher than Terra's -- that cost difference is passed
 // through honestly rather than eaten silently or charged flat regardless
 // of which model actually ran.
-export type ModelTier = "fast" | "best";
+// "claude" replaces the structure/edit model entirely with Anthropic's
+// Claude Sonnet 5, via a completely separate code path (generateStructureWithClaude
+// / editWithClaude below) since it's a different SDK and message format,
+// not just a different model string. Priced the same as "best" (see
+// CREDIT_COST_PER_BUILD_BEST) -- this is a real, working model choice,
+// not a label slapped on the existing GPT pipeline.
+export type ModelTier = "fast" | "best" | "claude";
+
+const CLAUDE_MODEL = "claude-sonnet-5";
+
+/** Vercel's edge/serverless functions don't run a real DOM/Buffer-heavy
+ *  library for this, so parse the data URL's mime type by hand. Falls back
+ *  to image/png if the prefix doesn't match a type the Claude API accepts. */
+function claudeImageMediaType(dataUrl: string): "image/png" | "image/jpeg" | "image/webp" | "image/gif" {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,/);
+  const mime = match?.[1];
+  if (mime === "image/png" || mime === "image/jpeg" || mime === "image/webp" || mime === "image/gif") return mime;
+  return "image/png";
+}
 
 function structureModelFor(tier: ModelTier): string {
   return tier === "best" ? "gpt-5.6-sol" : "gpt-5.6-terra";
@@ -154,6 +173,17 @@ export async function editWebsite(
   backendContext?: BackendContext,
   tier: ModelTier = "fast"
 ): Promise<GenerateResult> {
+  if (tier === "claude") {
+    onStage?.("structure");
+    const claudeEdit = await editWithClaude(existingHtml, instruction, imageDataUrl, backendContext);
+    if (!claudeEdit.ok) return claudeEdit;
+    onStage?.("structure_done");
+    onStage?.("design");
+    const polishedClaudeEdit = await applyDesignPass(claudeEdit.html);
+    onStage?.("design_done");
+    return { ok: true, html: polishedClaudeEdit };
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
     return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
@@ -212,6 +242,8 @@ async function generateStructure(
   backendContext?: BackendContext,
   tier: ModelTier = "fast"
 ): Promise<GenerateResult> {
+  if (tier === "claude") return generateStructureWithClaude(prompt, imageDataUrl, backendContext);
+
   if (!process.env.OPENAI_API_KEY) {
     console.error("[orchestrator] OPENAI_API_KEY is not set");
     return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
@@ -256,6 +288,115 @@ async function generateStructure(
       { promptPreview: prompt.slice(0, 80), outputLength: raw.length }
     );
     return { ok: false, error: "Couldn't generate a preview for that prompt. Try rephrasing.", status: 502 };
+  }
+
+  return { ok: true, html };
+}
+
+/** Structure pass via Claude Sonnet 5, used when tier === "claude" instead
+ *  of the OpenAI path above. Same system prompt, same output contract
+ *  (a complete HTML document, no commentary) -- only the model and its
+ *  SDK's message format differ. */
+async function generateStructureWithClaude(
+  prompt: string,
+  imageDataUrl?: string,
+  backendContext?: BackendContext
+): Promise<GenerateResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("[orchestrator] ANTHROPIC_API_KEY is not set");
+    return { ok: false, error: "The Claude tier is temporarily unavailable.", status: 500 };
+  }
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const structureText = backendContext
+    ? `${prompt}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
+    : prompt;
+  const structureSystemPrompt = backendContext
+    ? `${STRUCTURE_SYSTEM_PROMPT}\n\n${BACKEND_SYSTEM_ADDENDUM}`
+    : STRUCTURE_SYSTEM_PROMPT;
+
+  const content: any = imageDataUrl
+    ? [
+        { type: "text", text: structureText },
+        { type: "image", source: { type: "base64", media_type: claudeImageMediaType(imageDataUrl), data: imageDataUrl.split(",")[1] } },
+      ]
+    : structureText;
+
+  let raw: string;
+  try {
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      system: structureSystemPrompt,
+      messages: [{ role: "user", content }],
+    });
+    raw = message.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
+  } catch (err: any) {
+    console.error("[orchestrator] Claude request failed:", err?.message || err);
+    return { ok: false, error: "Generation failed. Please try again.", status: 502 };
+  }
+
+  const html = cleanHtml(raw);
+  if (!isCompleteHtmlDocument(html)) {
+    console.error("[orchestrator] Claude did not return a complete HTML document", {
+      promptPreview: prompt.slice(0, 80),
+      outputLength: raw.length,
+    });
+    return { ok: false, error: "Couldn't generate a preview for that prompt. Try rephrasing.", status: 502 };
+  }
+
+  return { ok: true, html };
+}
+
+/** Edit pass via Claude Sonnet 5, used when tier === "claude". Mirrors
+ *  the OpenAI edit path's contract and prompt, different SDK only. */
+async function editWithClaude(
+  existingHtml: string,
+  instruction: string,
+  imageDataUrl?: string,
+  backendContext?: BackendContext
+): Promise<GenerateResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("[orchestrator] ANTHROPIC_API_KEY is not set");
+    return { ok: false, error: "The Claude tier is temporarily unavailable.", status: 500 };
+  }
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const editText = backendContext
+    ? `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
+    : `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}`;
+  const editSystemPrompt = backendContext ? `${EDIT_SYSTEM_PROMPT}\n\n${BACKEND_SYSTEM_ADDENDUM}` : EDIT_SYSTEM_PROMPT;
+
+  const content: any = imageDataUrl
+    ? [
+        { type: "text", text: editText },
+        { type: "image", source: { type: "base64", media_type: claudeImageMediaType(imageDataUrl), data: imageDataUrl.split(",")[1] } },
+      ]
+    : editText;
+
+  let raw: string;
+  try {
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      system: editSystemPrompt,
+      messages: [{ role: "user", content }],
+    });
+    raw = message.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
+  } catch (err: any) {
+    console.error("[orchestrator] Claude edit request failed:", err?.message || err);
+    return { ok: false, error: "That edit failed. Please try again.", status: 502 };
+  }
+
+  const html = cleanHtml(raw);
+  if (!isCompleteHtmlDocument(html)) {
+    console.error("[orchestrator] Claude edit did not return a complete HTML document", {
+      instructionPreview: instruction.slice(0, 80),
+      outputLength: raw.length,
+    });
+    return { ok: false, error: "Couldn't apply that change. Try rephrasing it.", status: 502 };
   }
 
   return { ok: true, html };

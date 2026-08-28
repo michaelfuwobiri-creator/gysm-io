@@ -33,9 +33,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
-    // Optional: {"tier": "best"} uses the flagship model for 2x credits.
-    // Anything else (including omitted) is the default "fast" tier.
-    tier = body?.tier === "best" ? "best" : "fast";
+    // Optional: {"tier": "best"} or {"tier": "claude"} both use a
+    // stronger model for 2x credits. Anything else (including omitted)
+    // is the default "fast" tier.
+    tier = body?.tier === "best" ? "best" : body?.tier === "claude" ? "claude" : "fast";
   } catch {
     return NextResponse.json({ error: "Invalid request body. Expected JSON: {\"prompt\": \"...\"}." }, { status: 400 });
   }
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "\"prompt\" is required." }, { status: 400 });
   }
 
-  const buildCost = tier === "best" ? CREDIT_COST_PER_BUILD_BEST : CREDIT_COST_PER_BUILD;
+  const buildCost = tier === "fast" ? CREDIT_COST_PER_BUILD : CREDIT_COST_PER_BUILD_BEST;
 
   const balance = await getCreditBalance(auth.userId);
   if (balance < buildCost) {
