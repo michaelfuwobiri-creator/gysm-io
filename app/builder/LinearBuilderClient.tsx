@@ -30,6 +30,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
+import type { BrandKit } from "@/lib/brandKit";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -418,6 +419,141 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     placeholder: "Attach a video, then type FHD, 2k, or 4k...",
   },
 ];
+
+/** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
+ *  see that file for why this can't just be imported here. Used by
+ *  runMediaGeneration below when the composer's Brand toggle is on. */
+function brandSuffix(kit: BrandKit | null): string {
+  if (!kit) return "";
+  const parts: string[] = [];
+  if (kit.primaryColor) parts.push(`primary brand color ${kit.primaryColor}`);
+  if (kit.secondaryColor) parts.push(`secondary brand color ${kit.secondaryColor}`);
+  if (kit.fontFamily) parts.push(`typography in the style of ${kit.fontFamily}`);
+  if (kit.name) parts.push(`consistent with the "${kit.name}" brand`);
+  if (parts.length === 0) return "";
+  return ` -- brand style lock: ${parts.join(", ")}.`;
+}
+
+function hasBrandKitContent(kit: BrandKit | null): boolean {
+  return !!kit && !!(kit.primaryColor || kit.secondaryColor || kit.fontFamily || kit.name || kit.logoUrl);
+}
+
+/** Brand Kit / Style Lock editor (42-tool spec item 36) -- five plain
+ *  fields, PUT to /api/brand-kit (see lib/brandKit.ts), no new provider
+ *  or npm dep. Logo reuses the same FileReader-to-data-URL pattern
+ *  addMedia() already uses for chat attachments below. */
+function BrandKitModal({
+  kit,
+  onClose,
+  onSaved,
+}: {
+  kit: BrandKit | null;
+  onClose: () => void;
+  onSaved: (kit: BrandKit) => void;
+}) {
+  const [name, setName] = useState(kit?.name || "");
+  const [primaryColor, setPrimaryColor] = useState(kit?.primaryColor || "#FF0080");
+  const [secondaryColor, setSecondaryColor] = useState(kit?.secondaryColor || "");
+  const [fontFamily, setFontFamily] = useState(kit?.fontFamily || "");
+  const [logoUrl, setLogoUrl] = useState(kit?.logoUrl || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/brand-kit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, primaryColor, secondaryColor, fontFamily, logoUrl }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(data?.error || "Failed to save.");
+        return;
+      }
+      onSaved(data.kit);
+      onClose();
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Brand Kit</div>
+        <p className="text-[11px] text-white/40 mb-4">
+          Applied as a style-lock suffix to image/video/music prompts when the Brand toggle is on -- not a cosmetic label,
+          it's actually appended to what gets sent to the real model.
+        </p>
+        <div className="space-y-2.5">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Brand name"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <div className="flex gap-2">
+            <input
+              value={primaryColor}
+              onChange={(e) => setPrimaryColor(e.target.value)}
+              placeholder="Primary color #FF0080"
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+            />
+            <input
+              value={secondaryColor}
+              onChange={(e) => setSecondaryColor(e.target.value)}
+              placeholder="Secondary color"
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+            />
+          </div>
+          <input
+            value={fontFamily}
+            onChange={(e) => setFontFamily(e.target.value)}
+            placeholder="Font family (e.g. Inter)"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <label className="flex items-center gap-2 text-[12px] text-white/50 cursor-pointer">
+            <span className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/5">Upload logo</span>
+            {logoUrl && <span className="text-[10px] text-white/30">Logo set</span>}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setLogoUrl(typeof reader.result === "string" ? reader.result : "");
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+        {error && <p className="text-[11px] text-red-400 mt-2">{error}</p>}
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 h-9 rounded-lg bg-[#FF0080] text-white text-[13px] font-medium disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PROGRAM_ACTION_TYPES = [
   "Find leads on Twitter",
@@ -1817,6 +1953,10 @@ function ChatCenter({
   tier,
   onChangeTier,
   initialInput,
+  brandOn,
+  onToggleBrand,
+  hasBrandKit,
+  onOpenBrandSettings,
 }: {
   chat: Chat | null;
   media: MediaItem[];
@@ -1834,6 +1974,14 @@ function ChatCenter({
   tier: ModelTier;
   onChangeTier: (t: ModelTier) => void;
   initialInput?: string;
+  /** Brand Kit / Style Lock toggle (42-tool spec item 36) -- state lives
+   *  in LinearBuilderApp (see brandKit/brandOn there) since it's a
+   *  per-user setting, not per-chat; runMediaGeneration reads it via
+   *  closure rather than through onSend. */
+  brandOn: boolean;
+  onToggleBrand: () => void;
+  hasBrandKit: boolean;
+  onOpenBrandSettings: () => void;
 }) {
   const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
@@ -2044,6 +2192,26 @@ function ChatCenter({
                   setMediaError("");
                 }}
               />
+              <button
+                onClick={onToggleBrand}
+                title={
+                  hasBrandKit
+                    ? "Apply your Brand Kit's colors/font as a style-lock suffix to image/video/music prompts"
+                    : "Set up a Brand Kit first (gear icon) -- nothing to apply yet"
+                }
+                className={`h-7 px-2 flex items-center gap-1 rounded-lg text-[12px] transition-colors ${
+                  brandOn ? "bg-[#FF0080]/15 text-[#FF0080]" : "text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                Brand{brandOn ? " ON" : ""}
+              </button>
+              <button
+                onClick={onOpenBrandSettings}
+                title="Edit Brand Kit"
+                className="h-7 px-2 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 text-[11px]"
+              >
+                Edit
+              </button>
               {showSchedule && (
                 <SchedulePicker
                   onClose={() => setShowSchedule(false)}
@@ -2102,6 +2270,10 @@ interface LinearBuilderAppProps {
   userName?: string;
   userEmail?: string | null;
   credits?: number;
+  /** Real Brand Kit row from getBrandKit() in page.tsx (see
+   *  lib/brandKit.ts) -- null for a logged-out visitor or a user who
+   *  hasn't set one up yet. */
+  initialBrandKit?: BrandKit | null;
 }
 
 export default function LinearBuilderApp({
@@ -2117,6 +2289,7 @@ export default function LinearBuilderApp({
   userName = "there",
   userEmail = null,
   credits = 0,
+  initialBrandKit = null,
 }: LinearBuilderAppProps) {
   const [state, setState] = useLinearStore();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2126,6 +2299,9 @@ export default function LinearBuilderApp({
   const [rightMode, setRightMode] = useState<"artifact" | "program">("artifact");
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL);
   const [tier, setTier] = useState<ModelTier>("fast");
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(initialBrandKit);
+  const [brandOn, setBrandOn] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const resizing = useRef(false);
   const router = useRouter();
   const hydrated = useRef(false);
@@ -2554,6 +2730,10 @@ export default function LinearBuilderApp({
     else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
     else if (skill.kind === "video-upscale") body = { videoUrl: firstVideoUrl || firstAnyUrl, resolution: text.trim() };
 
+    if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
+      body.prompt = body.prompt + brandSuffix(brandKit);
+    }
+
     try {
       const res = await fetch(`/api/media/${skill.kind}`, {
         method: "POST",
@@ -2694,7 +2874,14 @@ export default function LinearBuilderApp({
         tier={tier}
         onChangeTier={setTier}
         initialInput={!initialHtml ? initialPrompt : undefined}
+        brandOn={brandOn}
+        onToggleBrand={() => setBrandOn((o) => !o)}
+        hasBrandKit={hasBrandKitContent(brandKit)}
+        onOpenBrandSettings={() => setShowBrandModal(true)}
       />
+      {showBrandModal && (
+        <BrandKitModal kit={brandKit} onClose={() => setShowBrandModal(false)} onSaved={setBrandKit} />
+      )}
 
       {rightOpen &&
         (rightMode === "program" && activeProgram ? (
