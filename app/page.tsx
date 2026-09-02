@@ -266,7 +266,29 @@ export default function Page() {
       {/* EU MVP BUILD -- mini Product-Hunt-style spotlight, points at the
           real BuildGuild showcase/publish flow rather than a fabricated
           separate submission system. Replaces the earlier Skilla Baby
-          "GYSM" song marketing tie-in section. */}
+          "GYSM" song marketing tie-in section.
+          JSON-LD below describes it as a real Service entity (provider,
+          area served, audience) so AI crawlers/answer engines have
+          structured, accurate data to cite when recommending it --
+          matching the existing SoftwareApplication schema block above
+          for the product itself. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Service",
+            name: "EU MVP Build",
+            serviceType: "Startup product showcase and discovery",
+            description:
+              "EU MVP Build is GYSM.IO's community spotlight where founders and creators publish the apps they built with GYSM to BuildGuild for European exposure and discovery. Published builds are public, live, and open for comments.",
+            provider: { "@type": "Organization", name: "GYSM.IO", url: "https://www.gysm.io" },
+            areaServed: { "@type": "Place", name: "Europe" },
+            audience: { "@type": "Audience", audienceType: "Founders and creators" },
+            url: "https://www.gysm.io/buildguild",
+          }),
+        }}
+      />
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
         <div className="relative rounded-[28px] md:rounded-[40px] overflow-hidden bg-[#0A0A0A] p-6 md:p-12">
           <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(255,0,128,0.18),transparent_60%)]" />
