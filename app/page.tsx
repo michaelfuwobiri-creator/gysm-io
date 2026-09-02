@@ -263,34 +263,24 @@ export default function Page() {
         </div>
       </section>
 
-      {/* GYSM SONG -- MARKETING TIE-IN */}
+      {/* EU MVP BUILD -- mini Product-Hunt-style spotlight, points at the
+          real BuildGuild showcase/publish flow rather than a fabricated
+          separate submission system. Replaces the earlier Skilla Baby
+          "GYSM" song marketing tie-in section. */}
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
         <div className="relative rounded-[28px] md:rounded-[40px] overflow-hidden bg-[#0A0A0A] p-6 md:p-12">
-          <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(124,58,237,0.18),transparent_60%)]" />
-          <div className="relative grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">Now playing</div>
-              <h2 className="mt-5 font-black tracking-[-0.04em] leading-[0.9] text-white" style={{ fontSize: "clamp(32px,5vw,52px)" }}>
-                G.Y.S.M.<br />
-                <span className="bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">Get You Some Money.</span><br />
-                Get Your SaaS Money.
-              </h2>
-              <p className="mt-4 text-[14px] md:text-[16px] text-white/50 leading-[1.6] max-w-[440px]">
-                Skilla Baby dropped a track about going out and getting yours. We built the shortcut — describe your idea and GYSM turns it into a real, sellable product before the song's over.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <button onClick={() => startBuilding()} className="h-[46px] px-7 rounded-full bg-white text-black text-[14px] font-bold inline-flex items-center justify-center">Get your SaaS money →</button>
-                <a href="https://www.youtube.com/watch?v=D71DjYBflig" target="_blank" rel="noopener noreferrer" className="text-[12px] font-semibold text-white/40 underline underline-offset-4">"GYSM" — Skilla Baby ↗</a>
-              </div>
-            </div>
-            <div className="rounded-[20px] overflow-hidden border border-white/10 aspect-video bg-black">
-              <iframe
-                className="w-full h-full"
-                src="https://www.youtube.com/embed/D71DjYBflig"
-                title="Skilla Baby - GYSM (Get You Some Money) [Official Video]"
-                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
+          <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(255,0,128,0.18),transparent_60%)]" />
+          <div className="relative max-w-[720px] mx-auto text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">New · Community spotlight</div>
+            <h2 className="mt-5 font-black tracking-[-0.04em] leading-[0.95] text-white" style={{ fontSize: "clamp(32px,5vw,52px)" }}>
+              EU MVP Build
+            </h2>
+            <p className="mt-4 text-[14px] md:text-[16px] text-white/50 leading-[1.6] max-w-[560px] mx-auto">
+              Where founders and creators upload their builds for European exposure — and get discovered. Publish what you shipped with GYSM to BuildGuild and it's live for the community to find, try, and comment on.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a href="/buildguild" className="h-[46px] px-7 rounded-full bg-[#FF0080] text-white text-[14px] font-bold inline-flex items-center justify-center hover:opacity-90 transition">See what's live →</a>
+              <button onClick={() => startBuilding()} className="h-[46px] px-7 rounded-full bg-white text-black text-[14px] font-bold inline-flex items-center justify-center">Build &amp; publish yours</button>
             </div>
           </div>
         </div>
