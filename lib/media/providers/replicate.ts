@@ -10,7 +10,7 @@
 // confirm the exact version hash on the model's page before relying on
 // this in production; wrong/stale version hashes are the most likely
 // first bug once real testing starts.
-export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove" | "reframe", string> = {
+export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove" | "reframe" | "video-upscale", string> = {
   video: "minimax/video-01",
   music: "meta/musicgen",
   upscale: "nightmareai/real-esrgan",
@@ -19,6 +19,12 @@ export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove
   // input { video_url, aspect_ratio, prompt? }, output a single video uri.
   // Official Luma model, $0.06/sec of output video, 10s max input duration.
   reframe: "luma/reframe-video",
+  // Real, verified model (confirmed 2026-09-03 against replicate.com/lucataco/real-esrgan-video):
+  // input { video_path, resolution: "FHD"|"2k"|"4k", model? }, output a single
+  // video uri. Community model (341K+ runs, not Replicate-official), ~$0.40/run,
+  // A100 GPU time so cost varies with clip length -- credit price in
+  // mediaCreditsConstants.ts is an estimate, not a hard guarantee.
+  "video-upscale": "lucataco/real-esrgan-video",
 };
 
 export function isReplicateConfigured(): boolean {

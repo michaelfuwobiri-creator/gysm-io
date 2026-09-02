@@ -308,10 +308,11 @@ interface MediaSkillDef {
   needsAttachment?: boolean;
   needsText?: boolean;
   placeholder: string;
-  /** Reframe only -- the composer's text field doubles as an aspect-ratio
-   *  picker instead of a free-form prompt (see submit()'s validation and
-   *  runMediaGeneration's body assembly below). */
-  aspectRatioOptions?: string[];
+  /** Skills where the composer's text field doubles as a fixed-choice
+   *  picker (aspect ratio, resolution, ...) instead of a free-form prompt
+   *  -- see submit()'s validation and runMediaGeneration's body assembly
+   *  below. */
+  pickOptions?: string[];
 }
 
 const MEDIA_SKILLS: MediaSkillDef[] = [
@@ -403,8 +404,18 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     desc: `Attach a video, type 9:16 / 1:1 / 16:9 -- ${MEDIA_CREDIT_COST.reframe} credits`,
     cost: MEDIA_CREDIT_COST.reframe,
     needsAttachment: true,
-    aspectRatioOptions: ["9:16", "1:1", "16:9"],
+    pickOptions: ["9:16", "1:1", "16:9"],
     placeholder: "Attach a video (max 10s), then type 9:16, 1:1, or 16:9...",
+  },
+  {
+    id: "video-upscale",
+    kind: "video-upscale",
+    label: "Upscale video",
+    desc: `Attach a video, type FHD / 2k / 4k -- ${MEDIA_CREDIT_COST["video-upscale"]} credits`,
+    cost: MEDIA_CREDIT_COST["video-upscale"],
+    needsAttachment: true,
+    pickOptions: ["FHD", "2k", "4k"],
+    placeholder: "Attach a video, then type FHD, 2k, or 4k...",
   },
 ];
 
@@ -793,7 +804,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "image" || media.kind === "edit") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
-          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe") && (
+          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
           {(media.kind === "tts" || media.kind === "voice-clone") && (
@@ -1852,8 +1863,8 @@ function ChatCenter({
         setMediaError("Format: avatarId | script");
         return;
       }
-      if (pickedMedia.aspectRatioOptions && !pickedMedia.aspectRatioOptions.includes(text.trim())) {
-        setMediaError(`Type one of: ${pickedMedia.aspectRatioOptions.join(", ")}`);
+      if (pickedMedia.pickOptions && !pickedMedia.pickOptions.includes(text.trim())) {
+        setMediaError(`Type one of: ${pickedMedia.pickOptions.join(", ")}`);
         return;
       }
       if (pickedMedia.needsText !== false && !text) {
@@ -2541,6 +2552,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "music") body = { prompt: text };
     else if (skill.kind === "edit") body = { imageUrl: firstImageUrl, op: skill.op };
     else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
+    else if (skill.kind === "video-upscale") body = { videoUrl: firstVideoUrl || firstAnyUrl, resolution: text.trim() };
 
     try {
       const res = await fetch(`/api/media/${skill.kind}`, {

@@ -20,6 +20,7 @@ export const MEDIA_KINDS = [
   "music",
   "edit",
   "reframe",
+  "video-upscale",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -35,6 +36,7 @@ export const MEDIA_CREDIT_COST: Record<MediaKind, number> = {
   music: 400, // ~$0.30 for a 30s background track (Replicate audio model)
   edit: 50, // ~$0.03 per op -- background remove / upscale (Replicate)
   reframe: 800, // ~$0.60 for a 10s clip (Replicate, Luma Reframe Video @ $0.06/sec output, 10s input cap)
+  "video-upscale": 550, // ~$0.40/run (Replicate, lucataco/real-esrgan-video, community model, A100 GPU-time billed -- varies with clip length)
 };
 
 // Which env var must be set for a kind to actually run. Every route
@@ -51,6 +53,7 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
   music: "REPLICATE_API_TOKEN",
   edit: "REPLICATE_API_TOKEN",
   reframe: "REPLICATE_API_TOKEN",
+  "video-upscale": "REPLICATE_API_TOKEN",
 };
 
 // Kinds whose provider call is a single request/response (fast, no job
@@ -58,7 +61,7 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
 // provider_job_id immediately and the client polls
 // GET /api/media/[id]/status until status is "done" or "failed".
 export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit"];
-// reframe is intentionally NOT in this list -- Luma's reframe-video model
-// runs on the same async prediction lifecycle as video/avatar/music, so
-// the client polls GET /api/media/[id]/status rather than getting a
-// same-request result.
+// reframe and video-upscale are intentionally NOT in this list -- both
+// run on the same async prediction lifecycle as video/avatar/music (up
+// to several minutes for video-upscale), so the client polls
+// GET /api/media/[id]/status rather than getting a same-request result.
