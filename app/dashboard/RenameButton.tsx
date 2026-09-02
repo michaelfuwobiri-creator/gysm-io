@@ -64,7 +64,7 @@ export default function RenameButton({ projectId, initialName }: Props) {
             }}
             maxLength={120}
             autoFocus
-            className="flex-1 h-8 px-3 rounded-lg bg-white border border-black/15 text-xs outline-none focus:border-fuchsia-500/40"
+            className="flex-1 h-8 px-3 rounded-lg bg-white border border-black/15 text-xs outline-none focus:border-[#FF0080]/40"
           />
           <button
             onClick={save}

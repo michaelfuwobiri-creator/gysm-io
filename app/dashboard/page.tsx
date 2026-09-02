@@ -117,7 +117,7 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-bold text-black/40 uppercase tracking-wider">
               {user.orgId ? "Team builds" : "Your builds"}
             </h2>
-            <a href="/builder" className="text-[13px] font-bold text-fuchsia-600 hover:text-fuchsia-700">
+            <a href="/builder" className="text-[13px] font-bold text-[#FF0080] hover:text-[#FF0080]">
               + New build
             </a>
           </div>
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
                       href={`/publish/${p.id}/app-stores`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-center px-3 py-2 rounded-lg border border-violet-500/30 text-violet-700 text-xs font-bold hover:bg-violet-50"
+                      className="text-center px-3 py-2 rounded-lg border border-[#FF0080]/30 text-[#FF0080] text-xs font-bold hover:bg-[#FF0080]/10"
                     >
                       Publish to App Store / Play Store
                     </a>

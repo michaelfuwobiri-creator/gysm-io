@@ -11,8 +11,8 @@ export default function GradientMesh() {
   return (
     <>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="gysm-blob gysm-blob-a absolute -top-1/3 left-[8%] w-[60%] h-[140%] rounded-full bg-violet-500/[0.14] blur-[90px]" />
-        <div className="gysm-blob gysm-blob-b absolute -top-1/4 right-[4%] w-[50%] h-[130%] rounded-full bg-fuchsia-500/[0.14] blur-[90px]" />
+        <div className="gysm-blob gysm-blob-a absolute -top-1/3 left-[8%] w-[60%] h-[140%] rounded-full bg-[#FF0080]/[0.14] blur-[90px]" />
+        <div className="gysm-blob gysm-blob-b absolute -top-1/4 right-[4%] w-[50%] h-[130%] rounded-full bg-[#FF0080]/[0.14] blur-[90px]" />
         <div className="gysm-blob gysm-blob-c absolute top-0 left-[32%] w-[40%] h-[120%] rounded-full bg-amber-300/[0.10] blur-[90px]" />
       </div>
       <style

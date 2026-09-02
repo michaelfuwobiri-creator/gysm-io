@@ -142,7 +142,7 @@ export default async function PublishedProjectPage({
           <span aria-hidden className="opacity-60">✦</span>
           AI-generated with
           <a href="/" className="font-black text-black/70 hover:text-black">
-            GYSM<span className="text-fuchsia-500">.IO</span>
+            GYSM<span className="text-[#FF0080]">.IO</span>
           </a>
           — describe an app, get a real one
         </div>

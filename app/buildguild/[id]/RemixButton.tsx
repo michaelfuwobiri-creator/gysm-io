@@ -45,7 +45,7 @@ export default function RemixButton({ projectId }: Props) {
       <button
         onClick={remix}
         disabled={loading}
-        className="h-9 px-5 rounded-full bg-fuchsia-600 text-white text-[13px] font-bold hover:bg-fuchsia-700 transition disabled:opacity-50"
+        className="h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-bold hover:bg-[#FF0080] transition disabled:opacity-50"
       >
         {loading ? "Remixing…" : "Remix this app →"}
       </button>

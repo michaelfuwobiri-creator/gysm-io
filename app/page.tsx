@@ -116,7 +116,7 @@ export default function Page() {
   }
 
   return (
-    <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-violet-600 selection:text-white">
+    <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-[#FF0080] selection:text-white">
       {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
           text content (the apostrophes here become &#x27;), and CSS's
           @import doesn't decode HTML entities, so the old <style> version
@@ -154,7 +154,7 @@ export default function Page() {
       {/* NAV */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
-          <div className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span></div>
+          <div className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span></div>
           <div className="flex items-center gap-2">
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Templates</a>
@@ -171,7 +171,7 @@ export default function Page() {
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 pt-10 md:pt-20 pb-6 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold shadow-sm">The AI no-code app builder for founders who ship</div>
         <h1 className="mt-6 mx-auto max-w-[820px] text-[40px] leading-[0.9] md:text-[84px] font-black tracking-[-0.05em]">
-          Build apps<br />10x faster<br />than <span className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent">coding</span>
+          Build apps<br />10x faster<br />than <span className="bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">coding</span>
         </h1>
         <p className="mx-auto mt-4 max-w-[480px] text-[15px] md:text-[18px] leading-[1.5] text-black/60 font-medium">Describe the app you want. GYSM.IO's AI no-code app builder turns that prompt into a real, working full-stack app — auth, database, and Stripe payments included — without writing a line of code.</p>
 
@@ -225,7 +225,7 @@ export default function Page() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {FEATURES.map((f) => (
             <div key={f.title} className="rounded-[20px] bg-white border border-black/5 p-5">
-              <div className="h-9 w-9 rounded-[10px] bg-violet-100 text-violet-700 grid place-items-center font-bold">{f.icon}</div>
+              <div className="h-9 w-9 rounded-[10px] bg-[#FF0080]/10 text-[#FF0080] grid place-items-center font-bold">{f.icon}</div>
               <div className="mt-4 text-[14px] font-bold">{f.title}</div>
               <div className="mt-1 text-[12.5px] leading-[1.5] opacity-60">{f.body}</div>
             </div>
@@ -272,7 +272,7 @@ export default function Page() {
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">Now playing</div>
               <h2 className="mt-5 font-black tracking-[-0.04em] leading-[0.9] text-white" style={{ fontSize: "clamp(32px,5vw,52px)" }}>
                 G.Y.S.M.<br />
-                <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-violet-400 bg-clip-text text-transparent">Get You Some Money.</span><br />
+                <span className="bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">Get You Some Money.</span><br />
                 Get Your SaaS Money.
               </h2>
               <p className="mt-4 text-[14px] md:text-[16px] text-white/50 leading-[1.6] max-w-[440px]">
@@ -328,7 +328,7 @@ export default function Page() {
             <div className="relative">
               <h2 className="font-black tracking-[-0.05em] leading-[0.85]">
                 <span className="block text-white" style={{ fontSize: "clamp(36px,8vw,72px)" }}>Your next SaaS is</span>
-                <span className="block bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent" style={{ fontSize: "clamp(36px,8vw,72px)" }}>one sentence away.</span>
+                <span className="block bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent" style={{ fontSize: "clamp(36px,8vw,72px)" }}>one sentence away.</span>
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">Stop planning. Describe it and watch it build.</p>
               <button onClick={() => startBuilding()} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
@@ -345,7 +345,7 @@ export default function Page() {
         <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-12 md:py-16">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-6">
             <div className="col-span-2 md:col-span-1">
-              <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span>
+              <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
               <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">The AI no-code app builder for founders who ship.</p>
             </div>
             <div>
@@ -380,7 +380,7 @@ export default function Page() {
               </ul>
             </div>
           </div>
-          <div className="mt-10 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-fuchsia-500">.IO</span> — built for founders who ship</div>
+          <div className="mt-10 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>
         </div>
       </footer>
     </div>

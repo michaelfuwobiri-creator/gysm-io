@@ -61,7 +61,7 @@ export default function PublishButton({ projectId, initialIsPublic, initialTitle
     <div className="w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full text-center px-3 py-2 rounded-lg bg-fuchsia-600 text-white text-xs font-bold"
+        className="w-full text-center px-3 py-2 rounded-lg bg-[#FF0080] text-white text-xs font-bold"
       >
         Share to BuildGuild
       </button>

@@ -18,12 +18,12 @@ export default function ActLayerPage() {
       <div className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="text-fuchsia-500">.IO</span>
+            GYSM<span className="text-[#FF0080]">.IO</span>
           </a>
           <a href="/" className="text-[11px] opacity-50 hover:opacity-100">Back to gysm.io</a>
         </div>
 
-        <p className="text-center text-[12px] font-bold uppercase tracking-[0.15em] text-fuchsia-500 mb-3">
+        <p className="text-center text-[12px] font-bold uppercase tracking-[0.15em] text-[#FF0080] mb-3">
           Built with GYSM.IO
         </p>
         <h1 className="text-4xl md:text-5xl font-black text-center tracking-tighter mb-4 leading-[1.05]">

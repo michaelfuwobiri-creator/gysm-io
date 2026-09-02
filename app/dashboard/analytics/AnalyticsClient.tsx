@@ -103,7 +103,7 @@ export default function AnalyticsClient({
             {daily.map((d) => (
               <div key={d.date} className="flex-1 min-w-[2px] group relative">
                 <div
-                  className="w-full rounded-t-sm bg-gradient-to-t from-fuchsia-400 to-violet-500 hover:opacity-80 transition"
+                  className="w-full rounded-t-sm bg-gradient-to-t from-[#FF0080] to-[#FF0080] hover:opacity-80 transition"
                   style={{ height: `${Math.max(2, (d.count / max) * 140)}px` }}
                   title={`${d.date}: ${d.count} view${d.count === 1 ? "" : "s"}`}
                 />
@@ -131,7 +131,7 @@ export default function AnalyticsClient({
                       <span className="text-black/40 shrink-0 ml-2">{r.count}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-black/[0.06] overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-violet-500" style={{ width: `${pct}%` }} />
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#FF0080] to-[#FF0080]" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );

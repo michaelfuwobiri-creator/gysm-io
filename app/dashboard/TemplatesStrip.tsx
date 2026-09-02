@@ -23,7 +23,7 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
     <div className="mb-10">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold text-black/40 uppercase tracking-wider">Start from a template</h2>
-        <a href="/templates" className="text-[13px] font-bold text-fuchsia-600 hover:text-fuchsia-700 shrink-0">
+        <a href="/templates" className="text-[13px] font-bold text-[#FF0080] hover:text-[#FF0080] shrink-0">
           Browse all →
         </a>
       </div>
@@ -35,7 +35,7 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
             <a
               key={t.id}
               href={`/builder?template=${t.id}`}
-              className="group w-[220px] shrink-0 rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-fuchsia-500/30 hover:shadow-md"
+              className="group w-[220px] shrink-0 rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-[#FF0080]/30 hover:shadow-md"
             >
               <div className="relative h-[120px] bg-white overflow-hidden pointer-events-none border-b border-black/5">
                 <div

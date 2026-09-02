@@ -46,7 +46,7 @@ export default function ChangelogPage() {
       <div className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="text-fuchsia-500">.IO</span>
+            GYSM<span className="text-[#FF0080]">.IO</span>
           </a>
           <a href="/roadmap" className="text-[11px] opacity-50 hover:opacity-100">
             See what's next →

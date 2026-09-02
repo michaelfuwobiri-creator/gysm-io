@@ -161,16 +161,16 @@ export default async function AppShell({
       <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-black/10 bg-white p-3 fixed inset-y-0 left-0 z-20">
         <div>
           <a href="/dashboard" className="flex items-center gap-2 px-2 py-3 mb-2">
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center text-white font-black text-sm shrink-0">
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-[#FF0080] to-[#FF0080] grid place-items-center text-white font-black text-sm shrink-0">
               G
             </div>
-            <span className="font-black tracking-tight">GYSM<span className="text-fuchsia-500">.IO</span></span>
+            <span className="font-black tracking-tight">GYSM<span className="text-[#FF0080]">.IO</span></span>
           </a>
 
           {/* Identity row -- who's signed in, at a glance, above the nav
               (same spot a workspace switcher usually lives). */}
           <div className="flex items-center gap-2 px-2 py-2 mb-3 rounded-xl bg-black/[0.03]">
-            <div className="h-6 w-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 grid place-items-center text-white text-[11px] font-black shrink-0">
+            <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#FF0080] to-[#FF0080] grid place-items-center text-white text-[11px] font-black shrink-0">
               {initial}
             </div>
             <span className="text-[12px] font-semibold text-black/70 truncate">{displayName}</span>

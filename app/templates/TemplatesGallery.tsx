@@ -110,7 +110,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
                 <div
                   key={t.id}
                   onClick={() => setOpenId(t.id)}
-                  className="group cursor-pointer rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-fuchsia-500/30 hover:shadow-md"
+                  className="group cursor-pointer rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-[#FF0080]/30 hover:shadow-md"
                 >
                   <div className="relative h-[170px] bg-white overflow-hidden pointer-events-none border-b border-black/5">
                     <div
@@ -173,7 +173,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
               <div className="flex items-center gap-2 shrink-0">
                 <a
                   href={`/builder?template=${open.id}`}
-                  className="px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:opacity-90 transition"
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-[#FF0080] to-[#FF0080] text-white hover:opacity-90 transition"
                 >
                   Use this template
                 </a>

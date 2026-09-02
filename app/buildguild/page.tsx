@@ -30,7 +30,7 @@ export default async function BuildGuildPage() {
   return (
     <div
       style={{ fontFamily: "Inter,sans-serif" }}
-      className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased selection:bg-violet-600 selection:text-white"
+      className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased selection:bg-[#FF0080] selection:text-white"
     >
       {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
           text content (the apostrophes here become &#x27;), and CSS's
@@ -44,7 +44,7 @@ export default async function BuildGuildPage() {
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
-            <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span>
+            <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
           </a>
           <div className="flex items-center gap-2">
             <a href="/dashboard" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>

@@ -48,7 +48,7 @@ export default function UseCaseLanding({
   }
 
   return (
-    <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-violet-600 selection:text-white">
+    <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-[#FF0080] selection:text-white">
       {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
           text content (the apostrophes here become &#x27;), and CSS's
           @import doesn't decode HTML entities, so the old <style> version
@@ -61,7 +61,7 @@ export default function UseCaseLanding({
       {/* NAV */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-fuchsia-500">.IO</span></span></a>
+          <a href="/" className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span></a>
           <div className="flex items-center gap-2">
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
@@ -76,7 +76,7 @@ export default function UseCaseLanding({
         <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold shadow-sm">{badge}</div>
         <h1 className="mt-6 mx-auto max-w-[820px] text-[36px] leading-[0.95] md:text-[72px] font-black tracking-[-0.05em]">
           {headlineLead}{" "}
-          <span className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent">{headlineHighlight}</span>
+          <span className="bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">{headlineHighlight}</span>
           {headlineTail ? <>{" "}{headlineTail}</> : null}
         </h1>
         <p className="mx-auto mt-4 max-w-[540px] text-[15px] md:text-[18px] leading-[1.5] text-black/60 font-medium">{subheadline}</p>
@@ -148,14 +148,14 @@ export default function UseCaseLanding({
             <div className="relative">
               <h2 className="font-black tracking-[-0.05em] leading-[0.85]">
                 <span className="block text-white" style={{ fontSize: "clamp(32px,7vw,64px)" }}>Stop planning.</span>
-                <span className="block bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 bg-clip-text text-transparent" style={{ fontSize: "clamp(32px,7vw,64px)" }}>Describe it and ship.</span>
+                <span className="block bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent" style={{ fontSize: "clamp(32px,7vw,64px)" }}>Describe it and ship.</span>
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">{faqNote}</p>
               <button onClick={() => startBuilding(examplePrompt)} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
               <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
             </div>
           </div>
-          <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM<span className="text-fuchsia-500">.IO</span> — built for founders who ship</div>
+          <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>
         </div>
       </section>
     </div>
