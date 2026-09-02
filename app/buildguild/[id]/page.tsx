@@ -22,6 +22,7 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
     published_at: string;
     html: string;
     views: number;
+    tags: string[];
   } | null = null;
 
   // Cheap shape check before hitting Postgres -- avoids a "invalid input
@@ -32,7 +33,7 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
   if (UUID_RE.test(params.id)) {
     try {
       const rows = await sql`
-        select id, title, tagline, publisher_name, published_at, html, views
+        select id, title, tagline, publisher_name, published_at, html, views, tags
         from projects
         where id = ${params.id} and is_public = true
         limit 1
@@ -87,6 +88,19 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
             <div>
               <h1 className="text-[26px] md:text-[32px] font-black tracking-tight">{app.title || "Untitled build"}</h1>
               {app.tagline && <p className="mt-1.5 text-[15px] text-white/50">{app.tagline}</p>}
+              {app.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  {app.tags.map((t) => (
+                    <a
+                      key={t}
+                      href={`/buildguild?tag=${encodeURIComponent(t)}`}
+                      className="h-6 px-2.5 rounded-full bg-white/[0.06] text-white/50 hover:text-white text-[11px] font-semibold grid place-items-center"
+                    >
+                      {t}
+                    </a>
+                  ))}
+                </div>
+              )}
               <p className="mt-3 text-[12px] text-white/35">
                 Published by {app.publisher_name || "a GYSM builder"} on{" "}
                 {new Date(app.published_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}

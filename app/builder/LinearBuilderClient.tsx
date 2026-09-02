@@ -28,6 +28,7 @@ import React, {
   useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
+import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -406,11 +407,11 @@ async function runRealGeneration(opts: {
 
 /** Publishes a real project to BuildGuild via the same endpoint the
  *  production builder uses. */
-async function publishToBuildGuild(projectId: string, title: string, tagline: string) {
+async function publishToBuildGuild(projectId: string, title: string, tagline: string, tags: string[]) {
   const res = await fetch(`/api/projects/${projectId}/publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, tagline }),
+    body: JSON.stringify({ title, tagline, tags }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Failed to publish.");
@@ -1208,8 +1209,15 @@ function ArtifactPanel({
   const [copied, setCopied] = useState(false);
   const [publishTitle, setPublishTitle] = useState("");
   const [publishTagline, setPublishTagline] = useState("");
+  const [publishTags, setPublishTags] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
+
+  function togglePublishTag(tag: string) {
+    setPublishTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length >= MAX_TAGS_PER_BUILD ? prev : [...prev, tag]
+    );
+  }
 
   const deviceWidths: Record<DeviceMode, string> = {
     desktop: "100%",
@@ -1222,7 +1230,7 @@ function ArtifactPanel({
     setPublishing(true);
     setPublishError("");
     try {
-      await publishToBuildGuild(artifact.projectId, publishTitle.trim(), publishTagline.trim());
+      await publishToBuildGuild(artifact.projectId, publishTitle.trim(), publishTagline.trim(), publishTags);
       onPublished(artifact.id);
     } catch (e: any) {
       setPublishError(e?.message || "Failed to publish.");
@@ -1381,6 +1389,19 @@ function ArtifactPanel({
                   placeholder="Tagline (optional)"
                   className="w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-[12px] text-white placeholder:text-white/30 outline-none"
                 />
+                <div className="flex flex-wrap gap-1.5">
+                  {BUILD_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => togglePublishTag(tag)}
+                      className={`h-6 px-2.5 rounded-full text-[11px] font-semibold transition-colors ${
+                        publishTags.includes(tag) ? "bg-[#FF0080] text-white" : "bg-white/5 text-white/40 border border-white/10 hover:text-white/70"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
                 {publishError && <p className="text-[11px] text-red-400">{publishError}</p>}
                 <button
                   onClick={handlePublish}

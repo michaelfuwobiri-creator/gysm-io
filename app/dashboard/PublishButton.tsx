@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 
 type Props = {
   projectId: string;
@@ -17,8 +18,15 @@ export default function PublishButton({ projectId, initialIsPublic, initialTitle
   const [published, setPublished] = useState(initialIsPublic);
   const [title, setTitle] = useState(initialTitle || defaultTitle);
   const [tagline, setTagline] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
+
+  function toggleTag(tag: string) {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length >= MAX_TAGS_PER_BUILD ? prev : [...prev, tag]
+    );
+  }
 
   async function publish() {
     if (!title.trim() || publishing) return;
@@ -28,7 +36,7 @@ export default function PublishButton({ projectId, initialIsPublic, initialTitle
       const res = await fetch(`/api/projects/${projectId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), tagline: tagline.trim() }),
+        body: JSON.stringify({ title: title.trim(), tagline: tagline.trim(), tags }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -81,6 +89,24 @@ export default function PublishButton({ projectId, initialIsPublic, initialTitle
             maxLength={200}
             className="w-full h-8 px-3 rounded-full bg-white border border-black/10 text-black text-[12px] outline-none"
           />
+          {/* Category chips -- optional, max MAX_TAGS_PER_BUILD, whitelisted
+              against BUILD_TAGS both here and (authoritatively) server-side
+              in the publish route. Powers the real filter chips on
+              /buildguild -- see lib/buildTags.ts. */}
+          <div className="flex flex-wrap gap-1.5">
+            {BUILD_TAGS.map((tag) => (
+              <button
+                type="button"
+                key={tag}
+                onClick={() => toggleTag(tag)}
+                className={`h-6 px-2.5 rounded-full text-[11px] font-semibold transition-colors ${
+                  tags.includes(tag) ? "bg-[#FF0080] text-white" : "bg-white text-black/50 border border-black/10 hover:text-black"
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
           {error && <p className="text-[11px] text-red-600">{error}</p>}
           <button
             onClick={publish}

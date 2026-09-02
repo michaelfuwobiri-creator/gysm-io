@@ -1,5 +1,7 @@
 import { sql } from "@/lib/db";
-import { toThumbnailHtml } from "@/lib/thumbnailHtml";
+import { getUser } from "@/lib/auth";
+import BuildCard from "./BuildCard";
+import SubmitBuildModal from "./SubmitBuildModal";
 
 // BuildGuild -- public gallery of every app users have opted to publish
 // (projects.is_public = true, set via POST /api/projects/[id]/publish).
@@ -7,13 +9,12 @@ import { toThumbnailHtml } from "@/lib/thumbnailHtml";
 // (enforced in their respective API routes, not here).
 //
 // Redesigned into a denser, "community board" layout (stats strip, sort
-// chips, search, top-builders + recent-activity sidebar) on top of the
-// exact same data model as before -- is_public projects, plus comments
-// for discussion counts. Every number on this page is a real aggregate
-// from those two tables. There is no likes/tags/MRR data anywhere in the
-// schema, so none of that is shown here -- views (already tracked, see
-// db/migrations/0004_project_extras.sql) and comment counts stand in for
-// it instead of inventing numbers that don't exist.
+// chips, search, category filter chips, top-builders + recent-activity
+// sidebar, hover-overlay cards, a real Submit Build modal) matching the
+// pasted reference design's layout -- but every number and filter here
+// is backed by real columns (projects.views, comments, and the new
+// projects.tags -- see db/migrations/0014_project_tags.sql and
+// lib/buildTags.ts). No fabricated MRR/likes/leaderboard data.
 
 type App = {
   id: string;
@@ -24,6 +25,7 @@ type App = {
   html: string;
   views: number;
   comment_count: number;
+  tags: string[];
 };
 
 type SortKey = "new" | "views" | "discussed";
@@ -43,7 +45,7 @@ async function fetchApps(sort: SortKey): Promise<App[]> {
     return (await sql`
       select
         p.id, p.title, p.tagline, p.publisher_name, p.published_at, p.html,
-        p.views,
+        p.views, p.tags,
         coalesce(c.comment_count, 0)::int as comment_count
       from projects p
       left join (
@@ -60,7 +62,7 @@ async function fetchApps(sort: SortKey): Promise<App[]> {
     return (await sql`
       select
         p.id, p.title, p.tagline, p.publisher_name, p.published_at, p.html,
-        p.views,
+        p.views, p.tags,
         coalesce(c.comment_count, 0)::int as comment_count
       from projects p
       left join (
@@ -76,7 +78,7 @@ async function fetchApps(sort: SortKey): Promise<App[]> {
   return (await sql`
     select
       p.id, p.title, p.tagline, p.publisher_name, p.published_at, p.html,
-      p.views,
+      p.views, p.tags,
       coalesce(c.comment_count, 0)::int as comment_count
     from projects p
     left join (
@@ -139,15 +141,20 @@ function timeAgo(iso: string): string {
 export default async function BuildGuildPage({
   searchParams,
 }: {
-  searchParams: { q?: string; sort?: string };
+  searchParams: { q?: string; sort?: string; tag?: string };
 }) {
   const q = (searchParams?.q || "").trim();
   const sort: SortKey = SORTS.some((s) => s.key === searchParams?.sort) ? (searchParams!.sort as SortKey) : "new";
+  const activeTag = (searchParams?.tag || "").trim();
 
   let apps: App[] = [];
   let activity: Activity[] = [];
+  let signedIn = false;
   try {
-    [apps, activity] = await Promise.all([fetchApps(sort), fetchActivity()]);
+    const [appsResult, activityResult, user] = await Promise.all([fetchApps(sort), fetchActivity(), getUser()]);
+    apps = appsResult;
+    activity = activityResult;
+    signedIn = !!user;
   } catch (error: any) {
     console.error("[buildguild] failed to load:", error.message);
   }
@@ -168,12 +175,36 @@ export default async function BuildGuildPage({
     .sort((a, b) => b.builds - a.builds || b.views - a.views)
     .slice(0, 5);
 
-  const filtered = q
-    ? apps.filter((a) => {
-        const hay = `${a.title || ""} ${a.tagline || ""} ${a.publisher_name || ""}`.toLowerCase();
-        return hay.includes(q.toLowerCase());
-      })
-    : apps;
+  // Category chips -- real tags actually present on published builds
+  // (projects.tags, set at publish time from the fixed BUILD_TAGS
+  // whitelist -- see lib/buildTags.ts), with real counts. No chip shows
+  // unless at least one live build carries that tag.
+  const tagCounts = apps.reduce((acc: Record<string, number>, a) => {
+    for (const t of a.tags || []) acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const tagChips = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+
+  const qs = (overrides: { sort?: string; tag?: string; q?: string }) => {
+    const params = new URLSearchParams();
+    const nextSort = overrides.sort ?? sort;
+    const nextTag = overrides.tag ?? activeTag;
+    const nextQ = overrides.q ?? q;
+    if (nextSort && nextSort !== "new") params.set("sort", nextSort);
+    if (nextTag) params.set("tag", nextTag);
+    if (nextQ) params.set("q", nextQ);
+    const s = params.toString();
+    return `/buildguild${s ? `?${s}` : ""}`;
+  };
+
+  const filtered = apps.filter((a) => {
+    if (activeTag && !(a.tags || []).includes(activeTag)) return false;
+    if (q) {
+      const hay = `${a.title || ""} ${a.tagline || ""} ${a.publisher_name || ""}`.toLowerCase();
+      if (!hay.includes(q.toLowerCase())) return false;
+    }
+    return true;
+  });
 
   return (
     <div
@@ -194,6 +225,7 @@ export default async function BuildGuildPage({
           </a>
           <div className="flex items-center gap-2">
             <a href="/dashboard" className="text-[13px] font-medium text-white/60 hover:text-white hidden md:block mr-2">Dashboard</a>
+            <SubmitBuildModal signedIn={signedIn} variant="nav" />
             <a href="/builder" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
               Start Building
             </a>
@@ -201,7 +233,7 @@ export default async function BuildGuildPage({
         </div>
       </nav>
 
-      <div className="relative max-w-[1280px] mx-auto px-5 pt-10 md:pt-14 pb-24">
+      <div className="relative max-w-[1280px] mx-auto px-5 pt-10 md:pt-14 pb-28">
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold mb-4">
             Community showcase
@@ -228,14 +260,40 @@ export default async function BuildGuildPage({
           ))}
         </div>
 
-        <div className="mt-10 grid lg:grid-cols-[1fr_300px] gap-8 items-start">
+        {/* Category chips -- real tags, real counts (see tagChips above).
+            Only rendered if at least one published build has a tag. */}
+        {tagChips.length > 0 && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <a
+              href={qs({ tag: "" })}
+              className={`h-8 px-3.5 rounded-full text-[12px] font-semibold grid place-items-center transition-colors ${
+                !activeTag ? "bg-white text-[#08080a]" : "bg-white/[0.06] text-white/50 hover:text-white"
+              }`}
+            >
+              All
+            </a>
+            {tagChips.map(([tag, count]) => (
+              <a
+                key={tag}
+                href={qs({ tag: activeTag === tag ? "" : tag })}
+                className={`h-8 px-3.5 rounded-full text-[12px] font-semibold grid place-items-center transition-colors ${
+                  activeTag === tag ? "bg-white text-[#08080a]" : "bg-white/[0.06] text-white/50 hover:text-white"
+                }`}
+              >
+                {tag} <span className="opacity-50 ml-1">{count}</span>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-8 grid lg:grid-cols-[1fr_300px] gap-8 items-start">
           <div>
             {/* Sort chips + search -- plain GET form, no client JS needed. */}
             <form className="flex flex-wrap items-center gap-2" action="/buildguild" method="get">
               {SORTS.map((s) => (
                 <a
                   key={s.key}
-                  href={`/buildguild?sort=${s.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+                  href={qs({ sort: s.key })}
                   className={`h-9 px-4 rounded-full text-[13px] font-semibold grid place-items-center transition-colors ${
                     sort === s.key ? "bg-[#FF0080] text-white" : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white"
                   }`}
@@ -244,6 +302,7 @@ export default async function BuildGuildPage({
                 </a>
               ))}
               <input type="hidden" name="sort" value={sort} />
+              {activeTag && <input type="hidden" name="tag" value={activeTag} />}
               <input
                 type="text"
                 name="q"
@@ -255,11 +314,11 @@ export default async function BuildGuildPage({
 
             {filtered.length === 0 ? (
               <div className="mt-8 rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] p-10 text-center">
-                <p className="font-bold">{apps.length === 0 ? "Nothing published yet" : "No builds match your search"}</p>
+                <p className="font-bold">{apps.length === 0 ? "Nothing published yet" : "No builds match"}</p>
                 <p className="text-[13px] text-white/40 mt-1 max-w-sm mx-auto">
                   {apps.length === 0
                     ? 'Be the first — finish a build, then hit "Share to BuildGuild" to put it here.'
-                    : "Try a different search term, or clear it to see everything."}
+                    : "Try a different search term or tag, or clear filters to see everything."}
                 </p>
                 <a href="/builder" className="mt-5 inline-block px-5 py-2 bg-[#FF0080] text-white rounded-full font-semibold text-[13px]">
                   Go to builder
@@ -268,35 +327,7 @@ export default async function BuildGuildPage({
             ) : (
               <div className="mt-6 columns-1 sm:columns-2 xl:columns-3 gap-5 [column-fill:balance]">
                 {filtered.map((app) => (
-                  <a
-                    key={app.id}
-                    href={`/buildguild/${app.id}`}
-                    className="group mb-5 block break-inside-avoid rounded-[20px] bg-white/[0.04] border border-white/10 overflow-hidden hover:border-[#FF0080]/40 hover:bg-white/[0.06] transition"
-                  >
-                    <div className="h-[160px] bg-[#0e0e11] pointer-events-none overflow-hidden border-b border-white/10">
-                      <iframe
-                        srcDoc={toThumbnailHtml(app.html)}
-                        className="w-full h-full border-0 scale-100"
-                        sandbox="allow-scripts allow-same-origin"
-                        title={app.title || "Published app"}
-                        tabIndex={-1}
-                        scrolling="no"
-                      />
-                    </div>
-                    <div className="p-4 flex flex-col gap-1.5">
-                      <div className="font-bold text-[14px] line-clamp-1">{app.title || "Untitled build"}</div>
-                      {app.tagline && <div className="text-[12px] text-white/50 line-clamp-2">{app.tagline}</div>}
-                      <div className="flex items-center justify-between mt-1.5">
-                        <div className="text-[11px] text-white/35">
-                          by {app.publisher_name || "a GYSM builder"} · {timeAgo(app.published_at)}
-                        </div>
-                        <div className="flex items-center gap-2.5 text-[11px] text-white/35 shrink-0">
-                          <span title="Views">👁 {app.views || 0}</span>
-                          {app.comment_count > 0 && <span title="Comments">💬 {app.comment_count}</span>}
-                        </div>
-                      </div>
-                    </div>
-                  </a>
+                  <BuildCard key={app.id} app={app} timeAgo={timeAgo(app.published_at)} />
                 ))}
               </div>
             )}
@@ -310,12 +341,7 @@ export default async function BuildGuildPage({
                 Shipped something with GYSM? Publish it from your dashboard and it shows up here for the whole
                 community to find.
               </p>
-              <a
-                href="/builder"
-                className="mt-4 block text-center rounded-full bg-[#FF0080] text-white text-[13px] font-semibold py-2 hover:bg-[#FF0080]/90 transition-colors"
-              >
-                Build &amp; publish
-              </a>
+              <SubmitBuildModal signedIn={signedIn} variant="card" />
             </div>
 
             {topBuilders.length > 0 && (
@@ -360,6 +386,13 @@ export default async function BuildGuildPage({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Sticky mobile Submit Build button, matching the pasted reference
+          design -- opens the same real modal as the nav/sidebar entry
+          points (see SubmitBuildModal.tsx). */}
+      <div className="fixed bottom-4 inset-x-0 flex justify-center md:hidden z-40">
+        <SubmitBuildModal signedIn={signedIn} variant="sticky" />
       </div>
     </div>
   );

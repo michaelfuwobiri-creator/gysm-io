@@ -1,12 +1,15 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { sanitizeTags, toPgTextArrayLiteral } from "@/lib/buildTags";
 
 // Owner-only publish/unpublish toggle for BuildGuild (see app/buildguild).
-// POST { title, tagline } -> publishes; DELETE -> unpublishes. Both are
-// scoped to `user_id = ${user.id}` in the WHERE clause, not just checked
-// in application logic, so there's no window where one user's request
-// could touch another user's row even if an id were guessed or reused.
+// POST { title, tagline, tags } -> publishes; DELETE -> unpublishes. Both
+// are scoped to `user_id = ${user.id}` in the WHERE clause, not just
+// checked in application logic, so there's no window where one user's
+// request could touch another user's row even if an id were guessed or
+// reused. `tags` is validated server-side against the fixed BUILD_TAGS
+// whitelist (see lib/buildTags.ts) -- never trust the picker UI alone.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getUser();
   if (!user) {
@@ -15,10 +18,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   let title = "";
   let tagline = "";
+  let tags: string[] = [];
   try {
     const body = await req.json();
     title = (body?.title ?? "").toString().trim().slice(0, 120);
     tagline = (body?.tagline ?? "").toString().trim().slice(0, 200);
+    tags = sanitizeTags(body?.tags);
   } catch {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -34,7 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           title = ${title},
           tagline = ${tagline || null},
           publisher_name = ${user.name},
-          published_at = now()
+          published_at = now(),
+          tags = ${toPgTextArrayLiteral(tags)}::text[]
       where id = ${params.id} and (user_id = ${user.id} or (org_id is not null and org_id = ${user.orgId}))
       returning id
     `;
