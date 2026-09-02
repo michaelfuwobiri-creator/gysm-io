@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { headers } from "next/headers";
+import { injectAiGeneratedMeta } from "@/lib/aiDisclosure";
 import type { Metadata } from "next";
 import ShareButton from "@/app/components/ShareButton";
 
@@ -128,7 +129,7 @@ export default async function PublishedProjectPage({
         }}
       />
       <iframe
-        srcDoc={project.html}
+        srcDoc={injectAiGeneratedMeta(project.html)}
         sandbox="allow-scripts allow-same-origin"
         className="flex-1 w-full border-0 bg-white"
         title={project.prompt}

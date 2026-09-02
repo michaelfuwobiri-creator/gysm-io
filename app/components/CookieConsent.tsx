@@ -38,7 +38,23 @@ export default function CookieConsent() {
   const [analyticsChoice, setAnalyticsChoice] = useState(true);
 
   useEffect(() => {
-    setVisible(readConsent() === null);
+    if (readConsent() !== null) {
+      setVisible(false);
+      return;
+    }
+    // Global Privacy Control: a browser/extension-level opt-out signal
+    // California's CPRA (and several other US state privacy laws)
+    // requires businesses to honor as equivalent to a manual "reject
+    // non-essential" choice. If the visitor's browser sends it, respect
+    // it immediately and silently rather than making them click through
+    // a banner to get the choice their browser already told us.
+    const gpc = (navigator as any).globalPrivacyControl === true;
+    if (gpc) {
+      writeConsent(false);
+      setVisible(false);
+      return;
+    }
+    setVisible(true);
   }, []);
 
   if (!visible) return null;

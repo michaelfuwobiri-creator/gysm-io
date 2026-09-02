@@ -1026,6 +1026,9 @@ export default function BuilderClient({
 
           {/* Composer -- pinned at the bottom of the left pane, chat-app style */}
           <div className="shrink-0 border-t border-black/10 p-4">
+        <p className="text-[11px] text-black/35 text-center mb-2">
+          You're chatting with GYSM's AI to build this app -- no human reviews your prompt before it generates code.
+        </p>
         <div className="relative rounded-[26px] p-[1.5px] bg-gradient-to-r from-violet-600/40 via-fuchsia-500/40 to-violet-600/40">
           <div className="bg-white border border-black/5 rounded-[24.5px] p-4 flex flex-col gap-3 shadow-sm">
             {imageDataUrl && (
