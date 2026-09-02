@@ -1083,7 +1083,28 @@ function MessageBubble({
  *  player, or a transcript + .vtt download for captions), or the error
  *  the route returned (credits are always refunded server-side on
  *  failure -- see lib/media/service.ts's markFailed). */
+/** Kinds worth showing in the public Flow TV gallery (see app/flow-tv)
+ *  -- excludes captions/script, which are text-shaped, not visual/audio
+ *  media (same list as lib/flowTv.ts's GALLERY_KINDS -- keep in sync). */
+const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone"];
+
 function MediaResultCard({ media }: { media: MediaMsgState }) {
+  const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  async function publish() {
+    if (!media.genId) return;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/media/${media.genId}/publish`, { method: "POST" });
+      if (res.ok) setPublished(true);
+    } catch {
+      // Best-effort -- the user can just try the button again.
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   return (
     <div className="mt-1 rounded-xl border border-white/10 bg-white/[0.03] p-3 max-w-sm">
       <div className="flex items-center gap-2 text-[10px] text-white/40 mb-2">
@@ -1123,12 +1144,24 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
-          {(media.kind === "tts" || media.kind === "voice-clone") && (
+          {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music") && (
             <audio src={media.url} controls className="w-full" />
           )}
-          <a href={media.url} download className="mt-2 inline-block text-[11px] text-[#FF0080] hover:underline">
-            Download
-          </a>
+          <div className="mt-2 flex items-center gap-3">
+            <a href={media.url} download className="text-[11px] text-[#FF0080] hover:underline">
+              Download
+            </a>
+            {media.genId && FLOW_TV_ELIGIBLE_KINDS.includes(media.kind) && (
+              <button
+                onClick={publish}
+                disabled={publishing || published}
+                title="Publish this to the public Flow TV gallery (see /flow-tv) -- shows your exact prompt, anyone can remix it"
+                className="text-[11px] text-white/40 hover:text-white disabled:opacity-60"
+              >
+                {published ? "Published to Flow TV" : publishing ? "Publishing..." : "Publish to Flow TV"}
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -2138,6 +2171,7 @@ function ChatCenter({
   hasBrandKit,
   onOpenBrandSettings,
   onOpenAssets,
+  initialMediaSkillId,
 }: {
   chat: Chat | null;
   media: MediaItem[];
@@ -2166,11 +2200,14 @@ function ChatCenter({
   /** Opens AssetsModal (Cast/Settings/Objects, item 10) -- see
    *  LinearBuilderApp's assets state + useAssetAsAttachment. */
   onOpenAssets: () => void;
+  initialMediaSkillId?: string;
 }) {
   const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(null);
+  const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(() =>
+    initialMediaSkillId ? MEDIA_SKILLS.find((s) => s.kind === initialMediaSkillId) || null : null
+  );
   const [mediaError, setMediaError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2465,6 +2502,11 @@ interface LinearBuilderAppProps {
    *  lib/brandKit.ts) -- null for a logged-out visitor or a user who
    *  hasn't set one up yet. */
   initialBrandKit?: BrandKit | null;
+  /** From Flow TV's Remix button (see app/flow-tv/FlowTvCard.tsx and
+   *  page.tsx's ?remixSkill=) -- pre-selects a Media Factory skill
+   *  alongside initialPrompt, so remixing a video generation actually
+   *  reopens the @video skill instead of just prefilling plain text. */
+  initialMediaSkillId?: string;
 }
 
 export default function LinearBuilderApp({
@@ -2481,6 +2523,7 @@ export default function LinearBuilderApp({
   userEmail = null,
   credits = 0,
   initialBrandKit = null,
+  initialMediaSkillId,
 }: LinearBuilderAppProps) {
   const [state, setState] = useLinearStore();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2986,7 +3029,7 @@ export default function LinearBuilderApp({
         return;
       }
       const url = data.url ?? data.audioUrl;
-      updateMediaMessage(chatId, msgId, { status: "done", url, transcript: data.text }, "Done -- ready below.");
+      updateMediaMessage(chatId, msgId, { status: "done", url, transcript: data.text, genId: data.id }, "Done -- ready below.");
       router.refresh();
     } catch (err: any) {
       updateMediaMessage(chatId, msgId, { status: "failed", error: err?.message }, "Network error. Try again.");
@@ -3095,6 +3138,7 @@ export default function LinearBuilderApp({
         tier={tier}
         onChangeTier={setTier}
         initialInput={!initialHtml ? initialPrompt : undefined}
+        initialMediaSkillId={initialMediaSkillId}
         brandOn={brandOn}
         onToggleBrand={() => setBrandOn((o) => !o)}
         hasBrandKit={hasBrandKitContent(brandKit)}

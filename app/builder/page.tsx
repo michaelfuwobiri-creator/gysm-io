@@ -29,7 +29,7 @@ import LinearBuilderClient from "./LinearBuilderClient";
 export default async function BuilderPage({
   searchParams,
 }: {
-  searchParams: { projectId?: string; template?: string; prompt?: string };
+  searchParams: { projectId?: string; template?: string; prompt?: string; remixSkill?: string; remixPrompt?: string };
 }) {
   let initialHtml: string | null = null;
   let initialPrompt = "";
@@ -84,7 +84,13 @@ export default async function BuilderPage({
     }
   } else if (searchParams?.prompt) {
     initialPrompt = searchParams.prompt;
+  } else if (searchParams?.remixPrompt) {
+    // From Flow TV's Remix button (see app/flow-tv/FlowTvCard.tsx) --
+    // prefills both the prompt text and which Media Factory skill is
+    // pre-selected, same "never auto-submit" rule as ?prompt= above.
+    initialPrompt = searchParams.remixPrompt;
   }
+  const initialMediaSkillId = searchParams?.remixPrompt ? searchParams?.remixSkill : undefined;
 
   return (
     <div style={{ fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
@@ -98,6 +104,7 @@ export default async function BuilderPage({
         userEmail={user?.email ?? null}
         credits={credits}
         initialBrandKit={brandKit}
+        initialMediaSkillId={initialMediaSkillId}
       />
     </div>
   );
