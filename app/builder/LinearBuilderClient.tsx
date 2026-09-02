@@ -2,16 +2,21 @@
 
 /**
  * GYSM Linear Builder -- Claude Artifacts x Linear.app style conversational
- * builder. Lives at /builder-v2 so the existing production /builder route
- * (real AI generation) is untouched while this is reviewed.
+ * builder. This IS the live /builder route (see app/builder/page.tsx).
  *
- * Everything here is intentionally self-contained and dependency-free
- * (no framer-motion / zustand / fuse.js / monaco / react-resizable-panels --
- * see the handoff notes for why) so it compiles against the app's existing
- * toolchain with zero new npm installs. All state -- chats, artifacts,
- * media, schedules, programs -- persists to localStorage, and AI replies /
- * "builds" are simulated client-side (word-by-word streaming, a fake
- * progress bar, canned program logs) rather than calling a real model.
+ * Chat generation, model tier, iterative edits, and BuildGuild publish all
+ * call the same real endpoints the previous BuilderClient.tsx used
+ * (/api/generate, /api/projects/[id]/publish) -- see runRealGeneration /
+ * publishToBuildGuild below. Chat history, search, media attachments,
+ * the schedule picker, and the program runner are net-new UI surfaces
+ * with no existing backend, so those still persist to localStorage and
+ * (for schedule/program specifically) still simulate their execution --
+ * disclosed clearly in the handoff notes rather than pretended otherwise.
+ *
+ * Everything here is intentionally dependency-free (no framer-motion /
+ * zustand / fuse.js / monaco / react-resizable-panels -- see the handoff
+ * notes for why) so it compiles against the app's existing toolchain with
+ * zero new npm installs.
  */
 
 import React, {
@@ -22,6 +27,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useRouter } from "next/navigation";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -47,12 +53,15 @@ interface CodeFile {
 interface Artifact {
   id: string;
   chatId: string;
+  projectId: string | null; // real gysm-io project id once generated server-side
   title: string;
   html: string;
   files: CodeFile[];
   url: string;
   progress: number; // 0-100
   deployed: boolean;
+  published: boolean; // published to BuildGuild
+  suggestions: string[];
 }
 
 interface MediaItem {
@@ -122,80 +131,24 @@ function uid(prefix = "id") {
 }
 
 function seedState(): StoreState {
-  const now = Date.now();
-  const chats: Chat[] = [
-    {
-      id: uid("chat"),
-      title: "Stripe for AI agencies",
-      preview: "Building pricing section",
-      timestamp: now - 1000 * 60 * 2,
-      pinned: true,
-      messages: [
-        {
-          id: uid("msg"),
-          role: "user",
-          content: "Build me a landing page + Stripe checkout for an AI agency that sells monthly retainers.",
-          createdAt: now - 1000 * 60 * 3,
-        },
-        {
-          id: uid("msg"),
-          role: "assistant",
-          content:
-            "On it. I put together a dark, premium landing page for the agency with three retainer tiers and a working Stripe checkout on each. Built demo: gysm.io/demo/8821",
-          createdAt: now - 1000 * 60 * 2,
-        },
-      ],
-    },
-    {
-      id: uid("chat"),
-      title: "Clinic booking system",
-      preview: "Calendar integration",
-      timestamp: now - 1000 * 60 * 60,
-      messages: [
-        {
-          id: uid("msg"),
-          role: "user",
-          content: "I need a booking system for a small physio clinic, patients pick a slot and pay a deposit.",
-          createdAt: now - 1000 * 60 * 62,
-        },
-        {
-          id: uid("msg"),
-          role: "assistant",
-          content:
-            "Got it -- a calendar-first booking flow with slot holds and a Stripe deposit at checkout. Built demo: gysm.io/demo/8790",
-          createdAt: now - 1000 * 60 * 60,
-        },
-      ],
-    },
-    {
-      id: uid("chat"),
-      title: "Astrology SaaS",
-      preview: "Checkout finalizing",
-      timestamp: now - 1000 * 60 * 60 * 3,
-      messages: [
-        {
-          id: uid("msg"),
-          role: "user",
-          content: "Build an astrology compatibility app, freemium with a paid deep report.",
-          createdAt: now - 1000 * 60 * 60 * 3 - 60000,
-        },
-        {
-          id: uid("msg"),
-          role: "assistant",
-          content:
-            "Building the compatibility quiz plus a paywalled deep report. Built demo: gysm.io/demo/8744",
-          createdAt: now - 1000 * 60 * 60 * 3,
-        },
-      ],
-    },
-  ];
+  // No canned demo chats -- a fresh, empty chat is created for real
+  // visitors; resuming a saved project or a deep-linked prompt is handled
+  // by LinearBuilderApp's one-time hydration effect below, reading
+  // initialHtml/initialProjectId/initialPrompt from app/builder/page.tsx.
+  const chat: Chat = {
+    id: uid("chat"),
+    title: "New Build",
+    preview: "Just started",
+    timestamp: Date.now(),
+    messages: [],
+  };
   return {
-    chats,
+    chats: [chat],
     artifacts: {},
     media: [],
     schedules: [],
     programs: {},
-    activeChatId: chats[0].id,
+    activeChatId: chat.id,
   };
 }
 
@@ -332,8 +285,25 @@ const PROGRAM_ACTION_TYPES = [
 ];
 
 /* --------------------------------------------------------------------- */
-/* Simulated AI: reply text + generated artifact                         */
+/* Real AI backend -- same /api/generate + /api/projects/[id]/publish     */
+/* contract the previous BuilderClient.tsx used                          */
 /* --------------------------------------------------------------------- */
+
+const STAGE_LABELS: Record<string, string> = {
+  structure: "Reading your prompt and planning the build...",
+  structure_done: "Structure, content, and interactivity written.",
+  design: "Applying a visual design pass...",
+  design_done: "Design polish complete.",
+  saving: "Saving your build...",
+};
+
+type ModelTier = "fast" | "best" | "claude";
+
+const TIER_LABELS: Record<ModelTier, string> = {
+  fast: "GYSM Terra",
+  best: "GYSM Sol",
+  claude: "Claude Sonnet 5",
+};
 
 function titleFromPrompt(prompt: string): string {
   const words = prompt
@@ -343,86 +313,108 @@ function titleFromPrompt(prompt: string): string {
   return words.slice(0, 5).join(" ") || "Untitled build";
 }
 
-function fakeAssistantReply(prompt: string, demoId: string): string {
-  const t = prompt.toLowerCase();
-  let opener = "Got it -- building that now.";
-  if (t.includes("stripe") || t.includes("pay") || t.includes("checkout")) {
-    opener = "On it. Wiring up a real Stripe checkout alongside the UI.";
-  } else if (t.includes("book") || t.includes("calendar") || t.includes("schedule")) {
-    opener = "Sounds good -- putting together a calendar-first flow for that.";
-  } else if (t.includes("dashboard") || t.includes("admin")) {
-    opener = "Building a clean dashboard shell with the data views you'd need.";
-  }
-  return `${opener} Here's a quick look at the structure:\n\n\`\`\`tsx\nexport default function Page() {\n  return <Hero title="${titleFromPrompt(prompt)}" />;\n}\n\`\`\`\n\nBuilt demo: gysm.io/demo/${demoId}`;
+interface GenerateDoneEvent {
+  type: "done";
+  html: string;
+  projectId?: string;
+  suggestions?: string[];
 }
-
-function fakeArtifactHtml(prompt: string): string {
-  const title = titleFromPrompt(prompt) || "Your build";
-  return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><style>
-    body{margin:0;font-family:Inter,system-ui,sans-serif;background:#08080a;color:#f8fafc;}
-    .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px;}
-    .badge{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#FF0080;border:1px solid rgba(255,0,128,.35);padding:4px 10px;border-radius:999px;margin-bottom:20px;}
-    h1{font-size:40px;font-weight:800;margin:0 0 12px;max-width:640px;}
-    p{color:rgba(248,250,252,.6);max-width:480px;margin:0 0 28px;}
-    button{background:linear-gradient(135deg,#FF0080,#e0117a);color:#fff;border:none;padding:12px 22px;border-radius:12px;font-weight:600;cursor:pointer;box-shadow:0 0 20px rgba(255,0,128,.25);}
-  </style></head><body>
-    <div class="hero">
-      <div class="badge">Generated by GYSM.IO</div>
-      <h1>${title}</h1>
-      <p>This is a live preview of what was just generated from your prompt. Every button, section, and price on this page is real -- not a mockup.</p>
-      <button>Get started</button>
-    </div>
-  </body></html>`;
+interface GenerateStageEvent {
+  type: "stage";
+  stage: string;
 }
+interface GenerateErrorEvent {
+  type: "error";
+  error?: string;
+  code?: string;
+}
+type GenerateEvent = GenerateDoneEvent | GenerateStageEvent | GenerateErrorEvent;
 
-function fakeArtifactFiles(prompt: string): CodeFile[] {
-  const title = titleFromPrompt(prompt) || "Build";
-  return [
-    {
-      name: "app/page.tsx",
-      language: "tsx",
-      content: `import Hero from "./Hero";
-
-export default function Page() {
-  // Generated from: "${prompt.replace(/"/g, "'").slice(0, 80)}"
-  return (
-    <main>
-      <Hero title="${title}" />
-    </main>
-  );
-}`,
-    },
-    {
-      name: "app/Hero.tsx",
-      language: "tsx",
-      content: `export default function Hero({ title }: { title: string }) {
-  return (
-    <section className="hero">
-      <span className="badge">Generated by GYSM.IO</span>
-      <h1>{title}</h1>
-      <button>Get started</button>
-    </section>
-  );
-}`,
-    },
-    {
-      name: "app/api/checkout/route.ts",
-      language: "ts",
-      content: `import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-export async function POST() {
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    line_items: [{ price: process.env.PRICE_ID!, quantity: 1 }],
-    success_url: process.env.NEXT_PUBLIC_SITE_URL + "/success",
-    cancel_url: process.env.NEXT_PUBLIC_SITE_URL + "/",
+/** Calls the real /api/generate endpoint (the same one the production
+ *  builder uses) and streams NDJSON stage events back through callbacks,
+ *  so the caller can show live progress instead of one opaque spinner.
+ *  Throws on network/parse failure; auth (401) and no-credits (402) are
+ *  reported via the onAuthRequired / onNoCredits callbacks instead of a
+ *  throw, since those are real HTTP statuses the caller should redirect
+ *  on rather than display as an error bubble. */
+async function runRealGeneration(opts: {
+  prompt: string;
+  previousHtml?: string | null;
+  projectId?: string | null;
+  image?: string;
+  tier: ModelTier;
+  onStage: (label: string) => void;
+  onAuthRequired: () => void;
+  onNoCredits: () => void;
+}): Promise<GenerateDoneEvent> {
+  const res = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: opts.prompt,
+      previousHtml: opts.previousHtml || undefined,
+      projectId: opts.projectId || undefined,
+      image: opts.image,
+      tier: opts.tier,
+    }),
   });
-  return Response.json({ url: session.url });
-}`,
-    },
-  ];
+
+  if (res.status === 401) {
+    opts.onAuthRequired();
+    throw new Error("__redirecting__");
+  }
+  if (res.status === 402) {
+    opts.onNoCredits();
+    throw new Error("__redirecting__");
+  }
+  if (!res.ok || !res.body) {
+    const body = await res.json().catch(() => ({} as any));
+    throw new Error(body.error || `Something went wrong (${res.status}).`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let done: GenerateDoneEvent | null = null;
+
+  while (true) {
+    const { done: streamDone, value } = await reader.read();
+    if (streamDone) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const evt = JSON.parse(line) as GenerateEvent;
+      if (evt.type === "stage") {
+        opts.onStage(STAGE_LABELS[evt.stage] ?? evt.stage);
+      } else if (evt.type === "error") {
+        if (evt.code === "NO_CREDITS") {
+          opts.onNoCredits();
+          throw new Error("__redirecting__");
+        }
+        throw new Error(evt.error || "Something went wrong.");
+      } else if (evt.type === "done") {
+        done = evt;
+      }
+    }
+  }
+
+  if (!done) throw new Error("No preview came back. Try again.");
+  return done;
+}
+
+/** Publishes a real project to BuildGuild via the same endpoint the
+ *  production builder uses. */
+async function publishToBuildGuild(projectId: string, title: string, tagline: string) {
+  const res = await fetch(`/api/projects/${projectId}/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, tagline }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Failed to publish.");
+  return data as { ok: true; id: string };
 }
 
 /* --------------------------------------------------------------------- */
@@ -508,7 +500,7 @@ function renderAssistantContent(content: string, onOpenArtifact: () => void) {
     const text = parts[i];
     const lang = parts[i + 1];
     const code = parts[i + 2];
-    const demoMatch = text.match(/Built demo:\s*(gysm\.io\/demo\/[\w-]+)/i);
+    const demoMatch = text.match(/built demo:\s*(\S+)/i);
     const cleanText = demoMatch ? text.replace(demoMatch[0], "").trim() : text.trim();
     if (cleanText) {
       nodes.push(
@@ -1193,18 +1185,22 @@ function ArtifactPanel({
   onClose,
   width,
   onStartResize,
+  onPublished,
 }: {
   artifact: Artifact | null;
   onClose: () => void;
   width: number;
   onStartResize: (e: React.MouseEvent) => void;
+  onPublished: (artifactId: string) => void;
 }) {
   const [tab, setTab] = useState<"preview" | "code" | "deploy">("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [activeFile, setActiveFile] = useState(0);
-  const [deployLogs, setDeployLogs] = useState<string[]>([]);
-  const [deploying, setDeploying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [publishTitle, setPublishTitle] = useState("");
+  const [publishTagline, setPublishTagline] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
 
   const deviceWidths: Record<DeviceMode, string> = {
     desktop: "100%",
@@ -1212,15 +1208,18 @@ function ArtifactPanel({
     mobile: "375px",
   };
 
-  function runDeploy() {
-    if (!artifact) return;
-    setDeploying(true);
-    setDeployLogs(["Queued build...", `Uploading ${artifact.files.length} files...`]);
-    const steps = ["Installing dependencies", "Building", "Optimizing assets", "Assigning domain", `Live at ${artifact.url}`];
-    steps.forEach((s, i) => {
-      setTimeout(() => setDeployLogs((l) => [...l, s]), 500 * (i + 1));
-    });
-    setTimeout(() => setDeploying(false), 500 * (steps.length + 1));
+  async function handlePublish() {
+    if (!artifact?.projectId || !publishTitle.trim() || publishing) return;
+    setPublishing(true);
+    setPublishError("");
+    try {
+      await publishToBuildGuild(artifact.projectId, publishTitle.trim(), publishTagline.trim());
+      onPublished(artifact.id);
+    } catch (e: any) {
+      setPublishError(e?.message || "Failed to publish.");
+    } finally {
+      setPublishing(false);
+    }
   }
 
   return (
@@ -1341,24 +1340,58 @@ function ArtifactPanel({
           </pre>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col p-4 gap-3 overflow-y-auto">
-          <button
-            onClick={runDeploy}
-            disabled={deploying}
-            className="rounded-xl bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[13px] font-semibold py-2.5 disabled:opacity-60"
-          >
-            {deploying ? "Deploying..." : "Deploy to Vercel"}
-          </button>
-          <div className="text-[12px] text-white/50">
-            URL: <span className="text-white/80">{artifact.url}</span>
+        <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+          <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/5 p-3">
+            <div className="flex items-center gap-2 text-[12px] text-emerald-300 font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Live now
+            </div>
+            <div className="mt-1 text-[13px] text-white break-all">{artifact.url}</div>
+            <p className="mt-1 text-[11px] text-white/40">
+              Every GYSM build is live the moment it's generated -- no separate deploy step needed.
+            </p>
           </div>
-          <div className="flex-1 rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-[11px] text-white/70 space-y-1 overflow-y-auto min-h-[140px]">
-            {deployLogs.length === 0 ? (
-              <span className="text-white/30">Logs will appear here once you deploy.</span>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+            <div className="text-[12px] text-white font-medium">Publish to BuildGuild</div>
+            <p className="text-[11px] text-white/40">
+              List this build publicly in the BuildGuild marketplace.
+            </p>
+            {artifact.published ? (
+              <div className="text-[12px] text-emerald-300">&#10003; Published</div>
             ) : (
-              deployLogs.map((l, i) => <div key={i}>&gt; {l}</div>)
+              <>
+                <input
+                  value={publishTitle}
+                  onChange={(e) => setPublishTitle(e.target.value)}
+                  placeholder="Title"
+                  className="w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-[12px] text-white placeholder:text-white/30 outline-none"
+                />
+                <input
+                  value={publishTagline}
+                  onChange={(e) => setPublishTagline(e.target.value)}
+                  placeholder="Tagline (optional)"
+                  className="w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-[12px] text-white placeholder:text-white/30 outline-none"
+                />
+                {publishError && <p className="text-[11px] text-red-400">{publishError}</p>}
+                <button
+                  onClick={handlePublish}
+                  disabled={!artifact.projectId || !publishTitle.trim() || publishing}
+                  className="w-full rounded-xl bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[13px] font-semibold py-2 disabled:opacity-40"
+                >
+                  {publishing ? "Publishing..." : "Publish"}
+                </button>
+              </>
             )}
           </div>
+
+          {artifact.suggestions.length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-1.5">
+              <div className="text-[12px] text-white font-medium">Suggested next steps</div>
+              {artifact.suggestions.map((s, i) => (
+                <div key={i} className="text-[11px] text-white/50">&bull; {s}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1511,6 +1544,9 @@ function ChatCenter({
   onSchedule,
   onOpenMobileArtifact,
   onOpenProgram,
+  tier,
+  onChangeTier,
+  initialInput,
 }: {
   chat: Chat | null;
   media: MediaItem[];
@@ -1525,8 +1561,11 @@ function ChatCenter({
   onSchedule: (label: string, runAt: number) => void;
   onOpenMobileArtifact: () => void;
   onOpenProgram: () => void;
+  tier: ModelTier;
+  onChangeTier: (t: ModelTier) => void;
+  initialInput?: string;
 }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1683,9 +1722,18 @@ function ChatCenter({
                   onPick={(label, runAt) => onSchedule(label, runAt)}
                 />
               )}
-              <span className="ml-auto flex items-center gap-1 text-[11px] text-white/40 px-2 py-1 rounded-lg bg-white/5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#FF0080]" /> GYSM v2
-              </span>
+              <select
+                value={tier}
+                onChange={(e) => onChangeTier(e.target.value as ModelTier)}
+                className="ml-auto flex items-center gap-1 text-[11px] text-white/60 px-2 py-1 rounded-lg bg-white/5 border border-white/10 outline-none cursor-pointer"
+                title="Model tier -- higher tiers cost more credits per build"
+              >
+                {(Object.keys(TIER_LABELS) as ModelTier[]).map((t) => (
+                  <option key={t} value={t} className="text-black">
+                    {TIER_LABELS[t]}
+                  </option>
+                ))}
+              </select>
               <button
                 onClick={submit}
                 disabled={!input.trim()}
@@ -1713,7 +1761,27 @@ const MIN_PANEL = 340;
 const MAX_PANEL = 720;
 const DEFAULT_PANEL = 420;
 
-export default function LinearBuilderApp() {
+interface LinearBuilderAppProps {
+  initialHtml?: string | null;
+  initialPrompt?: string;
+  initialProjectId?: string | null;
+  isAdmin?: boolean;
+  /** Where this component is actually mounted -- used for the /sign-in
+   *  redirect_url so a logged-out visitor comes back here. */
+  builderPath?: string;
+}
+
+export default function LinearBuilderApp({
+  initialHtml = null,
+  initialPrompt = "",
+  initialProjectId = null,
+  // isAdmin is accepted for parity with app/builder/page.tsx's props but
+  // not yet wired to any admin-only UI here -- the old BuilderClient's
+  // template-curation controls weren't ported in this pass. Flagged in
+  // the handoff notes as a known gap.
+  isAdmin: _isAdmin = false,
+  builderPath = "/builder",
+}: LinearBuilderAppProps) {
   const [state, setState] = useLinearStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -1721,11 +1789,66 @@ export default function LinearBuilderApp() {
   const [rightOpen, setRightOpen] = useState(true);
   const [rightMode, setRightMode] = useState<"artifact" | "program">("artifact");
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL);
+  const [tier, setTier] = useState<ModelTier>("fast");
   const resizing = useRef(false);
+  const router = useRouter();
+  const hydrated = useRef(false);
 
   const activeChat = state.chats.find((c) => c.id === state.activeChatId) || null;
   const activeArtifact = activeChat?.artifactId ? state.artifacts[activeChat.artifactId] : null;
   const activeProgram = activeChat ? state.programs[activeChat.id] : undefined;
+
+  /* One-time hydration from server props: resume a saved project
+   * (initialHtml + initialProjectId), or prefill a deep-linked prompt
+   * (initialPrompt alone, never auto-submitted -- matches the production
+   * builder's own "never surprise a credit spend" rule). */
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    if (initialHtml && initialProjectId) {
+      const chatId = uid("chat");
+      const artifactId = uid("art");
+      const host = typeof window !== "undefined" ? window.location.host : "gysm.io";
+      const chat: Chat = {
+        id: chatId,
+        title: titleFromPrompt(initialPrompt) || "Resumed build",
+        preview: initialPrompt.slice(0, 60) || "Resumed build",
+        timestamp: Date.now(),
+        artifactId,
+        messages: [
+          ...(initialPrompt
+            ? [{ id: uid("msg"), role: "user" as const, content: initialPrompt, createdAt: Date.now() - 1000 }]
+            : []),
+          {
+            id: uid("msg"),
+            role: "assistant" as const,
+            content: `Welcome back -- here's where you left off. Built demo: ${host}/publish/${initialProjectId}`,
+            createdAt: Date.now(),
+          },
+        ],
+      };
+      const artifact: Artifact = {
+        id: artifactId,
+        chatId,
+        projectId: initialProjectId,
+        title: titleFromPrompt(initialPrompt) || "Resumed build",
+        html: initialHtml,
+        files: [{ name: "index.html", language: "html", content: initialHtml }],
+        url: `${host}/publish/${initialProjectId}`,
+        progress: 100,
+        deployed: true,
+        published: false,
+        suggestions: [],
+      };
+      setState((s) => ({
+        ...s,
+        chats: [chat, ...s.chats.filter((c) => c.messages.length > 0)],
+        artifacts: { ...s.artifacts, [artifactId]: artifact },
+        activeChatId: chatId,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Global Ctrl/Cmd+K for search */
   useEffect(() => {
@@ -1894,10 +2017,22 @@ export default function LinearBuilderApp() {
     setMobileArtifactOpen(true);
   }
 
-  /** Simulate word-by-word streaming, then finalize the message and --
-   *  if the reply contains "Built demo:" -- create/open the artifact with
-   *  a 0->100% progress animation. */
-  function streamAssistantReply(chatId: string, fullText: string, demoId: string | null, prompt: string) {
+  function markPublished(artifactId: string) {
+    setState((s) => ({
+      ...s,
+      artifacts: { ...s.artifacts, [artifactId]: { ...s.artifacts[artifactId], published: true } },
+    }));
+  }
+
+  /** Sends a prompt to the real /api/generate endpoint, shows live stage
+   *  text in the assistant bubble while it streams, and on success turns
+   *  the response into a real artifact (real html, real projectId, a
+   *  real gysm.io/publish/<id> url). Redirects on 401/402 exactly like
+   *  the production builder does. */
+  async function runGeneration(chatId: string, prompt: string, image: string | undefined) {
+    const chatForRequest = store!.get().chats.find((c) => c.id === chatId);
+    const existingArtifact = chatForRequest?.artifactId ? store!.get().artifacts[chatForRequest.artifactId] : null;
+
     const msgId = uid("msg");
     setState((s) => ({
       ...s,
@@ -1908,65 +2043,66 @@ export default function LinearBuilderApp() {
       ),
     }));
 
-    const words = fullText.split(" ");
-    let i = 0;
-    const interval = setInterval(() => {
-      i += 1;
-      const partial = words.slice(0, i).join(" ");
+    const setStreamingText = (text: string) => {
+      setState((s) => ({
+        ...s,
+        chats: s.chats.map((c) =>
+          c.id === chatId ? { ...c, messages: c.messages.map((m) => (m.id === msgId ? { ...m, content: text } : m)) } : c
+        ),
+      }));
+    };
+    const finalizeText = (text: string) => {
       setState((s) => ({
         ...s,
         chats: s.chats.map((c) =>
           c.id === chatId
-            ? { ...c, messages: c.messages.map((m) => (m.id === msgId ? { ...m, content: partial } : m)) }
+            ? { ...c, messages: c.messages.map((m) => (m.id === msgId ? { ...m, content: text, streaming: false } : m)) }
             : c
         ),
       }));
-      if (i >= words.length) {
-        clearInterval(interval);
-        setState((s) => ({
-          ...s,
-          chats: c_finalize(s.chats, chatId, msgId),
-        }));
-        if (demoId) createArtifact(chatId, demoId, prompt);
-      }
-    }, 45);
-
-    function c_finalize(chats: Chat[], cid: string, mid: string) {
-      return chats.map((c) =>
-        c.id === cid ? { ...c, messages: c.messages.map((m) => (m.id === mid ? { ...m, streaming: false } : m)) } : c
-      );
-    }
-  }
-
-  function createArtifact(chatId: string, demoId: string, prompt: string) {
-    const artifact: Artifact = {
-      id: uid("art"),
-      chatId,
-      title: titleFromPrompt(prompt),
-      html: fakeArtifactHtml(prompt),
-      files: fakeArtifactFiles(prompt),
-      url: `gysm.io/demo/${demoId}`,
-      progress: 0,
-      deployed: false,
     };
-    setState((s) => ({
-      ...s,
-      artifacts: { ...s.artifacts, [artifact.id]: artifact },
-      chats: s.chats.map((c) => (c.id === chatId ? { ...c, artifactId: artifact.id } : c)),
-    }));
-    setRightMode("artifact");
-    setRightOpen(true);
 
-    let progress = 0;
-    const step = () => {
-      progress = Math.min(100, progress + 8 + Math.random() * 10);
+    try {
+      const result = await runRealGeneration({
+        prompt,
+        previousHtml: existingArtifact?.html ?? null,
+        projectId: existingArtifact?.projectId ?? null,
+        image,
+        tier,
+        onStage: setStreamingText,
+        onAuthRequired: () => router.push(`/sign-in?redirect_url=${encodeURIComponent(builderPath)}`),
+        onNoCredits: () => router.push("/pricing?reason=no_credits"),
+      });
+
+      const host = typeof window !== "undefined" ? window.location.host : "gysm.io";
+      const url = `${host}/publish/${result.projectId ?? ""}`;
+      finalizeText(`Here it is -- built demo: ${url}`);
+
+      const artifactId = existingArtifact?.id ?? uid("art");
+      const artifact: Artifact = {
+        id: artifactId,
+        chatId,
+        projectId: result.projectId ?? null,
+        title: existingArtifact?.title ?? titleFromPrompt(prompt),
+        html: result.html,
+        files: [{ name: "index.html", language: "html", content: result.html }],
+        url,
+        progress: 100,
+        deployed: true,
+        published: existingArtifact?.published ?? false,
+        suggestions: Array.isArray(result.suggestions) ? result.suggestions : [],
+      };
       setState((s) => ({
         ...s,
-        artifacts: { ...s.artifacts, [artifact.id]: { ...s.artifacts[artifact.id], progress } },
+        artifacts: { ...s.artifacts, [artifactId]: artifact },
+        chats: s.chats.map((c) => (c.id === chatId ? { ...c, artifactId } : c)),
       }));
-      if (progress < 100) setTimeout(step, 220);
-    };
-    setTimeout(step, 150);
+      setRightMode("artifact");
+      setRightOpen(true);
+    } catch (err: any) {
+      if (err?.message === "__redirecting__") return;
+      finalizeText(err?.message || "Something went wrong. Try again.");
+    }
   }
 
   function sendMessage(text: string, mediaIds: string[]) {
@@ -1995,6 +2131,13 @@ export default function LinearBuilderApp() {
       ),
     }));
 
+    // Only the first attached image is sent -- that's the real backend's
+    // reference-image capability (a single optional image per generation;
+    // see app/api/generate/route.ts's MAX_IMAGE_BYTES handling).
+    const firstImage = mediaIds
+      .map((id) => state.media.find((m) => m.id === id))
+      .find((m) => m?.type === "image")?.url;
+
     if (mediaIds.length > 0) {
       setState((s) => ({
         ...s,
@@ -2007,7 +2150,10 @@ export default function LinearBuilderApp() {
                   {
                     id: uid("msg"),
                     role: "system",
-                    content: `Added ${mediaIds.length} asset${mediaIds.length > 1 ? "s" : ""} to build context`,
+                    content:
+                      mediaIds.length > 1
+                        ? `Added ${mediaIds.length} assets to build context (only the first image is sent to the model)`
+                        : "Added 1 asset to build context",
                     createdAt: Date.now(),
                   },
                 ],
@@ -2017,9 +2163,7 @@ export default function LinearBuilderApp() {
       }));
     }
 
-    const demoId = String(Math.floor(1000 + Math.random() * 9000));
-    const reply = fakeAssistantReply(text, demoId);
-    setTimeout(() => streamAssistantReply(chatId, reply, demoId, text), 1200);
+    runGeneration(chatId, text, firstImage);
   }
 
   return (
@@ -2052,6 +2196,9 @@ export default function LinearBuilderApp() {
         onSchedule={scheduleChat}
         onOpenMobileArtifact={() => setMobileArtifactOpen(true)}
         onOpenProgram={openProgram}
+        tier={tier}
+        onChangeTier={setTier}
+        initialInput={!initialHtml ? initialPrompt : undefined}
       />
 
       {rightOpen &&
@@ -2066,6 +2213,7 @@ export default function LinearBuilderApp() {
               e.preventDefault();
               resizing.current = true;
             }}
+            onPublished={markPublished}
           />
         ))}
 
@@ -2087,6 +2235,7 @@ export default function LinearBuilderApp() {
                 onClose={() => setMobileArtifactOpen(false)}
                 width={"100%" as unknown as number}
                 onStartResize={() => {}}
+                onPublished={markPublished}
               />
             )}
           </div>

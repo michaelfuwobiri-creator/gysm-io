@@ -1,7 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
-import BuilderClient from "./BuilderClient";
+import LinearBuilderClient from "./LinearBuilderClient";
 
 // Middleware already gates /builder(.*) via Clerk, so getUser() here is
 // just for the optional ?projectId=/?template= resume lookups below and
@@ -76,11 +76,14 @@ export default async function BuilderPage({
   }
 
   return (
-    <BuilderClient
-      initialHtml={initialHtml}
-      initialPrompt={initialPrompt}
-      initialProjectId={initialProjectId}
-      isAdmin={isAdmin}
-    />
+    <div style={{ fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
+      <LinearBuilderClient
+        initialHtml={initialHtml}
+        initialPrompt={initialPrompt}
+        initialProjectId={initialProjectId}
+        isAdmin={isAdmin}
+        builderPath="/builder"
+      />
+    </div>
   );
 }
