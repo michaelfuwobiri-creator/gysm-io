@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/builder", "/dashboard", "/sign-in", "/sign-up", "/billing", "/team", "/settings"],
+        disallow: ["/api/", "/builder", "/dashboard", "/sign-in", "/sign-up", "/billing", "/team", "/settings", "/media-factory-preview.html"],
       },
       // General web search crawlers
       { userAgent: "Googlebot", allow: "/" },

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GYSM.IO Media Factory — Concept Preview</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  * { font-family: 'Inter', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .fuchsia-glow { box-shadow: 0 0 20px rgba(255,0,128,0.25); }
+  .fuchsia-glow-sm { box-shadow: 0 0 12px rgba(255,0,128,0.3); }
+  .ease-linear-out { transition: all 200ms cubic-bezier(0.16,1,0.3,1); }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,0,128,0.5); } 50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(255,0,128,0); } }
+  .pulse-dot { animation: pulse-dot 1.8s cubic-bezier(0.16,1,0.3,1) infinite; }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 37%, rgba(255,255,255,0.03) 63%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+  input[type="range"].fuchsia-range { -webkit-appearance: none; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.1); }
+  input[type="range"].fuchsia-range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 999px; background: #FF0080; cursor: pointer; box-shadow: 0 0 8px rgba(255,0,128,0.6); }
+</style>
+</head>
+<body class="bg-[#08080a] text-white antialiased">
+<div class="h-9 w-full shrink-0 flex items-center justify-center gap-2 bg-[#0f0f14] border-b border-[#FF0080]/30 text-[11px] text-white/70 px-4 text-center">
+  <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#FF0080] pulse-dot"></span>
+  <span><strong class="text-white">Concept preview</strong> — every generation below is simulated for design purposes, nothing here calls a real AI provider yet.</span>
+  <a href="https://www.gysm.io" class="text-[#FF0080] font-semibold hover:underline ml-1">Back to GYSM.IO</a>
+</div>
+<div id="root" style="height: calc(100vh - 36px);"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ------------------------------------------------------------------ */
+/* Data: this prototype simulates 22 GYSM.IO Media Factory generation */
+/* grouped into 7 @skill categories. There is no real Replicate/      */
+/* Fal.ai/HeyGen/ElevenLabs backend wired up here -- every "agent" is  */
+/* a name + a client-side timer that fakes a progress bar and reveals */
+/* a labeled placeholder. Usage counts and Factory stats are computed */
+/* from this browser's own localStorage (starts at 0), never          */
+/* hardcoded, so nothing here claims to be real platform-wide traffic */
+/* or revenue.                                                        */
+/* ------------------------------------------------------------------ */
+
+const SKILL_CATEGORIES = [
+  { key: "media", label: "@media", icon: "image", items: ["GYSM Image Generate", "Background Remover Auto", "Custom Removal", "Chroma Key", "Image Extender", "AI Upscaler"] },
+  { key: "video", label: "@video", icon: "video", items: ["GYSM Motion Text-to-Video 1080p", "Image-to-Video", "Character Lock multimodal", "Long Video to Shorts", "GYSM Script-to-Video", "Media Match with Script"] },
+  { key: "avatar", label: "@avatar", icon: "user", items: ["100 Avatars Library", "Talking Avatar", "Avatar Video", "Free Avatar Creator", "AI Presenter for demos"] },
+  { key: "script", label: "@script", icon: "file", items: ["AI Script Generator", "Idea to Script to Video", "Ad Scripts for Business", "Smart AI Writer"] },
+  { key: "captions", label: "@captions", icon: "captions", items: ["Auto Captions sync templates", "Accurate Captions", "Lyric Video Maker", "Text-to-Speech", "Voice Cloning"] },
+  { key: "audio", label: "@audio", icon: "music", items: ["GYSM Sound Generate Music", "Background Tracks", "Voice Enhancement", "Noise Removal", "Original Audio Ideas"] },
+  { key: "edit", label: "@edit", icon: "sparkles", items: ["Auto Reframe", "Stabilize", "Relight", "Flicker Removal", "Color Correction", "Slow-mo", "Retouching", "Virtual Try-On"] },
+];
+
+const AGENTS = [
+  { id: "gysm-motion", name: "GYSM Motion", cat: "video", icon: "video", desc: "Text/image → 1080p video generation" },
+  { id: "character-lock", name: "Character Lock", cat: "video", icon: "video", desc: "Consistent characters across shots" },
+  { id: "gysm-image", name: "GYSM Image", cat: "media", icon: "image", desc: "Product shots, posters, thumbnails" },
+  { id: "gysm-image-pro", name: "GYSM Image Pro", cat: "media", icon: "image", desc: "General-purpose image generation" },
+  { id: "gysm-sound", name: "GYSM Sound", cat: "audio", icon: "music", desc: "Original background music tracks" },
+  { id: "script-to-video", name: "GYSM Script-to-Video", cat: "video", icon: "video", desc: "Topic → scenes, voiceover, captions" },
+  { id: "shorts", name: "Long Video to Shorts", cat: "video", icon: "video", desc: "Auto-cuts 3 vertical clips" },
+  { id: "trim", name: "Transcript-Based Trimming", cat: "edit", icon: "sparkles", desc: "Removes dead air / silence" },
+  { id: "avatars-lib", name: "AI Avatars", cat: "avatar", icon: "user", desc: "100+ realistic talking avatars" },
+  { id: "presenter", name: "AI Presenters", cat: "avatar", icon: "user", desc: "Avatar-led product demos" },
+  { id: "tryon", name: "Virtual Try-On", cat: "avatar", icon: "user", desc: "E-commerce apparel try-on" },
+  { id: "script-gen", name: "AI Script Generator", cat: "script", icon: "file", desc: "Idea → structured script" },
+  { id: "captions", name: "Auto Captions", cat: "captions", icon: "captions", desc: "Synced captions, style templates" },
+  { id: "tts", name: "Text-to-Speech", cat: "captions", icon: "captions", desc: "Natural voiceover narration" },
+  { id: "voice-clone", name: "Voice Cloning", cat: "captions", icon: "captions", desc: "Clone a voice from a sample" },
+  { id: "bg-remove", name: "Background Remover", cat: "media", icon: "image", desc: "Auto background removal" },
+  { id: "custom-remove", name: "Custom Removal", cat: "media", icon: "image", desc: "Remove any selected object" },
+  { id: "chroma", name: "Chroma Key", cat: "media", icon: "image", desc: "Green-screen keying" },
+  { id: "extender", name: "AI Image Extender", cat: "media", icon: "image", desc: "Outpaint beyond the frame" },
+  { id: "reframe", name: "Auto Reframe", cat: "edit", icon: "sparkles", desc: "Reframe for any aspect ratio" },
+  { id: "upscaler", name: "AI Upscaler", cat: "media", icon: "image", desc: "Upscale to 4K" },
+  { id: "magic-tools", name: "Magic Tools Suite", cat: "edit", icon: "sparkles", desc: "Enhance, stabilize, relight, color" },
+];
+
+const CAPTION_STYLES = [
+  { key: "tiktok", label: "GYSM Bold", cls: "text-white font-black text-[15px]", style: { WebkitTextStroke: "1.5px black" } },
+  { key: "linear", label: "GYSM Minimal", cls: "text-white/90 font-medium text-[13px]", style: {} },
+  { key: "fuchsia", label: "Fuchsia glow", cls: "text-[#FF0080] font-bold text-[14px]", style: { textShadow: "0 0 12px rgba(255,0,128,0.8)" } },
+  { key: "karaoke", label: "Karaoke highlight", cls: "font-bold text-[14px]", style: { background: "linear-gradient(90deg,#FF0080 50%,white 50%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } },
+];
+
+const AVATARS = Array.from({ length: 12 }).map((_, i) => ({
+  id: "av" + i,
+  name: ["Maya", "Jordan", "Sam", "Riley", "Alex", "Noor", "Kai", "Priya", "Leo", "Sofia", "Theo", "Amara"][i],
+  tone: ["Professional", "Friendly", "Energetic"][i % 3],
+}));
+
+function loadLS(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+function saveLS(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+/* ------------------------------------------------------------------ */
+/* Minimal inline icon set (no external icon CDN)                     */
+/* ------------------------------------------------------------------ */
+function Icon({ name, className }) {
+  const common = { className: className || "w-4 h-4", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
+  switch (name) {
+    case "image": return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>;
+    case "video": return <svg {...common}><rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3"/></svg>;
+    case "user": return <svg {...common}><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>;
+    case "file": return <svg {...common}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/></svg>;
+    case "captions": return <svg {...common}><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 12h1M11 12h6M7 15h4M13 15h4"/></svg>;
+    case "music": return <svg {...common}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>;
+    case "sparkles": return <svg {...common}><path d="M12 3l1.8 4.9L19 9.5l-5.2 1.6L12 16l-1.8-4.9L5 9.5l5.2-1.6L12 3z"/><path d="M19 15l.7 1.9L21.5 17.5l-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.6z"/></svg>;
+    case "play": return <svg {...common} fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>;
+    case "plus": return <svg {...common}><path d="M12 5v14M5 12h14"/></svg>;
+    case "search": return <svg {...common}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>;
+    case "check": return <svg {...common}><path d="M20 6L9 17l-5-5"/></svg>;
+    case "gear": return <svg {...common}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+    default: return <svg {...common}><circle cx="12" cy="12" r="9"/></svg>;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Skill chip row + dropdown                                          */
+/* ------------------------------------------------------------------ */
+function SkillChips({ openMenu, setOpenMenu, onPick }) {
+  return (
+    <div className="flex flex-wrap gap-2 px-1 pb-2 relative">
+      {SKILL_CATEGORIES.map((cat) => {
+        const active = openMenu === cat.key;
+        return (
+          <div key={cat.key} className="relative">
+            <button
+              onClick={() => setOpenMenu(active ? null : cat.key)}
+              className={
+                "flex items-center gap-1.5 h-7 px-3 rounded-full text-[12px] font-medium border transition-all duration-200 " +
+                (active
+                  ? "bg-[#FF0080] text-white border-[#FF0080] fuchsia-glow-sm"
+                  : "bg-[#0f0f14] text-white/60 border-white/[0.08] hover:bg-white/10 hover:text-white")
+              }
+            >
+              <Icon name={cat.icon} className="w-3.5 h-3.5" />
+              {cat.label}
+            </button>
+            {active && (
+              <div className="absolute bottom-full mb-2 left-0 w-[320px] bg-[#0f0f14] border border-white/10 rounded-2xl shadow-2xl p-2 z-30">
+                {cat.items.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => { onPick(cat, item); setOpenMenu(null); }}
+                    className="w-full text-left px-3 py-2 rounded-xl text-[13px] text-white/80 hover:bg-white/[0.06] hover:text-white transition-colors duration-150 flex items-center justify-between group"
+                  >
+                    <span>{item}</span>
+                    <Icon name="plus" className="w-3.5 h-3.5 text-white/20 group-hover:text-[#FF0080]" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Progress bar used by every generation card                         */
+/* ------------------------------------------------------------------ */
+function useSimulatedProgress(durationMs, onDone, skip) {
+  const [progress, setProgress] = useState(skip ? 100 : 0);
+  const doneRef = useRef(!!skip);
+  useEffect(() => {
+    if (skip) return;
+    const start = Date.now();
+    const tick = setInterval(() => {
+      const pct = Math.min(100, Math.round(((Date.now() - start) / durationMs) * 100));
+      setProgress(pct);
+      if (pct >= 100 && !doneRef.current) {
+        doneRef.current = true;
+        clearInterval(tick);
+        onDone && onDone();
+      }
+    }, 60);
+    return () => clearInterval(tick);
+  }, []);
+  return progress;
+}
+
+function ProgressBar({ progress }) {
+  return (
+    <div className="h-1.5 w-full rounded-full bg-white/[0.08] overflow-hidden">
+      <div className="h-full rounded-full bg-[#FF0080] fuchsia-glow-sm transition-all duration-150" style={{ width: progress + "%" }} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Placeholder preview box -- clearly labeled as a demo placeholder,  */
+/* not a real generated asset (no real image/video model is wired up  */
+/* in this prototype).                                                */
+/* ------------------------------------------------------------------ */
+function PlaceholderMedia({ kind, label, className }) {
+  return (
+    <div className={"relative rounded-xl overflow-hidden border border-white/10 bg-gradient-to-br from-[#1a0a14] via-[#0f0f14] to-[#08080a] flex items-center justify-center " + (className || "")}>
+      <div className="flex flex-col items-center gap-2 text-white/30">
+        <Icon name={kind === "video" ? "video" : "image"} className="w-8 h-8" />
+        <span className="text-[10px] font-semibold uppercase tracking-wide">{label || "Demo placeholder"}</span>
+      </div>
+      {kind === "video" && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-[#FF0080] fuchsia-glow-sm flex items-center justify-center">
+            <Icon name="play" className="w-5 h-5 text-white" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionPill({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="h-7 px-3 rounded-full bg-white/[0.06] border border-white/10 text-[11px] font-semibold text-white/70 hover:bg-white/10 hover:text-white transition-colors duration-150"
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ---------------------------- @media card --------------------------*/
+function MediaGenCard({ msg, onComplete, onAction }) {
+  const [done, setDone] = useState(msg.done || false);
+  const rawProgress = useSimulatedProgress(2800, () => { if (!done) { setDone(true); onComplete(msg.id); } }, done);
+  const progress = done ? 100 : rawProgress;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-2">{msg.agent} {done ? "— done" : "generating…"}</div>
+      {!done && <ProgressBar progress={progress} />}
+      {done && (
+        <React.Fragment>
+          <PlaceholderMedia kind="image" label="Image preview (demo)" className="w-full aspect-video mb-3" />
+          <div className="flex flex-wrap gap-2">
+            <ActionPill onClick={() => onAction("Use as Hero")}>Use as Hero</ActionPill>
+            <ActionPill onClick={() => onAction("Remove BG")}>Remove BG</ActionPill>
+            <ActionPill onClick={() => onAction("Extend to 9:16")}>Extend to 9:16</ActionPill>
+            <ActionPill onClick={() => onAction("Upscale 4K")}>Upscale 4K</ActionPill>
+          </div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------- @video card ----------------------------*/
+function VideoGenCard({ msg, onComplete, onAction, appliedCaption }) {
+  const [done, setDone] = useState(msg.done || false);
+  const rawProgress = useSimulatedProgress(3000, () => { if (!done) { setDone(true); onComplete(msg.id); } }, done);
+  const progress = done ? 100 : rawProgress;
+  const capStyle = CAPTION_STYLES.find((c) => c.key === appliedCaption);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-2">
+        {msg.agent} {done ? "— 1080p ready" : "generating 1080p · 12s clip…"}
+      </div>
+      {!done && <ProgressBar progress={progress} />}
+      {done && (
+        <React.Fragment>
+          <div className="relative">
+            <PlaceholderMedia kind="video" label="Video preview (demo)" className="w-full aspect-video mb-3" />
+            {capStyle && (
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center px-4">
+                <span className={capStyle.cls} style={capStyle.style}>Your caption preview text</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionPill onClick={() => onAction("Add Avatar")}>Add Avatar</ActionPill>
+            <ActionPill onClick={() => onAction("Add Captions")}>Add Captions</ActionPill>
+            <ActionPill onClick={() => onAction("Cut to Shorts")}>Cut to Shorts</ActionPill>
+            <ActionPill onClick={() => onAction("Export")}>Export</ActionPill>
+          </div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------- @avatar card ----------------------------*/
+function AvatarCard({ msg, onGenerate }) {
+  const [selected, setSelected] = useState(msg.selectedAvatar || null);
+  const [script, setScript] = useState(msg.script || "");
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-3">100 Avatars Library</div>
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {AVATARS.map((av) => (
+          <button key={av.id} onClick={() => setSelected(av.id)} className="flex flex-col items-center gap-1 group">
+            <div className={"w-12 h-12 rounded-full flex items-center justify-center text-[13px] font-bold bg-gradient-to-br from-[#FF0080] to-[#7c1d4a] transition-all duration-200 " + (selected === av.id ? "ring-2 ring-[#FF0080] ring-offset-2 ring-offset-[#0f0f14]" : "opacity-80 group-hover:opacity-100")}>
+              {av.name[0]}
+            </div>
+            <span className="text-[9px] text-white/50 truncate w-full text-center">{av.name}</span>
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <div className="text-[10px] text-white/40 mb-2">
+          {AVATARS.find((a) => a.id === selected).name} · {AVATARS.find((a) => a.id === selected).tone}
+        </div>
+      )}
+      <textarea
+        value={script}
+        onChange={(e) => setScript(e.target.value)}
+        placeholder="Enter script for avatar to say…"
+        className="w-full h-16 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-[12px] text-white placeholder:text-white/30 outline-none resize-none mb-3"
+      />
+      <button
+        disabled={!selected || !script.trim()}
+        onClick={() => onGenerate(msg.id, selected, script)}
+        className="w-full h-9 rounded-full bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[12px] font-bold disabled:opacity-40 transition-all duration-200"
+      >
+        Generate Avatar Video
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------- @captions row ----------------------------*/
+function CaptionStylesRow({ onApply, applied }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-3">Caption styles</div>
+      <div className="flex flex-wrap gap-2">
+        {CAPTION_STYLES.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => onApply(s.key)}
+            className={"h-8 px-3 rounded-full text-[11px] font-semibold border transition-all duration-200 " + (applied === s.key ? "border-[#FF0080] bg-[#FF0080]/10 text-white" : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white")}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------- @shorts card ----------------------------*/
+function ShortsCard({ onExport }) {
+  const hooks = ["Hook 1 — first 3s", "Hook 2 — middle beat", "Hook 3 — CTA close"];
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[440px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-3">3 Shorts ready — 9:16</div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {hooks.map((h) => (
+          <div key={h} className="relative">
+            <PlaceholderMedia kind="video" label="9:16" className="aspect-[9/16]" />
+            <div className="absolute bottom-1 inset-x-1 text-[8px] text-center text-white/70 bg-black/50 rounded px-1 py-0.5">{h}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={onExport} className="w-full h-8 rounded-full bg-[#FF0080] text-white text-[12px] font-bold hover:bg-[#FF0080]/90 transition-colors duration-150">
+        Export All 3
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------- @edit card ----------------------------*/
+function EditCard() {
+  const [ratio, setRatio] = useState("16:9");
+  const [bgRemove, setBgRemove] = useState(false);
+  const [enhance, setEnhance] = useState(50);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-3">Auto Reframe</div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {["16:9", "9:16", "1:1", "4:5"].map((r) => (
+          <button key={r} onClick={() => setRatio(r)} className={"h-7 px-3 rounded-full text-[11px] font-semibold border transition-all duration-200 " + (ratio === r ? "border-[#FF0080] bg-[#FF0080]/10 text-white" : "border-white/10 text-white/50 hover:text-white")}>
+            {r}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[12px] text-white/70">Background remover</span>
+        <button onClick={() => setBgRemove((v) => !v)} className={"w-10 h-6 rounded-full transition-colors duration-200 relative " + (bgRemove ? "bg-[#FF0080]" : "bg-white/10")}>
+          <span className={"absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 " + (bgRemove ? "left-[18px]" : "left-0.5")} />
+        </button>
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[12px] text-white/70">Enhance</span>
+          <span className="text-[11px] text-white/40">{enhance}%</span>
+        </div>
+        <input type="range" min="0" max="100" value={enhance} onChange={(e) => setEnhance(e.target.value)} className="w-full fuchsia-range" />
+      </div>
+    </div>
+  );
+}
+
+function AudioGenCard({ msg, onComplete }) {
+  const [done, setDone] = useState(msg.done || false);
+  const rawProgress = useSimulatedProgress(2400, () => { if (!done) { setDone(true); onComplete(msg.id); } }, done);
+  const progress = done ? 100 : rawProgress;
+  const bars = useMemo(() => Array.from({ length: 28 }).map(() => 8 + Math.round(Math.random() * 28)), [done]);
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0f0f14] p-4 max-w-[420px]">
+      <div className="text-[12px] font-semibold text-white/80 mb-2">{msg.agent} {done ? "— done" : "generating…"}</div>
+      {!done && <ProgressBar progress={progress} />}
+      {done && (
+        <div className="flex items-end gap-[3px] h-14 px-1">
+          {bars.map((h, i) => (
+            <div key={i} className="w-1.5 rounded-full bg-[#FF0080]/70" style={{ height: h + "px" }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function matchAgentId(cat, item) {
+  const inCat = AGENTS.filter((a) => a.cat === cat);
+  const lower = (item || "").toLowerCase();
+  const hit = inCat.find((a) => lower.includes(a.name.toLowerCase().split(" ")[0].toLowerCase()));
+  return (hit || inCat[0] || AGENTS[0]).id;
+}
+
+/* ------------------------------------------------------------------ */
+/* Message renderer                                                    */
+/* ------------------------------------------------------------------ */
+function Message({ msg, onUpdate, onLogGeneration, onAppendMessage }) {
+  if (msg.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-white text-[#08080a] px-4 py-2.5 text-[13px] leading-relaxed">
+          {msg.tag && <span className="inline-block mr-1.5 px-2 py-0.5 rounded-full bg-[#FF0080]/10 text-[#FF0080] text-[10px] font-bold align-middle">{msg.tag}</span>}
+          {msg.text}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-7 h-7 rounded-full bg-[#FF0080] fuchsia-glow-sm flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">G</div>
+      <div className="flex-1">
+        {msg.kind === "text" && (
+          <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-[#0f0f14] border border-white/10 px-4 py-2.5 text-[13px] leading-relaxed text-white/80 whitespace-pre-wrap">
+            {msg.text}
+          </div>
+        )}
+        {msg.kind === "media-gen" && (
+          <MediaGenCard
+            msg={msg}
+            onComplete={(id) => { onUpdate(id, { done: true }); onLogGeneration({ cat: "media", item: msg.agent }); }}
+            onAction={(action) => {
+              if (action === "Extend to 9:16") onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "Extended to 9:16 (demo) — export from the Preview tab." });
+              if (action === "Remove BG") onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "Background removed (demo)." });
+              if (action === "Upscale 4K") onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "Upscaled to 4K (demo)." });
+              if (action === "Use as Hero") onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "Set as hero image for this build." });
+            }}
+          />
+        )}
+        {msg.kind === "video-gen" && (
+          <VideoGenCard
+            msg={msg}
+            appliedCaption={msg.appliedCaption}
+            onComplete={(id) => { onUpdate(id, { done: true }); onLogGeneration({ cat: "video", item: msg.agent }); }}
+            onAction={(action) => {
+              if (action === "Add Captions") onAppendMessage({ id: uid(), role: "assistant", kind: "captions-row", forId: msg.id });
+              if (action === "Cut to Shorts") onAppendMessage({ id: uid(), role: "assistant", kind: "shorts" });
+              if (action === "Add Avatar") onAppendMessage({ id: uid(), role: "assistant", kind: "avatar" });
+              if (action === "Export") onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "Queued for export (demo) — wire a real render pipeline to make this download an actual file." });
+            }}
+          />
+        )}
+        {msg.kind === "audio-gen" && (
+          <AudioGenCard msg={msg} onComplete={(id) => { onUpdate(id, { done: true }); onLogGeneration({ cat: "audio", item: msg.agent }); }} />
+        )}
+        {msg.kind === "avatar" && (
+          <AvatarCard
+            msg={msg}
+            onGenerate={(id, avatarId, script) => {
+              onUpdate(id, { selectedAvatar: avatarId, script });
+              onAppendMessage({ id: uid(), role: "assistant", kind: "video-gen", agent: "Talking Avatar", done: false });
+              onLogGeneration({ cat: "avatar", item: "Talking Avatar" });
+            }}
+          />
+        )}
+        {msg.kind === "captions-row" && (
+          <CaptionStylesRow
+            applied={msg.applied}
+            onApply={(styleKey) => {
+              onUpdate(msg.id, { applied: styleKey });
+              if (msg.forId) onUpdate(msg.forId, { appliedCaption: styleKey });
+              onLogGeneration({ cat: "captions", item: "Auto Captions" });
+            }}
+          />
+        )}
+        {msg.kind === "shorts" && (
+          <ShortsCard onExport={() => { onAppendMessage({ id: uid(), role: "assistant", kind: "text", text: "3 shorts queued for export (demo)." }); onLogGeneration({ cat: "video", item: "Long Video to Shorts" }); }} />
+        )}
+        {msg.kind === "edit-card" && <EditCard />}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Right panel tabs                                                    */
+/* ------------------------------------------------------------------ */
+function PreviewTab({ lastGeneration }) {
+  const [slider, setSlider] = useState(50);
+  if (!lastGeneration) {
+    return <div className="text-[12px] text-white/30 text-center mt-10">Nothing generated yet in this session — pick a skill and send a message.</div>;
+  }
+  if (lastGeneration.cat === "media") {
+    return (
+      <div>
+        <div className="text-[11px] font-semibold text-white/50 mb-2">{lastGeneration.item} — before / after (demo)</div>
+        <div className="relative rounded-xl overflow-hidden aspect-video border border-white/10">
+          <PlaceholderMedia kind="image" label="After" className="absolute inset-0" />
+          <div className="absolute inset-0 overflow-hidden" style={{ width: slider + "%" }}>
+            <PlaceholderMedia kind="image" label="Before" className="absolute inset-0" style={{ width: "1000px" }} />
+          </div>
+          <div className="absolute inset-y-0" style={{ left: slider + "%" }}>
+            <div className="w-0.5 h-full bg-[#FF0080]" />
+          </div>
+        </div>
+        <input type="range" min="0" max="100" value={slider} onChange={(e) => setSlider(e.target.value)} className="w-full fuchsia-range mt-3" />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="text-[11px] font-semibold text-white/50 mb-2">{lastGeneration.item} (demo)</div>
+      <PlaceholderMedia kind="video" label="Video" className="aspect-video" />
+      <div className="mt-3 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center px-3 gap-2">
+        <Icon name="play" className="w-3.5 h-3.5 text-[#FF0080]" />
+        <div className="flex-1 h-1 rounded-full bg-white/10"><div className="h-full w-1/3 rounded-full bg-[#FF0080]" /></div>
+        <span className="text-[10px] text-white/40">0:04 / 0:12</span>
+      </div>
+    </div>
+  );
+}
+
+function CodeTab() {
+  const snippets = [
+    { title: "GYSM Motion", lang: "js", code: '// GYSM Motion generation endpoint\\nconst run = await gysm.motion.generate({\\n  prompt,\\n  resolution: "1080p",\\n  duration: 12,\\n});' },
+    { title: "GYSM Image", lang: "js", code: '// GYSM Image generation endpoint\\nconst result = await gysm.image.generate({\\n  prompt,\\n  aspect_ratio: "16:9",\\n});' },
+    { title: "GYSM Talking Avatar", lang: "js", code: '// GYSM Avatar generation endpoint\\nconst video = await gysm.avatar.generate({\\n  avatarId,\\n  script,\\n});' },
+    { title: "GYSM Auto Captions", lang: "js", code: '// GYSM Captions endpoint\\nconst transcript = await gysm.captions.generate({\\n  audioFile,\\n  format: "vtt",\\n});' },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="text-[11px] text-white/40 leading-relaxed mb-1">
+        Reference shape for GYSM's own generation endpoints — none of these are live in this prototype. Each would
+        run on a real model provider behind the scenes once connected.
+      </div>
+      {snippets.map((s) => (
+        <div key={s.title} className="rounded-xl border border-white/10 bg-[#0f0f14] overflow-hidden">
+          <div className="px-3 py-2 text-[11px] font-semibold text-white/70 border-b border-white/10">{s.title}</div>
+          <pre className="p-3 text-[10.5px] text-[#FF0080]/90 overflow-x-auto"><code>{s.code.split("\\n").join("\n")}</code></pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeployTab({ billing, setBilling }) {
+  const plans = [
+    { name: "Starter", monthly: 29 },
+    { name: "Pro", monthly: 79 },
+    { name: "Agency", monthly: 199 },
+  ];
+  return (
+    <div>
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <button onClick={() => setBilling("monthly")} className={"h-7 px-3 rounded-full text-[11px] font-semibold " + (billing === "monthly" ? "bg-[#FF0080] text-white" : "bg-white/5 text-white/50")}>Monthly</button>
+        <button onClick={() => setBilling("yearly")} className={"h-7 px-3 rounded-full text-[11px] font-semibold " + (billing === "yearly" ? "bg-[#FF0080] text-white" : "bg-white/5 text-white/50")}>Yearly</button>
+      </div>
+      <div className="space-y-3">
+        {plans.map((p) => {
+          const price = billing === "yearly" ? Math.round(p.monthly * 0.8) : p.monthly;
+          return (
+            <div key={p.name} className="rounded-xl border border-white/10 bg-[#0f0f14] p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-bold">{p.name}</span>
+                <span className="text-[18px] font-black">${price}<span className="text-[11px] text-white/40 font-medium">/mo</span></span>
+              </div>
+              {billing === "yearly" && <div className="text-[10px] text-[#FF0080] mt-0.5">billed yearly · 20% off</div>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 rounded-xl border border-[#FF0080]/30 bg-[#FF0080]/10 p-3 text-center">
+        <div className="text-[11px] font-bold text-[#FF0080]">Commercial License</div>
+        <div className="text-[10px] text-white/50 mt-0.5">Agencies can resell builds to clients — keep 90% of what you charge.</div>
+      </div>
+    </div>
+  );
+}
+
+function AgentsTab({ generations }) {
+  const counts = generations.reduce((acc, g) => { acc[g.agentId] = (acc[g.agentId] || 0) + 1; return acc; }, {});
+  const totalByCat = generations.reduce((acc, g) => { acc[g.cat] = (acc[g.cat] || 0) + 1; return acc; }, {});
+  const totalImages = totalByCat.media || 0;
+  const totalVideos = totalByCat.video || 0;
+  const totalAudio = (totalByCat.audio || 0) + (totalByCat.avatar || 0);
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {AGENTS.map((a) => (
+          <div key={a.id} className="rounded-xl border border-white/10 bg-[#0f0f14] p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <Icon name={a.icon} className="w-4 h-4 text-[#FF0080]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF0080] pulse-dot" />
+            </div>
+            <div className="text-[11.5px] font-bold leading-tight">{a.name}</div>
+            <div className="text-[10px] text-white/40 leading-snug mt-0.5">{a.desc}</div>
+            <div className="text-[10px] text-white/30 mt-1.5">{counts[a.id] || 0} generated</div>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-[#FF0080]/10 to-transparent p-4">
+        <div className="text-[11px] font-bold text-white/70 mb-2">This session's factory stats</div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div><div className="text-[16px] font-black">{totalVideos}</div><div className="text-[9px] text-white/40">videos</div></div>
+          <div><div className="text-[16px] font-black">{totalImages}</div><div className="text-[9px] text-white/40">images</div></div>
+          <div><div className="text-[16px] font-black">{totalAudio}</div><div className="text-[9px] text-white/40">audio/avatar</div></div>
+        </div>
+        <div className="text-[9px] text-white/30 mt-2 text-center">Real counts from this browser's demo activity — not platform-wide traffic.</div>
+      </div>
+    </div>
+  );
+}
+
+function fmtDay(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yest)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function App() {
+  const [chats, setChats] = useState(() => loadLS("gysm_chats", []));
+  const [activeChatId, setActiveChatId] = useState(() => (chats[0] ? chats[0].id : null));
+  const [search, setSearch] = useState("");
+  const [input, setInput] = useState("");
+  const [openMenu, setOpenMenu] = useState(null);
+  const [pickedSkill, setPickedSkill] = useState(null); // {cat, item}
+  const [rightTab, setRightTab] = useState("preview");
+  const [generations, setGenerations] = useState(() => loadLS("gysm_generations", []));
+  const [billing, setBilling] = useState("monthly");
+
+  useEffect(() => { saveLS("gysm_chats", chats); }, [chats]);
+  useEffect(() => { saveLS("gysm_generations", generations); }, [generations]);
+
+  useEffect(() => {
+    if (chats.length === 0) {
+      const c = { id: uid(), title: "New Build", createdAt: Date.now(), messages: [] };
+      setChats([c]);
+      setActiveChatId(c.id);
+    }
+  }, []);
+
+  const activeChat = chats.find((c) => c.id === activeChatId) || chats[0];
+
+  function newBuild() {
+    const c = { id: uid(), title: "New Build", createdAt: Date.now(), messages: [] };
+    setChats((prev) => [c, ...prev]);
+    setActiveChatId(c.id);
+  }
+
+  function updateMessages(fn) {
+    setChats((prev) => prev.map((c) => (c.id === activeChatId ? { ...c, messages: fn(c.messages) } : c)));
+  }
+  function appendMessage(msg) {
+    updateMessages((msgs) => [...msgs, msg]);
+  }
+  function updateMessage(id, patch) {
+    updateMessages((msgs) => msgs.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
+  function logGeneration({ cat, item }) {
+    const agentId = matchAgentId(cat, item);
+    setGenerations((prev) => [...prev, { id: uid(), cat, item, agentId, ts: Date.now() }]);
+  }
+
+  function handleSend() {
+    if (!input.trim() && !pickedSkill) return;
+    const text = input.trim() || (pickedSkill ? pickedSkill.item : "");
+    const tag = pickedSkill ? pickedSkill.cat.label + " " + pickedSkill.item : null;
+    appendMessage({ id: uid(), role: "user", text, tag });
+
+    if (pickedSkill) {
+      const cat = pickedSkill.cat.key;
+      const item = pickedSkill.item;
+      if (cat === "media") appendMessage({ id: uid(), role: "assistant", kind: "media-gen", agent: item, done: false });
+      else if (cat === "video") appendMessage({ id: uid(), role: "assistant", kind: "video-gen", agent: item, done: false });
+      else if (cat === "audio") appendMessage({ id: uid(), role: "assistant", kind: "audio-gen", agent: item, done: false });
+      else if (cat === "avatar") appendMessage({ id: uid(), role: "assistant", kind: "avatar" });
+      else if (cat === "captions") appendMessage({ id: uid(), role: "assistant", kind: "captions-row" });
+      else if (cat === "edit") appendMessage({ id: uid(), role: "assistant", kind: "edit-card" });
+      else if (cat === "script") {
+        var scriptLines = [
+          "SCRIPT DRAFT (demo)",
+          "",
+          "Hook: " + text,
+          "Beat 1: Show the problem.",
+          "Beat 2: Show GYSM solving it.",
+          "CTA: Build yours at gysm.io",
+        ];
+        appendMessage({ id: uid(), role: "assistant", kind: "text", text: scriptLines.join(String.fromCharCode(10)) });
+      }
+    } else {
+      appendMessage({ id: uid(), role: "assistant", kind: "text", text: "Pick an @skill above (media, video, avatar, script, captions, audio, edit) to generate something, or describe the app you want built." });
+    }
+    setInput("");
+    setPickedSkill(null);
+  }
+
+  const filteredChats = chats.filter((c) => c.title.toLowerCase().includes(search.toLowerCase()));
+  const grouped = filteredChats.reduce((acc, c) => {
+    const g = fmtDay(c.createdAt);
+    (acc[g] = acc[g] || []).push(c);
+    return acc;
+  }, {});
+
+  const lastGeneration = generations[generations.length - 1];
+
+  return (
+    <div className="h-full w-screen flex bg-[#08080a] text-white overflow-hidden">
+      {/* LEFT: history */}
+      <div className="w-[300px] shrink-0 bg-[#0a0a0d] border-r border-white/[0.06] flex flex-col">
+        <div className="p-3">
+          <button onClick={newBuild} className="w-full h-9 rounded-full bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[13px] font-bold flex items-center justify-center gap-1.5 fuchsia-glow-sm hover:opacity-90 transition-all duration-200">
+            <Icon name="plus" className="w-4 h-4" /> New Build
+          </button>
+        </div>
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 h-8 rounded-lg bg-white/[0.05] border border-white/10 px-2.5">
+            <Icon name="search" className="w-3.5 h-3.5 text-white/30" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search builds…" className="bg-transparent outline-none text-[12px] text-white placeholder:text-white/30 w-full" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 pb-3">
+          {Object.entries(grouped).map(([group, list]) => (
+            <div key={group} className="mb-3">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/30">{group}</div>
+              {list.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveChatId(c.id)}
+                  className={"w-full text-left px-2.5 py-2 rounded-lg text-[12.5px] truncate transition-colors duration-150 " + (c.id === activeChatId ? "bg-[#FF0080]/10 text-white" : "text-white/60 hover:bg-white/[0.05] hover:text-white")}
+                >
+                  {c.title}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CENTER: chat */}
+      <div className="flex-1 flex flex-col bg-[#08080a] min-w-0">
+        <div className="h-14 shrink-0 border-b border-white/[0.06] flex items-center px-5">
+          <span className="font-black tracking-tight text-[14px]">GYSM<span className="text-[#FF0080]">.IO</span> <span className="text-white/30 font-medium">/ Media Factory</span></span>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          {(activeChat ? activeChat.messages : []).length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center text-white/30 gap-2">
+              <Icon name="sparkles" className="w-8 h-8 text-[#FF0080]" />
+              <p className="text-[13px]">Pick a skill below (@media, @video, @avatar…) and describe what you want.</p>
+            </div>
+          )}
+          {(activeChat ? activeChat.messages : []).map((m) => (
+            <Message key={m.id} msg={m} onUpdate={updateMessage} onLogGeneration={logGeneration} onAppendMessage={appendMessage} />
+          ))}
+        </div>
+        <div className="shrink-0 border-t border-white/[0.06] px-5 pt-3 pb-4 bg-[#08080a]">
+          {pickedSkill && (
+            <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FF0080]/15 border border-[#FF0080]/40 text-[11px] font-semibold text-[#FF0080]">
+              {pickedSkill.cat.label} {pickedSkill.item}
+              <button onClick={() => setPickedSkill(null)} className="text-[#FF0080]/60 hover:text-white">×</button>
+            </div>
+          )}
+          <SkillChips openMenu={openMenu} setOpenMenu={setOpenMenu} onPick={(cat, item) => setPickedSkill({ cat, item })} />
+          <div className="flex items-end gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Describe what you want, or just pick a skill above and hit send…"
+              className="flex-1 h-11 max-h-32 rounded-2xl bg-[#0f0f14] border border-white/10 px-4 py-2.5 text-[13px] text-white placeholder:text-white/30 outline-none resize-none focus:border-[#FF0080]/50 transition-colors duration-200"
+            />
+            <button onClick={handleSend} className="h-11 px-5 rounded-2xl bg-[#FF0080] text-white text-[13px] font-bold hover:bg-[#FF0080]/90 fuchsia-glow-sm transition-all duration-200">
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT: artifact panel */}
+      <div className="w-[420px] shrink-0 bg-[#0a0a0d] border-l border-white/[0.06] flex flex-col">
+        <div className="h-14 shrink-0 border-b border-white/[0.06] flex items-center px-4 gap-1">
+          {["preview", "code", "deploy", "agents"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setRightTab(t)}
+              className={"h-full px-3 text-[12px] font-semibold capitalize border-b-2 transition-colors duration-200 " + (rightTab === t ? "text-white border-[#FF0080]" : "text-white/40 border-transparent hover:text-white/70")}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {rightTab === "preview" && <PreviewTab lastGeneration={lastGeneration} />}
+          {rightTab === "code" && <CodeTab />}
+          {rightTab === "deploy" && <DeployTab billing={billing} setBilling={setBilling} />}
+          {rightTab === "agents" && <AgentsTab generations={generations} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
