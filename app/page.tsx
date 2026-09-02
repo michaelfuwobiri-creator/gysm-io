@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import CookiePreferencesLink from "./components/CookiePreferencesLink";
 
 const NavAuthLink = dynamic(() => import("./components/NavAuthLink"), { ssr: false });
 
@@ -374,6 +375,7 @@ export default function Page() {
                 <li><a href="/support" className="text-black/80 hover:text-black">Support</a></li>
                 <li><a href="/terms" className="text-black/80 hover:text-black">Terms</a></li>
                 <li><a href="/privacy" className="text-black/80 hover:text-black">Privacy</a></li>
+                <li><CookiePreferencesLink /></li>
               </ul>
             </div>
           </div>

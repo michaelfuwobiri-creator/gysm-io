@@ -1,8 +1,9 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import PWARegister from "./components/PWARegister";
+import AnalyticsGate from "./components/AnalyticsGate";
+import CookieConsent from "./components/CookieConsent";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
@@ -84,7 +85,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PWARegister />
         </ClerkProvider>
-        <Analytics />
+        <AnalyticsGate />
+        <CookieConsent />
       </body>
     </html>
   );

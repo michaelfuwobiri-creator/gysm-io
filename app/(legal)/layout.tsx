@@ -1,6 +1,7 @@
 // Shared chrome for GYSM.IO's own legal/support pages (Privacy, Terms, Support).
 // Matches the main site's header style so these feel like part of gysm.io,
 // not a bolted-on legal template.
+import CookiePreferencesLink from "@/app/components/CookiePreferencesLink";
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#FDFCF5] text-[#0A0A0A] antialiased">
@@ -14,6 +15,9 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         </div>
       </nav>
       <div className="max-w-[720px] mx-auto px-5 py-14">{children}</div>
+      <div className="max-w-[720px] mx-auto px-5 pb-14 -mt-8 text-[12px] font-semibold">
+        <CookiePreferencesLink className="underline opacity-50 hover:opacity-100" />
+      </div>
     </div>
   );
 }

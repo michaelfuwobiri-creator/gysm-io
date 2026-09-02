@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Terms of Service</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated August 15, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated September 1, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -47,6 +47,18 @@ export default function TermsPage() {
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Third-party services</h2>
           <p>GYSM relies on third-party providers, including Clerk for authentication and Stripe for payments, each governed by their own terms and privacy policies in addition to ours.</p>
+        </section>
+
+        <section>
+          <h2 className="text-[18px] font-bold text-black mb-2">You&apos;re interacting with AI</h2>
+          <p>
+            GYSM&apos;s builder is an AI system: when you type a prompt, it&apos;s sent to a
+            third-party AI model (OpenAI, Google Gemini, or Anthropic Claude, depending on the tier
+            you choose) to generate a response. Every app, page, and piece of code GYSM produces is
+            AI-generated content, not human-written or human-reviewed by GYSM before it reaches you.
+            Builds you publish to BuildGuild carry a visible "Built with GYSM.IO" notice for the same
+            reason — so visitors know the app was AI-generated.
+          </p>
         </section>
 
         <section>
