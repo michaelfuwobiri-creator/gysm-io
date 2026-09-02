@@ -634,6 +634,9 @@ function Sidebar({
   onRenameChat,
   mobileOpen,
   onCloseMobile,
+  userName,
+  userEmail,
+  credits,
 }: {
   chats: Chat[];
   schedules: ScheduleItem[];
@@ -646,6 +649,14 @@ function Sidebar({
   onRenameChat: (id: string, title: string) => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** Real signed-in identity (from Clerk via getUser(), see page.tsx) --
+   *  this footer used to show hardcoded "Jordan Kim / jordan@studio.co"
+   *  demo data left over from the initial mockup pass. */
+  userName: string;
+  userEmail: string | null;
+  /** Real credit balance (see lib/credits.ts) -- replaces a fabricated
+   *  "12/50 builds 24%" progress bar that wasn't wired to anything. */
+  credits: number;
 }) {
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -823,30 +834,28 @@ function Sidebar({
           )}
         </div>
 
-        {/* Bottom: user + capacity */}
+        {/* Bottom: real user + real credit balance (see getUser()/
+            getCreditBalance() in page.tsx) -- was hardcoded demo data. */}
         <div className="p-4 border-t border-white/8 space-y-3">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center text-[#08080a] text-[11px] font-bold">
-              JK
+            <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center text-[#08080a] text-[11px] font-bold shrink-0">
+              {userName.trim().charAt(0).toUpperCase() || "G"}
             </div>
             <div className="min-w-0">
-              <div className="text-[12px] text-white truncate">Jordan Kim</div>
-              <div className="text-[10px] text-white/40 truncate">jordan@studio.co</div>
+              <div className="text-[12px] text-white truncate">{userName}</div>
+              {userEmail && <div className="text-[10px] text-white/40 truncate">{userEmail}</div>}
             </div>
-            <button className="ml-auto text-white/40 hover:text-white text-[14px]">&#9881;</button>
+            <a href="/dashboard" className="ml-auto text-white/40 hover:text-white text-[14px]" title="Dashboard">&#9881;</a>
           </div>
-          <div>
-            <div className="flex items-center justify-between text-[10px] text-white/40 mb-1">
-              <span>12/50 builds</span>
-              <span>24%</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full w-[24%] rounded-full bg-[#FF0080]" />
-            </div>
+          <div className="flex items-center justify-between text-[10px] text-white/40">
+            <span className="font-bold text-white/70">{credits} credits</span>
           </div>
-          <button className="w-full rounded-lg bg-white text-[#08080a] text-[12px] font-semibold py-1.5 hover:bg-[#FF0080] hover:text-white transition-colors">
+          <a
+            href="/pricing"
+            className="block w-full text-center rounded-lg bg-white text-[#08080a] text-[12px] font-semibold py-1.5 hover:bg-[#FF0080] hover:text-white transition-colors"
+          >
             Upgrade
-          </button>
+          </a>
         </div>
       </aside>
     </>
@@ -1769,6 +1778,11 @@ interface LinearBuilderAppProps {
   /** Where this component is actually mounted -- used for the /sign-in
    *  redirect_url so a logged-out visitor comes back here. */
   builderPath?: string;
+  /** Real signed-in identity + credit balance, from getUser()/
+   *  getCreditBalance() in page.tsx -- see Sidebar's footer. */
+  userName?: string;
+  userEmail?: string | null;
+  credits?: number;
 }
 
 export default function LinearBuilderApp({
@@ -1781,6 +1795,9 @@ export default function LinearBuilderApp({
   // the handoff notes as a known gap.
   isAdmin: _isAdmin = false,
   builderPath = "/builder",
+  userName = "there",
+  userEmail = null,
+  credits = 0,
 }: LinearBuilderAppProps) {
   const [state, setState] = useLinearStore();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2180,6 +2197,9 @@ export default function LinearBuilderApp({
         onRenameChat={renameChat}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
+        userName={userName}
+        userEmail={userEmail}
+        credits={credits}
       />
 
       <ChatCenter

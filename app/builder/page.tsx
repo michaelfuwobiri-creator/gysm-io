@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
+import { getCreditBalance } from "@/lib/credits";
 import LinearBuilderClient from "./LinearBuilderClient";
 
 // Middleware already gates /builder(.*) via Clerk, so getUser() here is
@@ -35,6 +36,11 @@ export default async function BuilderPage({
 
   const user = await getUser();
   const isAdmin = isAdminEmail(user?.email ?? null);
+  // Real identity + balance for the sidebar footer (see
+  // LinearBuilderClient.tsx's Sidebar) -- 0 credits for a logged-out
+  // visitor is fine, the /sign-in redirect on first generate attempt is
+  // the actual gate, not this display value.
+  const credits = user ? await getCreditBalance(user.id) : 0;
 
   const projectId = searchParams?.projectId;
   const templateId = searchParams?.template;
@@ -83,6 +89,9 @@ export default async function BuilderPage({
         initialProjectId={initialProjectId}
         isAdmin={isAdmin}
         builderPath="/builder"
+        userName={user?.name || "there"}
+        userEmail={user?.email ?? null}
+        credits={credits}
       />
     </div>
   );
