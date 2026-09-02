@@ -519,7 +519,7 @@ function renderAssistantContent(content: string, onOpenArtifact: () => void) {
           onClick={onOpenArtifact}
           className="mt-2 flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left hover:border-[#FF0080]/40 hover:bg-[#FF0080]/5 transition-colors"
         >
-          <div className="h-10 w-10 shrink-0 rounded-lg bg-gradient-to-br from-[#FF0080] to-[#e0117a] flex items-center justify-center text-white text-[13px] font-bold">
+          <div className="h-10 w-10 shrink-0 rounded-lg bg-[#FF0080] flex items-center justify-center text-white text-[13px] font-bold">
             {"</>"}
           </div>
           <div className="min-w-0 flex-1">
@@ -683,7 +683,7 @@ function Sidebar({
           </div>
           <button
             onClick={onNewChat}
-            className="group w-full rounded-xl bg-gradient-to-r from-[#FF0080] to-[#e0117a] px-3 py-2.5 text-[13px] font-semibold text-white flex items-center justify-center gap-2 shadow-[0_0_0_rgba(255,0,128,0)] hover:shadow-[0_0_20px_rgba(255,0,128,0.35)] transition-shadow duration-300"
+            className="group w-full rounded-xl bg-[#FF0080] px-3 py-2.5 text-[13px] font-semibold text-white flex items-center justify-center gap-2 shadow-[0_0_0_rgba(255,0,128,0)] hover:shadow-[0_0_20px_rgba(255,0,128,0.35)] transition-shadow duration-300"
           >
             <span className="text-[16px] leading-none">+</span> New Build
           </button>
@@ -1376,7 +1376,7 @@ function ArtifactPanel({
                 <button
                   onClick={handlePublish}
                   disabled={!artifact.projectId || !publishTitle.trim() || publishing}
-                  className="w-full rounded-xl bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[13px] font-semibold py-2 disabled:opacity-40"
+                  className="w-full rounded-xl bg-[#FF0080] text-white text-[13px] font-semibold py-2 disabled:opacity-40"
                 >
                   {publishing ? "Publishing..." : "Publish"}
                 </button>
@@ -1458,7 +1458,7 @@ function ProgramPanel({
         <button
           onClick={run}
           disabled={program.running}
-          className="rounded-lg bg-gradient-to-r from-[#FF0080] to-[#e0117a] text-white text-[11px] font-semibold px-3 py-1.5 disabled:opacity-60"
+          className="rounded-lg bg-[#FF0080] text-white text-[11px] font-semibold px-3 py-1.5 disabled:opacity-60"
         >
           {program.running ? "Running..." : "Run"}
         </button>
