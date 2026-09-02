@@ -29,6 +29,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
+import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -43,6 +44,21 @@ interface ChatMessage {
   createdAt: number;
   mediaIds?: string[];
   streaming?: boolean;
+  /** Present when this assistant message is a real Media Factory
+   *  generation (see /api/media/* + MediaSkillDef below) rather than
+   *  an /api/generate app-build reply. */
+  media?: MediaMsgState;
+}
+
+interface MediaMsgState {
+  kind: MediaKind;
+  label: string;
+  cost: number;
+  status: "processing" | "done" | "failed";
+  genId?: string;
+  url?: string;
+  transcript?: string;
+  error?: string;
 }
 
 interface CodeFile {
@@ -274,6 +290,108 @@ const SKILLS = [
   { cmd: "/program", label: "Program", desc: "Build a multi-step autonomous run" },
   { cmd: "/deploy", label: "Deploy", desc: "Publish the current artifact" },
   { cmd: "/stripe", label: "Stripe", desc: "Wire up a checkout for this build" },
+];
+
+/** Media Factory skill catalog for the composer's "Media Factory" menu --
+ *  each entry maps to a real /api/media/<kind> route (see lib/media/*
+ *  and app/api/media/*). `id` is client-only (edit has two ids sharing
+ *  the server "edit" kind, distinguished by `op`); `needsAttachment`/
+ *  `needsText` drive the composer's validation + disabled-state, and
+ *  match each route's actual required-field checks exactly. */
+interface MediaSkillDef {
+  id: string;
+  kind: MediaKind;
+  op?: "upscale" | "bg-remove";
+  label: string;
+  desc: string;
+  cost: number;
+  needsAttachment?: boolean;
+  needsText?: boolean;
+  placeholder: string;
+}
+
+const MEDIA_SKILLS: MediaSkillDef[] = [
+  {
+    id: "image",
+    kind: "image",
+    label: "Image",
+    desc: `Generate an image -- ${MEDIA_CREDIT_COST.image} credits`,
+    cost: MEDIA_CREDIT_COST.image,
+    placeholder: "Describe the image to generate...",
+  },
+  {
+    id: "video",
+    kind: "video",
+    label: "Video",
+    desc: `Text/image-to-video -- ${MEDIA_CREDIT_COST.video} credits`,
+    cost: MEDIA_CREDIT_COST.video,
+    placeholder: "Describe the video (attach an image to animate it)...",
+  },
+  {
+    id: "avatar",
+    kind: "avatar",
+    label: "Talking avatar",
+    desc: `Real HeyGen avatar id | script -- ${MEDIA_CREDIT_COST.avatar} credits`,
+    cost: MEDIA_CREDIT_COST.avatar,
+    placeholder: "avatarId | What the avatar should say...",
+  },
+  {
+    id: "captions",
+    kind: "captions",
+    label: "Captions",
+    desc: `Transcribe attached audio/video -- ${MEDIA_CREDIT_COST.captions} credits`,
+    cost: MEDIA_CREDIT_COST.captions,
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach audio or video, then send",
+  },
+  {
+    id: "tts",
+    kind: "tts",
+    label: "Voiceover (TTS)",
+    desc: `Text-to-speech -- ${MEDIA_CREDIT_COST.tts} credits`,
+    cost: MEDIA_CREDIT_COST.tts,
+    placeholder: "Type the narration script...",
+  },
+  {
+    id: "voice-clone",
+    kind: "voice-clone",
+    label: "Voice clone",
+    desc: `Clone attached voice sample -- ${MEDIA_CREDIT_COST["voice-clone"]} credits`,
+    cost: MEDIA_CREDIT_COST["voice-clone"],
+    needsAttachment: true,
+    placeholder: "Attach a voice sample, then type what it should say...",
+  },
+  {
+    id: "music",
+    kind: "music",
+    label: "Music",
+    desc: `~30s background track -- ${MEDIA_CREDIT_COST.music} credits`,
+    cost: MEDIA_CREDIT_COST.music,
+    placeholder: "Describe the music (mood, genre, instruments)...",
+  },
+  {
+    id: "edit-upscale",
+    kind: "edit",
+    op: "upscale",
+    label: "Upscale image",
+    desc: `Attach an image to upscale -- ${MEDIA_CREDIT_COST.edit} credits`,
+    cost: MEDIA_CREDIT_COST.edit,
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an image, then send",
+  },
+  {
+    id: "edit-bg-remove",
+    kind: "edit",
+    op: "bg-remove",
+    label: "Remove background",
+    desc: `Attach an image -- ${MEDIA_CREDIT_COST.edit} credits`,
+    cost: MEDIA_CREDIT_COST.edit,
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an image, then send",
+  },
 ];
 
 const PROGRAM_ACTION_TYPES = [
@@ -611,10 +729,67 @@ function MessageBubble({
           ) : (
             <TypingDots />
           )
+        ) : message.media ? (
+          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         ) : (
           renderAssistantContent(message.content, onOpenArtifact)
         )}
+        {message.media && <MediaResultCard media={message.media} />}
       </div>
+    </div>
+  );
+}
+
+/** Renders a real Media Factory generation's live state inside a chat
+ *  bubble -- processing spinner, the finished asset (image/video/audio
+ *  player, or a transcript + .vtt download for captions), or the error
+ *  the route returned (credits are always refunded server-side on
+ *  failure -- see lib/media/service.ts's markFailed). */
+function MediaResultCard({ media }: { media: MediaMsgState }) {
+  return (
+    <div className="mt-1 rounded-xl border border-white/10 bg-white/[0.03] p-3 max-w-sm">
+      <div className="flex items-center gap-2 text-[10px] text-white/40 mb-2">
+        <span className="text-[#FF0080] font-semibold">Media Factory</span>
+        <span>{media.label}</span>
+        <span className="ml-auto">{media.cost} credits</span>
+      </div>
+      {media.status === "processing" && (
+        <div className="flex items-center gap-2 text-[12px] text-white/60">
+          <TypingDots />
+          <span>Generating...</span>
+        </div>
+      )}
+      {media.status === "failed" && (
+        <p className="text-[12px] text-red-400">{media.error || "Generation failed. Your credits were refunded."}</p>
+      )}
+      {media.status === "done" && media.kind === "captions" && (
+        <div>
+          {media.transcript && (
+            <p className="text-[12px] text-white/70 whitespace-pre-wrap mb-2">{media.transcript}</p>
+          )}
+          {media.url && (
+            <a href={media.url} download="captions.vtt" className="text-[11px] text-[#FF0080] hover:underline">
+              Download .vtt
+            </a>
+          )}
+        </div>
+      )}
+      {media.status === "done" && media.kind !== "captions" && media.url && (
+        <>
+          {(media.kind === "image" || media.kind === "edit") && (
+            <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
+          )}
+          {(media.kind === "video" || media.kind === "avatar") && (
+            <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
+          )}
+          {(media.kind === "tts" || media.kind === "voice-clone") && (
+            <audio src={media.url} controls className="w-full" />
+          )}
+          <a href={media.url} download className="mt-2 inline-block text-[11px] text-[#FF0080] hover:underline">
+            Download
+          </a>
+        </>
+      )}
     </div>
   );
 }
@@ -1184,6 +1359,46 @@ function SkillsMenu({ onPick }: { onPick: (cmd: string) => void }) {
   );
 }
 
+/** "Media Factory" composer menu -- real generation skills (image, video,
+ *  talking avatar, captions, TTS, voice clone, music, image edit), each
+ *  calling a real /api/media/<kind> route (see MEDIA_SKILLS above). This
+ *  is the actual, wired-to-real-providers successor to the /media
+ *  concept-preview page at public/media-factory-preview.html -- that
+ *  page stays up as a labeled preview; this is the live version. */
+function MediaSkillsMenu({ onPick }: { onPick: (skill: MediaSkillDef) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
+        title="Media Factory -- generate images, video, voice, and more"
+      >
+        Media Factory
+      </button>
+      {open && (
+        <div className="absolute bottom-full mb-2 left-0 w-72 rounded-lg border border-white/10 bg-[#15151a] shadow-xl py-1 z-20 max-h-80 overflow-y-auto">
+          {MEDIA_SKILLS.map((s) => (
+            <button
+              key={s.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onPick(s);
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-1.5 hover:bg-white/5"
+            >
+              <div className="text-[12px] text-white">{s.label}</div>
+              <div className="text-[10px] text-white/40">{s.desc}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* --------------------------------------------------------------------- */
 /* Artifact panel (Preview / Code / Deploy)                               */
 /* --------------------------------------------------------------------- */
@@ -1580,7 +1795,7 @@ function ChatCenter({
 }: {
   chat: Chat | null;
   media: MediaItem[];
-  onSend: (text: string, mediaIds: string[]) => void;
+  onSend: (text: string, mediaIds: string[], mediaSkillId?: string) => void;
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -1598,6 +1813,8 @@ function ChatCenter({
   const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(null);
+  const [mediaError, setMediaError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1610,7 +1827,30 @@ function ChatCenter({
 
   function submit() {
     const text = input.trim();
-    if (!text || !chat) return;
+    if (!chat) return;
+
+    if (pickedMedia) {
+      if (pickedMedia.needsAttachment && chatMedia.length === 0) {
+        setMediaError("Attach a file first.");
+        return;
+      }
+      if (pickedMedia.kind === "avatar" && !text.includes("|")) {
+        setMediaError("Format: avatarId | script");
+        return;
+      }
+      if (pickedMedia.needsText !== false && !text) {
+        setMediaError("Type a prompt first.");
+        return;
+      }
+      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id);
+      setInput("");
+      setMediaError("");
+      setPickedMedia(null);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
+
+    if (!text) return;
     if (text === "/schedule") {
       setShowSchedule(true);
       setInput("");
@@ -1635,6 +1875,11 @@ function ChatCenter({
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
+
+  const mediaReady = pickedMedia
+    ? (pickedMedia.needsAttachment ? chatMedia.length > 0 : true) &&
+      (pickedMedia.needsText === false || !!input.trim())
+    : !!input.trim();
 
   return (
     <div
@@ -1698,6 +1943,24 @@ function ChatCenter({
       <div className="sticky bottom-0 bg-[#08080a]/80 backdrop-blur px-4 pb-4 pt-2">
         <div className="max-w-[720px] mx-auto">
           <MediaTray items={chatMedia} onRemove={onRemoveMedia} />
+          {pickedMedia && (
+            <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-[#FF0080]/30 bg-[#FF0080]/10 px-2.5 py-1.5 text-[11px] text-white/80">
+              <span className="font-semibold text-[#FF0080]">Media Factory:</span>
+              <span>
+                {pickedMedia.label} -- {pickedMedia.cost} credits
+              </span>
+              <button
+                onClick={() => {
+                  setPickedMedia(null);
+                  setMediaError("");
+                }}
+                className="ml-auto text-white/40 hover:text-white"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+          {mediaError && <div className="mb-1.5 text-[11px] text-red-400">{mediaError}</div>}
           <div
             className={`rounded-2xl border bg-white/[0.03] px-3 py-2.5 transition-shadow ${
               dragOver ? "border-[#FF0080]/60 shadow-[0_0_0_3px_rgba(255,0,128,0.15)]" : "border-white/10 focus-within:border-[#FF0080]/50 focus-within:shadow-[0_0_0_3px_rgba(255,0,128,0.12)]"
@@ -1718,7 +1981,7 @@ function ChatCenter({
                 }
               }}
               rows={1}
-              placeholder="Build something... Describe your idea, attach media, or @ a skill"
+              placeholder={pickedMedia ? pickedMedia.placeholder : "Build something... Describe your idea, attach media, or @ a skill"}
               className="w-full resize-none bg-transparent outline-none text-[14px] text-white placeholder:text-white/30 max-h-40"
             />
             <div className="flex items-center gap-1 mt-1 relative">
@@ -1746,6 +2009,12 @@ function ChatCenter({
                   else setInput((v) => `${v ? v + " " : ""}${cmd} `);
                 }}
               />
+              <MediaSkillsMenu
+                onPick={(skill) => {
+                  setPickedMedia(skill);
+                  setMediaError("");
+                }}
+              />
               {showSchedule && (
                 <SchedulePicker
                   onClose={() => setShowSchedule(false)}
@@ -1766,9 +2035,9 @@ function ChatCenter({
               </select>
               <button
                 onClick={submit}
-                disabled={!input.trim()}
+                disabled={!mediaReady}
                 className={`h-8 w-8 flex items-center justify-center rounded-full text-white transition-all ${
-                  input.trim()
+                  mediaReady
                     ? "bg-[#FF0080] shadow-[0_0_16px_rgba(255,0,128,0.45)] hover:brightness-110"
                     : "bg-white/10 cursor-not-allowed"
                 }`}
@@ -2143,13 +2412,162 @@ export default function LinearBuilderApp({
     }
   }
 
-  function sendMessage(text: string, mediaIds: string[]) {
+  /** Patches an in-flight Media Factory generation's message (see
+   *  runMediaGeneration below) without touching the rest of chat state --
+   *  used by both the initial POST response and the status-poll loop. */
+  function updateMediaMessage(chatId: string, msgId: string, patch: Partial<MediaMsgState>, contentOverride?: string) {
+    setState((s) => ({
+      ...s,
+      chats: s.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === msgId
+                  ? {
+                      ...m,
+                      ...(contentOverride !== undefined ? { content: contentOverride } : {}),
+                      media: m.media ? { ...m.media, ...patch } : m.media,
+                    }
+                  : m
+              ),
+            }
+          : c
+      ),
+    }));
+  }
+
+  const MEDIA_POLL_INTERVAL_MS = 4000;
+  const MEDIA_POLL_MAX_ATTEMPTS = 60; // ~4 minutes
+
+  /** Polls GET /api/media/[id]/status (see that route) for an async
+   *  generation (video/avatar/music, or edit if it didn't finish inline)
+   *  until it settles, then refreshes the real credit balance -- a
+   *  failure always means the server already refunded the credits
+   *  (see lib/media/service.ts's markFailed). */
+  async function pollMediaStatus(chatId: string, msgId: string, genId: string, attempt = 0) {
+    if (attempt >= MEDIA_POLL_MAX_ATTEMPTS) {
+      updateMediaMessage(chatId, msgId, { status: "failed", error: "Timed out waiting on the provider." }, "Timed out waiting on the provider.");
+      router.refresh();
+      return;
+    }
+    try {
+      const res = await fetch(`/api/media/${genId}/status`);
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        const msg = data?.error || "Status check failed.";
+        updateMediaMessage(chatId, msgId, { status: "failed", error: msg }, msg);
+        router.refresh();
+        return;
+      }
+      if (data.status === "done") {
+        updateMediaMessage(chatId, msgId, { status: "done", url: data.url }, "Done -- ready below.");
+        router.refresh();
+        return;
+      }
+      if (data.status === "failed") {
+        const msg = data.error || "Generation failed. Your credits were refunded.";
+        updateMediaMessage(chatId, msgId, { status: "failed", error: msg }, msg);
+        router.refresh();
+        return;
+      }
+    } catch {
+      // Transient network hiccup -- keep polling rather than failing
+      // the whole generation over one flaky request.
+    }
+    setTimeout(() => pollMediaStatus(chatId, msgId, genId, attempt + 1), MEDIA_POLL_INTERVAL_MS);
+  }
+
+  /** Sends a request to the real /api/media/<kind> route for the picked
+   *  Media Factory skill (see MEDIA_SKILLS), shows a live-updating
+   *  generation card in the assistant bubble, and polls to completion
+   *  for async kinds. Redirects on 401/402 exactly like runGeneration. */
+  async function runMediaGeneration(chatId: string, text: string, mediaIds: string[], skill: MediaSkillDef) {
+    const msgId = uid("msg");
+    const placeholderMedia: MediaMsgState = { kind: skill.kind, label: skill.label, cost: skill.cost, status: "processing" };
+    setState((s) => ({
+      ...s,
+      chats: s.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: msgId,
+                  role: "assistant",
+                  content: `Generating ${skill.label.toLowerCase()}...`,
+                  createdAt: Date.now(),
+                  media: placeholderMedia,
+                },
+              ],
+            }
+          : c
+      ),
+    }));
+
+    const attached = mediaIds.map((id) => state.media.find((m) => m.id === id)).filter(Boolean) as MediaItem[];
+    const firstImageUrl = attached.find((m) => m.type === "image")?.url;
+    const firstAnyUrl = attached[0]?.url;
+
+    let body: Record<string, unknown> = {};
+    if (skill.kind === "image") body = { prompt: text };
+    else if (skill.kind === "video") body = { prompt: text, imageUrl: firstImageUrl };
+    else if (skill.kind === "avatar") {
+      const idx = text.indexOf("|");
+      body = { avatarId: text.slice(0, idx).trim(), script: text.slice(idx + 1).trim() };
+    } else if (skill.kind === "captions") body = { audioUrl: firstAnyUrl };
+    else if (skill.kind === "tts") body = { text };
+    else if (skill.kind === "voice-clone") body = { sampleAudioUrl: firstAnyUrl, text };
+    else if (skill.kind === "music") body = { prompt: text };
+    else if (skill.kind === "edit") body = { imageUrl: firstImageUrl, op: skill.op };
+
+    try {
+      const res = await fetch(`/api/media/${skill.kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.status === 401) {
+        router.push(`/sign-in?redirect_url=${encodeURIComponent(builderPath)}`);
+        return;
+      }
+      if (res.status === 402) {
+        router.push("/pricing?reason=no_credits");
+        return;
+      }
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        const msg = data?.error || "Generation failed.";
+        updateMediaMessage(chatId, msgId, { status: "failed", error: msg }, msg);
+        return;
+      }
+      if (data.status === "processing") {
+        updateMediaMessage(
+          chatId,
+          msgId,
+          { status: "processing", genId: data.id },
+          `Generating ${skill.label.toLowerCase()}... this can take a minute.`
+        );
+        pollMediaStatus(chatId, msgId, data.id);
+        return;
+      }
+      const url = data.url ?? data.audioUrl;
+      updateMediaMessage(chatId, msgId, { status: "done", url, transcript: data.text }, "Done -- ready below.");
+      router.refresh();
+    } catch (err: any) {
+      updateMediaMessage(chatId, msgId, { status: "failed", error: err?.message }, "Network error. Try again.");
+    }
+  }
+
+  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string) {
     if (!activeChat) return;
     const chatId = activeChat.id;
+    const mediaSkill = mediaSkillId ? MEDIA_SKILLS.find((s) => s.id === mediaSkillId) : undefined;
     const userMsg: ChatMessage = {
       id: uid("msg"),
       role: "user",
-      content: text,
+      content: text || (mediaSkill ? `[${mediaSkill.label}]` : ""),
       createdAt: Date.now(),
       mediaIds: mediaIds.length ? mediaIds : undefined,
     };
@@ -2176,7 +2594,7 @@ export default function LinearBuilderApp({
       .map((id) => state.media.find((m) => m.id === id))
       .find((m) => m?.type === "image")?.url;
 
-    if (mediaIds.length > 0) {
+    if (mediaIds.length > 0 && !mediaSkill) {
       setState((s) => ({
         ...s,
         chats: s.chats.map((c) =>
@@ -2201,7 +2619,11 @@ export default function LinearBuilderApp({
       }));
     }
 
-    runGeneration(chatId, text, firstImage);
+    if (mediaSkill) {
+      runMediaGeneration(chatId, text, mediaIds, mediaSkill);
+    } else {
+      runGeneration(chatId, text, firstImage);
+    }
   }
 
   return (
