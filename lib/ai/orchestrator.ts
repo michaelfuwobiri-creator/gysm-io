@@ -2,6 +2,19 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 
+// Every generation makes up to two sequential model calls (a structure/edit
+// pass, then a shared Gemini design-polish pass -- see applyDesignPass,
+// which every tier including "fast" goes through). None of the SDKs used
+// here set a timeout by default (OpenAI and Anthropic both default to 10
+// minutes *per attempt*, retried up to 2 more times on top of that), so a
+// single degraded provider call had no bound short of Vercel's hard
+// 240-second function timeout (see maxDuration in app/api/generate/route.ts)
+// -- which meant a slow call failed silently with zero user-facing error
+// after riding out the full request budget, instead of surfacing a fast,
+// actionable "that failed, try again." 100s x 2 sequential calls leaves
+// real headroom under the 240s ceiling for DB writes and stream overhead.
+const PER_CALL_TIMEOUT_MS = 100_000;
+
 const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM.IO builder. Generate ONE complete, production-quality HTML document for the user's request.
 
 HARD RULES:
@@ -190,7 +203,7 @@ export async function editWebsite(
   }
 
   onStage?.("structure");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const editText = backendContext
     ? `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
@@ -249,7 +262,7 @@ async function generateStructure(
     return { ok: false, error: "Generation is temporarily unavailable.", status: 500 };
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const structureText = backendContext
     ? `${prompt}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
@@ -307,7 +320,7 @@ async function generateStructureWithClaude(
     return { ok: false, error: "The Claude tier is temporarily unavailable.", status: 500 };
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const structureText = backendContext
     ? `${prompt}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
@@ -362,7 +375,7 @@ async function editWithClaude(
     return { ok: false, error: "The Claude tier is temporarily unavailable.", status: 500 };
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
 
   const editText = backendContext
     ? `EXISTING APP:\n${existingHtml}\n\nCHANGE REQUESTED:\n${instruction}\n\nCONNECTED SUPABASE PROJECT:\nSUPABASE_URL = ${backendContext.url}\nSUPABASE_ANON_KEY = ${backendContext.anonKey}`
@@ -406,7 +419,7 @@ async function applyDesignPass(html: string): Promise<string> {
   if (!process.env.GEMINI_API_KEY) return html;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: PER_CALL_TIMEOUT_MS } });
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
       contents: `${DESIGN_SYSTEM_PROMPT}\n\nHTML TO POLISH:\n${html}`,
