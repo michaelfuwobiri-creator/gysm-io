@@ -317,6 +317,12 @@ interface MediaSkillDef {
   pickOptions?: string[];
 }
 
+/** Prompt template for the "Thumbnail" skill (item 32) -- same @image
+ *  route/model/cost, just steered toward a bold, high-contrast,
+ *  video-cover composition instead of a generic image. */
+const THUMBNAIL_PROMPT_PREFIX =
+  "Bold, high-contrast video thumbnail / cover image, eye-catching composition, clear focal subject, YouTube/social-cover style: ";
+
 const MEDIA_SKILLS: MediaSkillDef[] = [
   {
     id: "image",
@@ -418,6 +424,22 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     needsAttachment: true,
     pickOptions: ["FHD", "2k", "4k"],
     placeholder: "Attach a video, then type FHD, 2k, or 4k...",
+  },
+  {
+    id: "thumbnail",
+    kind: "image",
+    label: "Thumbnail",
+    desc: `YouTube/video-cover style image -- ${MEDIA_CREDIT_COST.image} credits`,
+    cost: MEDIA_CREDIT_COST.image,
+    placeholder: "Describe the thumbnail (subject, mood, bold text idea)...",
+  },
+  {
+    id: "script",
+    kind: "script",
+    label: "Script generator",
+    desc: `Topic -> scene-by-scene script -- ${MEDIA_CREDIT_COST.script} credits`,
+    cost: MEDIA_CREDIT_COST.script,
+    placeholder: "What's the video about? (e.g. \"3 productivity tips for founders\")",
   },
 ];
 
@@ -1090,7 +1112,10 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           )}
         </div>
       )}
-      {media.status === "done" && media.kind !== "captions" && media.url && (
+      {media.status === "done" && media.kind === "script" && media.transcript && (
+        <p className="text-[12px] text-white/70 whitespace-pre-wrap">{media.transcript}</p>
+      )}
+      {media.status === "done" && media.kind !== "captions" && media.kind !== "script" && media.url && (
         <>
           {(media.kind === "image" || media.kind === "edit") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
@@ -2909,7 +2934,10 @@ export default function LinearBuilderApp({
     const firstAnyUrl = attached[0]?.url;
 
     let body: Record<string, unknown> = {};
-    if (skill.kind === "image") body = { prompt: text, referenceImageUrl: firstImageUrl };
+    if (skill.kind === "image") {
+      const prompt = skill.id === "thumbnail" ? `${THUMBNAIL_PROMPT_PREFIX}${text}` : text;
+      body = { prompt, referenceImageUrl: firstImageUrl };
+    }
     else if (skill.kind === "video") body = { prompt: text, imageUrl: firstImageUrl };
     else if (skill.kind === "avatar") {
       const idx = text.indexOf("|");
@@ -2921,6 +2949,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "edit") body = { imageUrl: firstImageUrl, op: skill.op };
     else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
     else if (skill.kind === "video-upscale") body = { videoUrl: firstVideoUrl || firstAnyUrl, resolution: text.trim() };
+    else if (skill.kind === "script") body = { topic: text };
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);
