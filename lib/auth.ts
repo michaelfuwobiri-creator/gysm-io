@@ -25,16 +25,35 @@ export async function getUser(): Promise<{
   if (!userId) return null;
 
   const user = await currentUser();
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+  // Clerk's own top-level firstName/lastName only get populated if this
+  // Clerk instance has "Personal information" collection turned on (User
+  // & Authentication settings). A social sign-in (Google, GitHub, etc.)
+  // still hands Clerk the person's real name and email on the linked
+  // externalAccounts record regardless of that setting -- so without this
+  // fallback, anyone who signed up via Google on an instance with that
+  // setting off gets a completely blank name (no first/last name, no
+  // username, and the top-level emailAddresses array can also come back
+  // empty), even though Clerk has their name and email right there.
+  const primaryExternal = user?.externalAccounts?.[0];
+
+  const fullName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+    [primaryExternal?.firstName, primaryExternal?.lastName].filter(Boolean).join(" ").trim();
+
+  const email =
+    user?.emailAddresses?.[0]?.emailAddress ?? primaryExternal?.emailAddress ?? null;
+
+  const username = user?.username || primaryExternal?.username || null;
 
   return {
     id: userId,
     email,
     // Best display name we have for public-facing use (BuildGuild author
-    // name, publisher name) -- falls back through Clerk's name fields to
-    // the email's local part rather than ever showing a raw user_ id.
-    name: fullName || user?.username || (email ? email.split("@")[0] : null),
+    // name, publisher name) -- falls back through Clerk's name fields,
+    // then the linked social account's name fields, then a username, then
+    // the email's local part, rather than ever showing a raw user_ id.
+    name: fullName || username || (email ? email.split("@")[0] : null),
     orgId: orgId ?? null,
     orgRole: orgRole ?? null,
   };
