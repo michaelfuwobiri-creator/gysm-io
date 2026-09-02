@@ -19,6 +19,7 @@ export const MEDIA_KINDS = [
   "voice-clone",
   "music",
   "edit",
+  "reframe",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -32,7 +33,8 @@ export const MEDIA_CREDIT_COST: Record<MediaKind, number> = {
   tts: 25, // ~$0.01 for a short narration (OpenAI TTS)
   "voice-clone": 75, // ~$0.05 per ~500 chars (ElevenLabs multilingual)
   music: 400, // ~$0.30 for a 30s background track (Replicate audio model)
-  edit: 50, // ~$0.03 per op -- background remove / upscale / reframe (Replicate)
+  edit: 50, // ~$0.03 per op -- background remove / upscale (Replicate)
+  reframe: 800, // ~$0.60 for a 10s clip (Replicate, Luma Reframe Video @ $0.06/sec output, 10s input cap)
 };
 
 // Which env var must be set for a kind to actually run. Every route
@@ -48,6 +50,7 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
   "voice-clone": "ELEVENLABS_API_KEY",
   music: "REPLICATE_API_TOKEN",
   edit: "REPLICATE_API_TOKEN",
+  reframe: "REPLICATE_API_TOKEN",
 };
 
 // Kinds whose provider call is a single request/response (fast, no job
@@ -55,3 +58,7 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
 // provider_job_id immediately and the client polls
 // GET /api/media/[id]/status until status is "done" or "failed".
 export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit"];
+// reframe is intentionally NOT in this list -- Luma's reframe-video model
+// runs on the same async prediction lifecycle as video/avatar/music, so
+// the client polls GET /api/media/[id]/status rather than getting a
+// same-request result.

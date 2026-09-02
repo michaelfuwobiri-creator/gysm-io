@@ -10,11 +10,15 @@
 // confirm the exact version hash on the model's page before relying on
 // this in production; wrong/stale version hashes are the most likely
 // first bug once real testing starts.
-export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove", string> = {
+export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove" | "reframe", string> = {
   video: "minimax/video-01",
   music: "meta/musicgen",
   upscale: "nightmareai/real-esrgan",
   "bg-remove": "cjwbw/rembg",
+  // Real, verified model (confirmed 2026-09-02 against replicate.com/luma/reframe-video/api/schema):
+  // input { video_url, aspect_ratio, prompt? }, output a single video uri.
+  // Official Luma model, $0.06/sec of output video, 10s max input duration.
+  reframe: "luma/reframe-video",
 };
 
 export function isReplicateConfigured(): boolean {

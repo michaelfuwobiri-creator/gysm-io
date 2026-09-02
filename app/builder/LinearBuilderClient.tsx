@@ -308,6 +308,10 @@ interface MediaSkillDef {
   needsAttachment?: boolean;
   needsText?: boolean;
   placeholder: string;
+  /** Reframe only -- the composer's text field doubles as an aspect-ratio
+   *  picker instead of a free-form prompt (see submit()'s validation and
+   *  runMediaGeneration's body assembly below). */
+  aspectRatioOptions?: string[];
 }
 
 const MEDIA_SKILLS: MediaSkillDef[] = [
@@ -391,6 +395,16 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     needsAttachment: true,
     needsText: false,
     placeholder: "Attach an image, then send",
+  },
+  {
+    id: "reframe",
+    kind: "reframe",
+    label: "Auto-reframe video",
+    desc: `Attach a video, type 9:16 / 1:1 / 16:9 -- ${MEDIA_CREDIT_COST.reframe} credits`,
+    cost: MEDIA_CREDIT_COST.reframe,
+    needsAttachment: true,
+    aspectRatioOptions: ["9:16", "1:1", "16:9"],
+    placeholder: "Attach a video (max 10s), then type 9:16, 1:1, or 16:9...",
   },
 ];
 
@@ -779,7 +793,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "image" || media.kind === "edit") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
-          {(media.kind === "video" || media.kind === "avatar") && (
+          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
           {(media.kind === "tts" || media.kind === "voice-clone") && (
@@ -1838,6 +1852,10 @@ function ChatCenter({
         setMediaError("Format: avatarId | script");
         return;
       }
+      if (pickedMedia.aspectRatioOptions && !pickedMedia.aspectRatioOptions.includes(text.trim())) {
+        setMediaError(`Type one of: ${pickedMedia.aspectRatioOptions.join(", ")}`);
+        return;
+      }
       if (pickedMedia.needsText !== false && !text) {
         setMediaError("Type a prompt first.");
         return;
@@ -2508,6 +2526,7 @@ export default function LinearBuilderApp({
 
     const attached = mediaIds.map((id) => state.media.find((m) => m.id === id)).filter(Boolean) as MediaItem[];
     const firstImageUrl = attached.find((m) => m.type === "image")?.url;
+    const firstVideoUrl = attached.find((m) => m.type === "video")?.url;
     const firstAnyUrl = attached[0]?.url;
 
     let body: Record<string, unknown> = {};
@@ -2521,6 +2540,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "voice-clone") body = { sampleAudioUrl: firstAnyUrl, text };
     else if (skill.kind === "music") body = { prompt: text };
     else if (skill.kind === "edit") body = { imageUrl: firstImageUrl, op: skill.op };
+    else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
 
     try {
       const res = await fetch(`/api/media/${skill.kind}`, {
