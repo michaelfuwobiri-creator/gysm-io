@@ -31,6 +31,7 @@ import { useRouter } from "next/navigation";
 import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
 import type { BrandKit } from "@/lib/brandKit";
+import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -548,6 +549,160 @@ function BrandKitModal({
           </button>
           <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = { cast: "Cast", setting: "Settings", object: "Objects" };
+
+/** Asset Management / "Ingredients" panel (42-tool spec, layer 2, item
+ *  10) -- save named Cast/Settings/Objects reference images, reuse them
+ *  across generations by attaching one to the active chat (see
+ *  LinearBuilderApp's useAssetAsAttachment), which flows into the same
+ *  firstImageUrl the image/video routes already read for image-to-image
+ *  / image-to-video. GET/POST/DELETE against /api/media-assets (see
+ *  lib/mediaAssets.ts). */
+function AssetsModal({
+  assets,
+  onClose,
+  onCreated,
+  onDeleted,
+  onUse,
+}: {
+  assets: MediaAsset[];
+  onClose: () => void;
+  onCreated: (asset: MediaAsset) => void;
+  onDeleted: (id: string) => void;
+  onUse: (asset: MediaAsset) => void;
+}) {
+  const [tab, setTab] = useState<AssetCategory>("cast");
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function add() {
+    if (!name.trim() || !imageUrl) {
+      setError("Name and a reference image are both required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/media-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: tab, name: name.trim(), referenceImageUrl: imageUrl }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(data?.error || "Failed to save.");
+        return;
+      }
+      onCreated(data.asset);
+      setName("");
+      setImageUrl("");
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id: string) {
+    onDeleted(id);
+    try {
+      await fetch(`/api/media-assets/${id}`, { method: "DELETE" });
+    } catch {
+      // Best-effort -- the row is a per-user convenience list, not
+      // something a failed delete needs to roll back in the UI for.
+    }
+  }
+
+  const shown = assets.filter((a) => a.category === tab);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Asset Management</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Save a character, location, or prop once, then reuse it as a real image-to-image / image-to-video reference
+          instead of re-describing it every time.
+        </p>
+        <div className="flex gap-1 mb-3">
+          {(Object.keys(ASSET_CATEGORY_LABELS) as AssetCategory[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setTab(c)}
+              className={`px-3 py-1 rounded-lg text-[12px] ${
+                tab === c ? "bg-[#FF0080]/15 text-[#FF0080]" : "text-white/50 hover:bg-white/5"
+              }`}
+            >
+              {ASSET_CATEGORY_LABELS[c]}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1.5 mb-3">
+          {shown.length === 0 && <p className="text-[11px] text-white/30">No {ASSET_CATEGORY_LABELS[tab].toLowerCase()} saved yet.</p>}
+          {shown.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 rounded-lg border border-white/10 p-1.5">
+              <img src={a.referenceImageUrl} alt="" className="h-8 w-8 rounded object-cover bg-black/30" />
+              <span className="flex-1 text-[12px] text-white truncate">{a.name}</span>
+              <button
+                onClick={() => {
+                  onUse(a);
+                  onClose();
+                }}
+                className="text-[11px] text-[#FF0080] hover:underline"
+              >
+                Use
+              </button>
+              <button onClick={() => remove(a.id)} className="text-[11px] text-white/30 hover:text-red-400">
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={`New ${ASSET_CATEGORY_LABELS[tab].toLowerCase().replace(/s$/, "")} name`}
+            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <label className="px-2.5 py-2 rounded-lg border border-white/10 text-[11px] text-white/50 hover:bg-white/5 cursor-pointer whitespace-nowrap">
+            {imageUrl ? "Image set" : "Upload image"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setImageUrl(typeof reader.result === "string" ? reader.result : "");
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+        {error && <p className="text-[11px] text-red-400 mb-2">{error}</p>}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={add}
+            disabled={saving}
+            className="flex-1 h-9 rounded-lg bg-[#FF0080] text-white text-[13px] font-medium disabled:opacity-50"
+          >
+            {saving ? "Saving..." : `Save to ${ASSET_CATEGORY_LABELS[tab]}`}
+          </button>
+          <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Close
           </button>
         </div>
       </div>
@@ -1957,6 +2112,7 @@ function ChatCenter({
   onToggleBrand,
   hasBrandKit,
   onOpenBrandSettings,
+  onOpenAssets,
 }: {
   chat: Chat | null;
   media: MediaItem[];
@@ -1982,6 +2138,9 @@ function ChatCenter({
   onToggleBrand: () => void;
   hasBrandKit: boolean;
   onOpenBrandSettings: () => void;
+  /** Opens AssetsModal (Cast/Settings/Objects, item 10) -- see
+   *  LinearBuilderApp's assets state + useAssetAsAttachment. */
+  onOpenAssets: () => void;
 }) {
   const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
@@ -2212,6 +2371,13 @@ function ChatCenter({
               >
                 Edit
               </button>
+              <button
+                onClick={onOpenAssets}
+                title="Cast / Settings / Objects -- reuse a saved reference image"
+                className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
+              >
+                Assets
+              </button>
               {showSchedule && (
                 <SchedulePicker
                   onClose={() => setShowSchedule(false)}
@@ -2302,9 +2468,18 @@ export default function LinearBuilderApp({
   const [brandKit, setBrandKit] = useState<BrandKit | null>(initialBrandKit);
   const [brandOn, setBrandOn] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [showAssetsModal, setShowAssetsModal] = useState(false);
   const resizing = useRef(false);
   const router = useRouter();
   const hydrated = useRef(false);
+
+  useEffect(() => {
+    fetch("/api/media-assets")
+      .then((r) => r.json())
+      .then((d) => setAssets(d?.assets || []))
+      .catch(() => {});
+  }, []);
 
   const activeChat = state.chats.find((c) => c.id === state.activeChatId) || null;
   const activeArtifact = activeChat?.artifactId ? state.artifacts[activeChat.artifactId] : null;
@@ -2428,6 +2603,23 @@ export default function LinearBuilderApp({
 
   function renameChat(id: string, title: string) {
     setState((s) => ({ ...s, chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
+  }
+
+  /** Attaches a saved Cast/Settings/Object (see AssetsModal) to the
+   *  active chat exactly like a freshly-dropped file would -- it then
+   *  flows through the same chatMedia/firstImageUrl path addMedia()
+   *  populates below, so @image (image-to-image) and @video
+   *  (image-to-video) pick it up with zero extra plumbing. */
+  function useAssetAsAttachment(asset: MediaAsset) {
+    if (!activeChat) return;
+    const item: MediaItem = {
+      id: uid("media"),
+      chatId: activeChat.id,
+      url: asset.referenceImageUrl,
+      type: "image",
+      name: asset.name,
+    };
+    setState((s) => ({ ...s, media: [...s.media, item] }));
   }
 
   function addMedia(files: FileList) {
@@ -2717,7 +2909,7 @@ export default function LinearBuilderApp({
     const firstAnyUrl = attached[0]?.url;
 
     let body: Record<string, unknown> = {};
-    if (skill.kind === "image") body = { prompt: text };
+    if (skill.kind === "image") body = { prompt: text, referenceImageUrl: firstImageUrl };
     else if (skill.kind === "video") body = { prompt: text, imageUrl: firstImageUrl };
     else if (skill.kind === "avatar") {
       const idx = text.indexOf("|");
@@ -2878,9 +3070,19 @@ export default function LinearBuilderApp({
         onToggleBrand={() => setBrandOn((o) => !o)}
         hasBrandKit={hasBrandKitContent(brandKit)}
         onOpenBrandSettings={() => setShowBrandModal(true)}
+        onOpenAssets={() => setShowAssetsModal(true)}
       />
       {showBrandModal && (
         <BrandKitModal kit={brandKit} onClose={() => setShowBrandModal(false)} onSaved={setBrandKit} />
+      )}
+      {showAssetsModal && (
+        <AssetsModal
+          assets={assets}
+          onClose={() => setShowAssetsModal(false)}
+          onCreated={(a) => setAssets((prev) => [a, ...prev])}
+          onDeleted={(id) => setAssets((prev) => prev.filter((a) => a.id !== id))}
+          onUse={useAssetAsAttachment}
+        />
       )}
 
       {rightOpen &&
