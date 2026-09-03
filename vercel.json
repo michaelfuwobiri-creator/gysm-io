@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "crons": [
-    { "path": "/api/voiie/cron/hunt", "schedule": "*/30 * * * *" },
+    { "path": "/api/voiie/cron/hunt", "schedule": "0 13 * * *" },
     { "path": "/api/voiie/cron/renewals", "schedule": "0 14 * * *" }
   ]
 }
