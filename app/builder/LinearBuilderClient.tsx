@@ -490,6 +490,26 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     needsText: false,
     placeholder: "Attach a model/person photo, then a garment photo, then send",
   },
+  {
+    id: "remove-object",
+    kind: "inpaint",
+    label: "Remove object",
+    desc: `Attach an image, then paint over what to remove -- ${MEDIA_CREDIT_COST.inpaint} credits`,
+    cost: MEDIA_CREDIT_COST.inpaint,
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an image, then send to open the paint tool",
+  },
+  {
+    id: "outpaint",
+    kind: "inpaint",
+    label: "Extend image (outpaint)",
+    desc: `Attach an image, type Left / Right / Top / Bottom / All sides -- ${MEDIA_CREDIT_COST.inpaint} credits`,
+    cost: MEDIA_CREDIT_COST.inpaint,
+    needsAttachment: true,
+    pickOptions: ["Left", "Right", "Top", "Bottom", "All sides"],
+    placeholder: "Attach an image, then type Left, Right, Top, Bottom, or All sides...",
+  },
 ];
 
 /** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
@@ -508,6 +528,230 @@ function brandSuffix(kit: BrandKit | null): string {
 
 function hasBrandKitContent(kit: BrandKit | null): boolean {
   return !!kit && !!(kit.primaryColor || kit.secondaryColor || kit.fontFamily || kit.name || kit.logoUrl);
+}
+
+/** Loads an <img> element for canvas work (Image Outpainting / Object
+ *  Removal, items 26/31) -- crossOrigin "anonymous" so canvas export
+ *  (toDataURL) doesn't throw for same-origin data: URLs (the common
+ *  case -- most attached/generated MediaItem.url values already are
+ *  one) or for a remote host that happens to send CORS headers; a
+ *  remote host that doesn't will still throw a SecurityError, which
+ *  callers surface as a real, honest error rather than silently
+ *  producing a blank mask. */
+function loadImageEl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Couldn't load that image for editing."));
+    img.src = url;
+  });
+}
+
+const OUTPAINT_EXTEND_RATIO = 0.4;
+
+/** Image Outpainting (item 26) -- builds the padded image + auto-mask
+ *  pair FLUX.1 [pro] Fill needs (see lib/media/providers/fal.ts's
+ *  inpaintImage) entirely client-side: a plain canvas resize/pad, no
+ *  free-hand drawing required, unlike Object Removal below. The new
+ *  border area is painted white in the mask (repaint) and the original
+ *  photo's footprint stays black (keep) -- standard FLUX Fill
+ *  convention. */
+async function buildOutpaintPayload(imageUrl: string, direction: string): Promise<{ paddedImageDataUrl: string; maskDataUrl: string }> {
+  const img = await loadImageEl(imageUrl);
+  const extraW = Math.round(img.naturalWidth * OUTPAINT_EXTEND_RATIO);
+  const extraH = Math.round(img.naturalHeight * OUTPAINT_EXTEND_RATIO);
+  const dir = direction.trim().toLowerCase();
+  let padLeft = 0, padRight = 0, padTop = 0, padBottom = 0;
+  if (dir === "left" || dir === "all sides") padLeft = extraW;
+  if (dir === "right" || dir === "all sides") padRight = extraW;
+  if (dir === "top" || dir === "all sides") padTop = extraH;
+  if (dir === "bottom" || dir === "all sides") padBottom = extraH;
+
+  const width = img.naturalWidth + padLeft + padRight;
+  const height = img.naturalHeight + padTop + padBottom;
+
+  const imgCanvas = document.createElement("canvas");
+  imgCanvas.width = width;
+  imgCanvas.height = height;
+  const ictx = imgCanvas.getContext("2d");
+  if (!ictx) throw new Error("Canvas isn't supported in this browser.");
+  ictx.fillStyle = "#808080"; // repainted entirely per the mask below, so this color is irrelevant
+  ictx.fillRect(0, 0, width, height);
+  ictx.drawImage(img, padLeft, padTop);
+
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = width;
+  maskCanvas.height = height;
+  const mctx = maskCanvas.getContext("2d");
+  if (!mctx) throw new Error("Canvas isn't supported in this browser.");
+  mctx.fillStyle = "white";
+  mctx.fillRect(0, 0, width, height);
+  mctx.fillStyle = "black";
+  mctx.fillRect(padLeft, padTop, img.naturalWidth, img.naturalHeight);
+
+  return { paddedImageDataUrl: imgCanvas.toDataURL("image/png"), maskDataUrl: maskCanvas.toDataURL("image/png") };
+}
+
+/** Object Removal (item 31) -- the free-hand counterpart to
+ *  buildOutpaintPayload above. The user brushes over the object; on
+ *  confirm this exports a same-dimension black/white mask (white =
+ *  painted = repaint) for FLUX.1 [pro] Fill. Pointer events (not mouse)
+ *  so it works with touch/pen too. */
+function MaskEditorModal({
+  imageUrl,
+  onCancel,
+  onConfirm,
+}: {
+  imageUrl: string;
+  onCancel: () => void;
+  onConfirm: (maskDataUrl: string) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [brushSize, setBrushSize] = useState(50);
+  const [hasStrokes, setHasStrokes] = useState(false);
+  const strokesRef = useRef<{ x: number; y: number }[]>([]);
+  const drawingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadImageEl(imageUrl)
+      .then((img) => {
+        if (!cancelled) setImgEl(img);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err?.message || "Couldn't load that image for editing.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
+
+  const redraw = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !imgEl) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(255,0,128,0.55)";
+    for (const p of strokesRef.current) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  useEffect(() => {
+    if (!imgEl || !canvasRef.current) return;
+    canvasRef.current.width = imgEl.naturalWidth;
+    canvasRef.current.height = imgEl.naturalHeight;
+    redraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgEl]);
+
+  function pointFromEvent(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    drawingRef.current = true;
+    strokesRef.current.push(pointFromEvent(e));
+    setHasStrokes(true);
+    redraw();
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    strokesRef.current.push(pointFromEvent(e));
+    redraw();
+  }
+  function stopDrawing() {
+    drawingRef.current = false;
+  }
+
+  function clearMask() {
+    strokesRef.current = [];
+    setHasStrokes(false);
+    redraw();
+  }
+
+  function confirm() {
+    if (!imgEl) return;
+    try {
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = imgEl.naturalWidth;
+      maskCanvas.height = imgEl.naturalHeight;
+      const mctx = maskCanvas.getContext("2d");
+      if (!mctx) throw new Error("Canvas isn't supported in this browser.");
+      mctx.fillStyle = "black";
+      mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+      mctx.fillStyle = "white";
+      for (const p of strokesRef.current) {
+        mctx.beginPath();
+        mctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2);
+        mctx.fill();
+      }
+      onConfirm(maskCanvas.toDataURL("image/png"));
+    } catch (err: any) {
+      setLoadError(err?.message || "Couldn't export the mask -- this image may be blocked by a cross-origin restriction.");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl">
+        <div className="text-[14px] font-semibold text-white mb-1">Paint over the object to remove</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Brush over the object -- the painted area gets removed and filled in naturally (real FLUX.1 [pro] Fill inpainting).
+        </p>
+        {loadError ? (
+          <p className="text-[12px] text-red-400 mb-3">{loadError}</p>
+        ) : !imgEl ? (
+          <p className="text-[12px] text-white/40 mb-3">Loading image...</p>
+        ) : (
+          <div className="rounded-lg overflow-hidden border border-white/10 bg-black/30">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-auto cursor-crosshair touch-none"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={stopDrawing}
+              onPointerLeave={stopDrawing}
+            />
+          </div>
+        )}
+        <div className="mt-3 flex items-center gap-3">
+          <label className="text-[11px] text-white/50 flex items-center gap-2">
+            Brush size
+            <input type="range" min={15} max={150} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} />
+          </label>
+          <button onClick={clearMask} className="ml-auto text-[11px] text-white/50 hover:text-white underline">
+            Clear
+          </button>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onCancel} className="flex-1 h-9 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Cancel
+          </button>
+          <button
+            onClick={confirm}
+            disabled={!hasStrokes}
+            className={`flex-1 h-9 rounded-lg text-[13px] font-semibold transition-colors ${
+              hasStrokes ? "bg-[#FF0080] text-white hover:brightness-110" : "bg-white/10 text-white/30 cursor-not-allowed"
+            }`}
+          >
+            Use this mask
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Brand Kit / Style Lock editor (42-tool spec item 36) -- five plain
@@ -1196,7 +1440,7 @@ function MessageBubble({
 /** Kinds worth showing in the public Flow TV gallery (see app/flow-tv)
  *  -- excludes captions/script, which are text-shaped, not visual/audio
  *  media (same list as lib/flowTv.ts's GALLERY_KINDS -- keep in sync). */
-const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance", "video-bg-remove"];
+const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance", "video-bg-remove", "inpaint"];
 
 function MediaResultCard({ media }: { media: MediaMsgState }) {
   const [published, setPublished] = useState(false);
@@ -1248,7 +1492,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
       )}
       {media.status === "done" && media.kind !== "captions" && media.kind !== "script" && media.url && (
         <>
-          {(media.kind === "image" || media.kind === "edit" || media.kind === "virtual-try-on") && (
+          {(media.kind === "image" || media.kind === "edit" || media.kind === "virtual-try-on" || media.kind === "inpaint") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
           {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove" || media.kind === "export") && (
@@ -2285,7 +2529,7 @@ function ChatCenter({
 }: {
   chat: Chat | null;
   media: MediaItem[];
-  onSend: (text: string, mediaIds: string[], mediaSkillId?: string, batchCount?: number) => void;
+  onSend: (text: string, mediaIds: string[], mediaSkillId?: string, batchCount?: number, maskDataUrl?: string) => void;
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -2326,6 +2570,16 @@ function ChatCenter({
   const [batchCount, setBatchCount] = useState<1 | 2 | 4>(1);
   useEffect(() => {
     if (pickedMedia?.kind !== "image") setBatchCount(1);
+  }, [pickedMedia]);
+  /** Object Removal (item 31) -- submit() opens MaskEditorModal instead
+   *  of sending on the first click (see below); the drawn mask is held
+   *  here until the user clicks Send again to actually submit. Reset
+   *  whenever a different skill is picked so a leftover mask from a
+   *  previous attempt can't leak into an unrelated send. */
+  const [maskDataUrl, setMaskDataUrl] = useState<string | null>(null);
+  const [showMaskEditor, setShowMaskEditor] = useState(false);
+  useEffect(() => {
+    if (pickedMedia?.id !== "remove-object") setMaskDataUrl(null);
   }, [pickedMedia]);
   const [mediaError, setMediaError] = useState("");
   const [templates, setTemplates] = useState<MediaTemplate[]>([]);
@@ -2404,11 +2658,20 @@ function ChatCenter({
         setMediaError("Type a prompt first.");
         return;
       }
-      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id, pickedMedia.kind === "image" ? batchCount : 1);
+      // Object Removal (item 31): the first Send opens the paint tool
+      // instead of submitting -- there's nothing to send yet until a
+      // mask exists. Once MaskEditorModal's onConfirm stores one below,
+      // a second Send actually submits with it attached.
+      if (pickedMedia.id === "remove-object" && !maskDataUrl) {
+        setShowMaskEditor(true);
+        return;
+      }
+      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id, pickedMedia.kind === "image" ? batchCount : 1, maskDataUrl || undefined);
       setInput("");
       setMediaError("");
       setPickedMedia(null);
       setBatchCount(1);
+      setMaskDataUrl(null);
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
@@ -2512,6 +2775,7 @@ function ChatCenter({
               <span>
                 {pickedMedia.label} -- {pickedMedia.cost * (pickedMedia.kind === "image" ? batchCount : 1)} credits
                 {pickedMedia.kind === "image" && batchCount > 1 ? ` (${batchCount}x)` : ""}
+                {pickedMedia.id === "remove-object" && maskDataUrl ? " -- mask ready, send again to submit" : ""}
               </span>
               {pickedMedia.kind === "image" && (
                 <button
@@ -2545,6 +2809,16 @@ function ChatCenter({
           onClose={() => setShowTemplatesModal(false)}
           onUse={useTemplate}
           onRemove={removeTemplate}
+        />
+      )}
+      {showMaskEditor && chatMedia.find((m) => m.type === "image") && (
+        <MaskEditorModal
+          imageUrl={chatMedia.find((m) => m.type === "image")!.url}
+          onCancel={() => setShowMaskEditor(false)}
+          onConfirm={(dataUrl) => {
+            setMaskDataUrl(dataUrl);
+            setShowMaskEditor(false);
+          }}
         />
       )}
           <div
@@ -3142,7 +3416,7 @@ export default function LinearBuilderApp({
    *  Media Factory skill (see MEDIA_SKILLS), shows a live-updating
    *  generation card in the assistant bubble, and polls to completion
    *  for async kinds. Redirects on 401/402 exactly like runGeneration. */
-  async function runMediaGeneration(chatId: string, text: string, mediaIds: string[], skill: MediaSkillDef) {
+  async function runMediaGeneration(chatId: string, text: string, mediaIds: string[], skill: MediaSkillDef, maskDataUrl?: string) {
     const msgId = uid("msg");
     const placeholderMedia: MediaMsgState = { kind: skill.kind, label: skill.label, cost: skill.cost, status: "processing" };
     setState((s) => ({
@@ -3194,6 +3468,27 @@ export default function LinearBuilderApp({
     else if (skill.kind === "video-bg-remove") body = { videoUrl: firstVideoUrl || firstAnyUrl };
     else if (skill.kind === "export") body = { videoUrl: firstVideoUrl || firstAnyUrl, preset: text.trim() };
     else if (skill.kind === "virtual-try-on") body = { modelImageUrl: attachedImageUrls[0], garmentImageUrl: attachedImageUrls[1] };
+    else if (skill.kind === "inpaint" && skill.id === "remove-object") {
+      body = { imageUrl: firstImageUrl, maskUrl: maskDataUrl };
+    } else if (skill.kind === "inpaint" && skill.id === "outpaint") {
+      // Image Outpainting (item 26): build the padded image + auto-mask
+      // client-side (see buildOutpaintPayload above) before this
+      // generation's real request goes out -- a canvas/load failure
+      // here (e.g. a cross-origin image) fails the message the same way
+      // a provider error would, without ever hitting the API or
+      // spending a credit.
+      try {
+        const { paddedImageDataUrl, maskDataUrl: outpaintMask } = await buildOutpaintPayload(firstImageUrl || firstAnyUrl || "", text.trim());
+        body = {
+          imageUrl: paddedImageDataUrl,
+          maskUrl: outpaintMask,
+          prompt: "Naturally extend the scene, seamlessly continuing the existing image, photorealistic, high detail.",
+        };
+      } catch (err: any) {
+        updateMediaMessage(chatId, msgId, { status: "failed", error: err?.message }, err?.message || "Couldn't prepare that image for outpainting.");
+        return;
+      }
+    }
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);
@@ -3237,7 +3532,7 @@ export default function LinearBuilderApp({
     }
   }
 
-  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string, batchCount: number = 1) {
+  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string, batchCount: number = 1, maskDataUrl?: string) {
     if (!activeChat) return;
     const chatId = activeChat.id;
     const mediaSkill = mediaSkillId ? MEDIA_SKILLS.find((s) => s.id === mediaSkillId) : undefined;
@@ -3306,7 +3601,7 @@ export default function LinearBuilderApp({
       // independent success/failure, exactly like N separate sends would,
       // just issued in one go instead of one at a time.
       for (let i = 0; i < count; i++) {
-        runMediaGeneration(chatId, text, mediaIds, mediaSkill);
+        runMediaGeneration(chatId, text, mediaIds, mediaSkill, maskDataUrl);
       }
     } else {
       runGeneration(chatId, text, firstImage);

@@ -144,3 +144,37 @@ export async function virtualTryOn(modelImageUrl: string, garmentImageUrl: strin
   }
   return { url };
 }
+// Image Outpainting / Object Removal (42-tool spec, layer 4/5, items 26
+// and 31) -- both are the same real operation, FLUX.1 [pro] Fill
+// inpainting (verified 2026-09-03 against fal.ai/models/fal-ai/
+// flux-pro/v1/fill's live API docs: commercial-use, Partner tier,
+// $0.05/megapixel, image_url + mask_url + prompt -> images:[{url}]).
+// mask convention is standard FLUX Fill: white = area to repaint, black
+// = area to keep unchanged. Building the image/mask pair (drawn brush
+// strokes for object removal, padded canvas for outpainting) happens
+// client-side in the builder -- this function just calls the model.
+const FAL_FILL_MODEL = "fal-ai/flux-pro/v1/fill";
+
+export async function inpaintImage(imageUrl: string, maskUrl: string, prompt: string): Promise<{ url: string }> {
+  if (!process.env.FAL_API_KEY) {
+    throw new Error("FAL_API_KEY is not set.");
+  }
+  const res = await fetch(`https://fal.run/${FAL_FILL_MODEL}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${process.env.FAL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ image_url: imageUrl, mask_url: maskUrl, prompt }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Fal.ai request failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as any;
+  const url = data?.images?.[0]?.url;
+  if (!url) {
+    throw new Error("Fal.ai response did not include an image URL.");
+  }
+  return { url };
+}
