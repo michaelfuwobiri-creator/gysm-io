@@ -470,6 +470,16 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     needsText: false,
     placeholder: "Attach a video, then send",
   },
+  {
+    id: "export",
+    kind: "export",
+    label: "Export for platform",
+    desc: `Attach a video, type 16:9 / 9:16 / 1:1 -- ${MEDIA_CREDIT_COST.export} credits`,
+    cost: MEDIA_CREDIT_COST.export,
+    needsAttachment: true,
+    pickOptions: ["16:9", "9:16", "1:1"],
+    placeholder: "Attach a video, then type 16:9, 9:16, or 1:1...",
+  },
 ];
 
 /** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
@@ -1231,7 +1241,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "image" || media.kind === "edit") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
-          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove") && (
+          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove" || media.kind === "export") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
           {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music" || media.kind === "sound-effect" || media.kind === "voice-enhance") && (
@@ -3167,6 +3177,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "sound-effect") body = { text };
     else if (skill.kind === "voice-enhance") body = { audioUrl: firstAnyUrl };
     else if (skill.kind === "video-bg-remove") body = { videoUrl: firstVideoUrl || firstAnyUrl };
+    else if (skill.kind === "export") body = { videoUrl: firstVideoUrl || firstAnyUrl, preset: text.trim() };
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);

@@ -55,3 +55,61 @@ export async function generateImage(prompt: string, referenceImageUrl?: string):
   }
   return { url };
 }
+// Export Controls (42-tool spec, layer 7, item 39) -- real FFMPEG-backed
+// utility endpoints (verified 2026-09-03 against fal.ai/models/fal-ai/
+// workflow-utilities/scale-video and .../trim-video's live API docs),
+// not a generative model: deterministic crop/resize/trim, priced at
+// Fal's $0.001/compute-second, effectively free next to every other
+// kind in this file. Complements @reframe (Replicate's Luma model,
+// subject-aware AI reframing, 800 credits, 10s input cap) rather than
+// duplicating it -- this is the "just fit it to the platform's exact
+// dimensions" utility path, no AI framing decisions, no duration cap.
+const FAL_SCALE_VIDEO_MODEL = "fal-ai/workflow-utilities/scale-video";
+const FAL_TRIM_VIDEO_MODEL = "fal-ai/workflow-utilities/trim-video";
+
+export type ExportPreset = "16:9" | "9:16" | "1:1";
+
+const EXPORT_PRESET_DIMENSIONS: Record<ExportPreset, { width: number; height: number }> = {
+  "16:9": { width: 1920, height: 1080 },
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+};
+
+async function callFalWorkflowUtility(model: string, body: Record<string, unknown>): Promise<{ url: string }> {
+  if (!process.env.FAL_API_KEY) {
+    throw new Error("FAL_API_KEY is not set.");
+  }
+  const res = await fetch(`https://fal.run/${model}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${process.env.FAL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Fal.ai request failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as any;
+  const url = data?.video?.url;
+  if (!url) {
+    throw new Error("Fal.ai response did not include a video URL.");
+  }
+  return { url };
+}
+
+// Scales/center-crops a video to a named platform preset's exact
+// dimensions (e.g. "9:16" -> 1080x1920), mode "crop" so the result
+// always fills the target frame instead of letterboxing.
+export async function scaleVideoToPreset(videoUrl: string, preset: ExportPreset): Promise<{ url: string }> {
+  const { width, height } = EXPORT_PRESET_DIMENSIONS[preset];
+  return callFalWorkflowUtility(FAL_SCALE_VIDEO_MODEL, { video_url: videoUrl, width, height, mode: "crop" });
+}
+
+// Trims a video to [startTime, endTime] seconds -- exposed for future
+// export-flow steps (e.g. a trim-then-resize chain); not yet wired into
+// a builder skill on its own.
+export async function trimVideo(videoUrl: string, startTime: number, endTime: number): Promise<{ url: string }> {
+  return callFalWorkflowUtility(FAL_TRIM_VIDEO_MODEL, { video_url: videoUrl, start_time: startTime, end_time: endTime });
+}
