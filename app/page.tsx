@@ -49,10 +49,16 @@ const APPS = [
 // wordmark), not a generic placeholder glyph -- verified against the live
 // build at /publish/[projectId] for each entry in APPS.
 function AppLogo({ name, className }: { name: string; className?: string }) {
+  // Every mark below is a purpose-drawn glyph tied to what that app actually
+  // does (a burst for orbit's zodiac matching, a sun for Studio Sol's salon
+  // bookings, a repeat cycle for loop's habit tracking, a speed chevron for
+  // VelocityRun's racing game) -- not an initial in a box. Same rounded-app-icon
+  // shape across all four so the row reads as a real home-screen icon grid,
+  // something you'd actually tap, rather than a plain lettered tile set.
   switch (name) {
     case "orbit.":
       return (
-        <div className={`${className} rounded-full bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center`}>
+        <div className={`${className} rounded-[18px] bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center shadow-inner`}>
           <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
             <path d="M12 4l1.6 5.4L19 11l-5.4 1.6L12 18l-1.6-5.4L5 11l5.4-1.6L12 4Z" fill="white" />
           </svg>
@@ -60,20 +66,31 @@ function AppLogo({ name, className }: { name: string; className?: string }) {
       );
     case "Studio Sol":
       return (
-        <div className={`${className} rounded-[10px] bg-gradient-to-br from-pink-500 to-orange-400 grid place-items-center text-white font-black`}>
-          S
+        <div className={`${className} rounded-[18px] bg-gradient-to-br from-pink-500 to-orange-400 grid place-items-center shadow-inner`}>
+          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
+            <circle cx="12" cy="12" r="4" fill="white" />
+            <g stroke="white" strokeWidth="2" strokeLinecap="round">
+              <path d="M12 2.5v3M12 18.5v3M3.8 3.8l2.1 2.1M18.1 18.1l2.1 2.1M2.5 12h3M18.5 12h3M3.8 20.2l2.1-2.1M18.1 5.9l2.1-2.1" />
+            </g>
+          </svg>
         </div>
       );
     case "loop.":
       return (
-        <div className={`${className} rounded-[10px] bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center text-white font-black`}>
-          L
+        <div className={`${className} rounded-[18px] bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center shadow-inner`}>
+          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
+            <path d="M4 12a8 8 0 0 1 8-8c2.5 0 4.7 1.2 6.1 3M20 4v4h-4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M20 12a8 8 0 0 1-8 8c-2.5 0-4.7-1.2-6.1-3M4 20v-4h4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
       );
     case "VelocityRun":
       return (
-        <div className={`${className} rounded-[10px] bg-gradient-to-br from-indigo-600 to-fuchsia-600 grid place-items-center text-white font-black`}>
-          V
+        <div className={`${className} rounded-[18px] bg-gradient-to-br from-indigo-600 to-fuchsia-600 grid place-items-center shadow-inner`}>
+          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
+            <path d="M2.5 7.5h9M2.5 12h13M2.5 16.5h6" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M14.5 5.5l6.5 6.5-6.5 6.5" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
       );
     default:
@@ -246,10 +263,11 @@ export default function Page() {
               href={`/publish/${app.projectId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="group rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg transition"
+              className="group relative rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg hover:-translate-y-[2px] transition-all"
             >
-              <div className="h-[88px] md:h-[110px] rounded-[14px] bg-zinc-50 border border-black/5 grid place-items-center">
-                <AppLogo name={app.name} className="h-11 w-11 md:h-14 md:w-14 text-[18px] md:text-[22px]" />
+              <div className="relative h-[88px] md:h-[110px] rounded-[14px] bg-zinc-50 border border-black/5 grid place-items-center overflow-hidden">
+                <AppLogo name={app.name} className="h-11 w-11 md:h-14 md:w-14 text-[18px] md:text-[22px] transition-transform duration-300 group-hover:scale-110" />
+                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-white border border-black/10 grid place-items-center text-[12px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">↗</div>
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <div>
