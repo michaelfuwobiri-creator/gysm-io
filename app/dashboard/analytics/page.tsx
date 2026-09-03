@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import AppShell from "@/app/components/AppShell";
 import { getPublishedProjects, getDailyViews, getTopReferrers } from "@/lib/analytics";
+import { getMediaUsageSummary } from "@/lib/mediaAnalytics";
 import AnalyticsClient from "./AnalyticsClient";
+import MediaUsageSection from "./MediaUsageSection";
 
 export const metadata = { title: "Analytics | GYSM.IO" };
 export const dynamic = "force-dynamic";
@@ -19,10 +21,11 @@ export default async function AnalyticsPage() {
   }
 
   const ownerId = user.orgId ?? user.id;
-  const [projects, daily, referrers] = await Promise.all([
+  const [projects, daily, referrers, mediaUsage] = await Promise.all([
     getPublishedProjects(ownerId),
     getDailyViews(ownerId, 30),
     getTopReferrers(ownerId, 30),
+    getMediaUsageSummary(user.id),
   ]);
 
   return (
@@ -32,6 +35,7 @@ export default async function AnalyticsPage() {
         initialDaily={daily}
         initialReferrers={referrers}
       />
+      <MediaUsageSection usage={mediaUsage} />
     </AppShell>
   );
 }

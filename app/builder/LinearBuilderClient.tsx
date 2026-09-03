@@ -32,6 +32,7 @@ import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
 import type { BrandKit } from "@/lib/brandKit";
 import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
+import type { MediaTemplate } from "@/lib/mediaTemplates";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -755,6 +756,67 @@ function AssetsModal({
             Close
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Template System (42-tool spec, layer 6, item 37) -- lists a user's
+ *  saved composer states (skill + prompt/pick-value), reload one with
+ *  "Use". Saving happens inline in the composer (see ChatCenter's
+ *  saveCurrentAsTemplate) rather than from this modal -- it always
+ *  saves *the current* skill+prompt, so there's nothing else to fill in
+ *  here. */
+function TemplatesModal({
+  templates,
+  onClose,
+  onUse,
+  onRemove,
+}: {
+  templates: MediaTemplate[];
+  onClose: () => void;
+  onUse: (t: MediaTemplate) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Templates</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Saved skill + prompt combos -- pick a Media Factory skill, type a prompt, then hit "Save as template" next to
+          it to add one.
+        </p>
+        <div className="max-h-64 overflow-y-auto space-y-1.5">
+          {templates.length === 0 && <p className="text-[11px] text-white/30">No templates saved yet.</p>}
+          {templates.map((t) => {
+            const skill = MEDIA_SKILLS.find((s) => s.id === t.skillId);
+            return (
+              <div key={t.id} className="flex items-center gap-2 rounded-lg border border-white/10 p-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] text-white truncate">{t.name}</div>
+                  <div className="text-[10px] text-white/35 truncate">
+                    {skill?.label || t.skillId} -- {t.prompt}
+                  </div>
+                </div>
+                <button onClick={() => onUse(t)} className="text-[11px] text-[#FF0080] hover:underline shrink-0">
+                  Use
+                </button>
+                <button onClick={() => onRemove(t.id)} className="text-[11px] text-white/30 hover:text-red-400 shrink-0">
+                  Remove
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full h-9 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5"
+        >
+          Close
+        </button>
       </div>
     </div>
   );
@@ -2203,7 +2265,7 @@ function ChatCenter({
 }: {
   chat: Chat | null;
   media: MediaItem[];
-  onSend: (text: string, mediaIds: string[], mediaSkillId?: string) => void;
+  onSend: (text: string, mediaIds: string[], mediaSkillId?: string, batchCount?: number) => void;
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -2236,7 +2298,57 @@ function ChatCenter({
   const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(() =>
     initialMediaSkillId ? MEDIA_SKILLS.find((s) => s.kind === initialMediaSkillId) || null : null
   );
+  /** Batch Generation (42-tool spec item 35) -- run the same prompt N
+   *  times in one send, producing N independent result cards/credit
+   *  charges instead of one. Scoped to image generation only (the
+   *  synchronous, cheapest-per-unit skill, and the one where "give me a
+   *  few options" is the real, common use case) rather than every kind. */
+  const [batchCount, setBatchCount] = useState<1 | 2 | 4>(1);
+  useEffect(() => {
+    if (pickedMedia?.kind !== "image") setBatchCount(1);
+  }, [pickedMedia]);
   const [mediaError, setMediaError] = useState("");
+  const [templates, setTemplates] = useState<MediaTemplate[]>([]);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/media-templates")
+      .then((r) => r.json())
+      .then((d) => setTemplates(d?.templates || []))
+      .catch(() => {});
+  }, []);
+
+  /** Saves the composer's current skill+prompt as a reusable Template
+   *  (see TemplatesModal above) -- always saves what's live right now,
+   *  so there's no separate "new template" form to fill in. */
+  function saveCurrentAsTemplate() {
+    if (!pickedMedia || !input.trim()) return;
+    const name = window.prompt("Name this template:");
+    if (!name) return;
+    fetch("/api/media-templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, skillId: pickedMedia.id, prompt: input.trim() }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.template) setTemplates((prev) => [d.template, ...prev]);
+      })
+      .catch(() => {});
+  }
+
+  function useTemplate(t: MediaTemplate) {
+    const skill = MEDIA_SKILLS.find((s) => s.id === t.skillId);
+    if (skill) setPickedMedia(skill);
+    setInput(t.prompt);
+    setMediaError("");
+    setShowTemplatesModal(false);
+  }
+
+  function removeTemplate(id: string) {
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    fetch(`/api/media-templates/${id}`, { method: "DELETE" }).catch(() => {});
+  }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -2268,10 +2380,11 @@ function ChatCenter({
         setMediaError("Type a prompt first.");
         return;
       }
-      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id);
+      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id, pickedMedia.kind === "image" ? batchCount : 1);
       setInput("");
       setMediaError("");
       setPickedMedia(null);
+      setBatchCount(1);
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
@@ -2373,20 +2486,43 @@ function ChatCenter({
             <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-[#FF0080]/30 bg-[#FF0080]/10 px-2.5 py-1.5 text-[11px] text-white/80">
               <span className="font-semibold text-[#FF0080]">Media Factory:</span>
               <span>
-                {pickedMedia.label} -- {pickedMedia.cost} credits
+                {pickedMedia.label} -- {pickedMedia.cost * (pickedMedia.kind === "image" ? batchCount : 1)} credits
+                {pickedMedia.kind === "image" && batchCount > 1 ? ` (${batchCount}x)` : ""}
               </span>
+              {pickedMedia.kind === "image" && (
+                <button
+                  onClick={() => setBatchCount((n) => (n === 1 ? 2 : n === 2 ? 4 : 1))}
+                  title="Generate multiple variations from the same prompt in one send"
+                  className="rounded-md border border-white/15 px-1.5 py-0.5 text-[10px] text-white/60 hover:text-white hover:border-white/30"
+                >
+                  Batch: {batchCount}x
+                </button>
+              )}
+              {input.trim() && (
+                <button onClick={saveCurrentAsTemplate} className="ml-auto text-white/50 hover:text-white underline">
+                  Save as template
+                </button>
+              )}
               <button
                 onClick={() => {
                   setPickedMedia(null);
                   setMediaError("");
                 }}
-                className="ml-auto text-white/40 hover:text-white"
+                className={input.trim() ? "text-white/40 hover:text-white" : "ml-auto text-white/40 hover:text-white"}
               >
                 &times;
               </button>
             </div>
           )}
           {mediaError && <div className="mb-1.5 text-[11px] text-red-400">{mediaError}</div>}
+      {showTemplatesModal && (
+        <TemplatesModal
+          templates={templates}
+          onClose={() => setShowTemplatesModal(false)}
+          onUse={useTemplate}
+          onRemove={removeTemplate}
+        />
+      )}
           <div
             className={`rounded-2xl border bg-white/[0.03] px-3 py-2.5 transition-shadow ${
               dragOver ? "border-[#FF0080]/60 shadow-[0_0_0_3px_rgba(255,0,128,0.15)]" : "border-white/10 focus-within:border-[#FF0080]/50 focus-within:shadow-[0_0_0_3px_rgba(255,0,128,0.12)]"
@@ -2467,6 +2603,13 @@ function ChatCenter({
                 className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
               >
                 Assets
+              </button>
+              <button
+                onClick={() => setShowTemplatesModal(true)}
+                title="Saved skill + prompt combos"
+                className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
+              >
+                Templates
               </button>
               {showSchedule && (
                 <SchedulePicker
@@ -3067,14 +3210,18 @@ export default function LinearBuilderApp({
     }
   }
 
-  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string) {
+  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string, batchCount: number = 1) {
     if (!activeChat) return;
     const chatId = activeChat.id;
     const mediaSkill = mediaSkillId ? MEDIA_SKILLS.find((s) => s.id === mediaSkillId) : undefined;
+    // Batch Generation (item 35): clamp regardless of what the composer
+    // sent, and only meaningful for image (matches the composer's own
+    // kind === "image" gate on the batch toggle).
+    const count = mediaSkill?.kind === "image" ? Math.max(1, Math.min(4, Math.round(batchCount))) : 1;
     const userMsg: ChatMessage = {
       id: uid("msg"),
       role: "user",
-      content: text || (mediaSkill ? `[${mediaSkill.label}]` : ""),
+      content: (text || (mediaSkill ? `[${mediaSkill.label}]` : "")) + (count > 1 ? ` (batch of ${count})` : ""),
       createdAt: Date.now(),
       mediaIds: mediaIds.length ? mediaIds : undefined,
     };
@@ -3127,7 +3274,13 @@ export default function LinearBuilderApp({
     }
 
     if (mediaSkill) {
-      runMediaGeneration(chatId, text, mediaIds, mediaSkill);
+      // Fire all N generations concurrently -- each call creates its own
+      // placeholder message, its own credit deduction, and its own
+      // independent success/failure, exactly like N separate sends would,
+      // just issued in one go instead of one at a time.
+      for (let i = 0; i < count; i++) {
+        runMediaGeneration(chatId, text, mediaIds, mediaSkill);
+      }
     } else {
       runGeneration(chatId, text, firstImage);
     }
