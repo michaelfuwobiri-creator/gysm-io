@@ -480,6 +480,16 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     pickOptions: ["16:9", "9:16", "1:1"],
     placeholder: "Attach a video, then type 16:9, 9:16, or 1:1...",
   },
+  {
+    id: "virtual-try-on",
+    kind: "virtual-try-on",
+    label: "Virtual try-on",
+    desc: `Attach 2 images: model photo, then garment photo -- ${MEDIA_CREDIT_COST["virtual-try-on"]} credits`,
+    cost: MEDIA_CREDIT_COST["virtual-try-on"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach a model/person photo, then a garment photo, then send",
+  },
 ];
 
 /** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
@@ -1238,7 +1248,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
       )}
       {media.status === "done" && media.kind !== "captions" && media.kind !== "script" && media.url && (
         <>
-          {(media.kind === "image" || media.kind === "edit") && (
+          {(media.kind === "image" || media.kind === "edit" || media.kind === "virtual-try-on") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
           {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove" || media.kind === "export") && (
@@ -2378,6 +2388,10 @@ function ChatCenter({
         setMediaError("Attach a file first.");
         return;
       }
+      if (pickedMedia.kind === "virtual-try-on" && chatMedia.filter((m) => m.type === "image").length < 2) {
+        setMediaError("Attach two images: a model/person photo, then a garment photo.");
+        return;
+      }
       if (pickedMedia.kind === "avatar" && !text.includes("|")) {
         setMediaError("Format: avatarId | script");
         return;
@@ -3156,6 +3170,7 @@ export default function LinearBuilderApp({
     const firstImageUrl = attached.find((m) => m.type === "image")?.url;
     const firstVideoUrl = attached.find((m) => m.type === "video")?.url;
     const firstAnyUrl = attached[0]?.url;
+    const attachedImageUrls = attached.filter((m) => m.type === "image").map((m) => m.url);
 
     let body: Record<string, unknown> = {};
     if (skill.kind === "image") {
@@ -3178,6 +3193,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "voice-enhance") body = { audioUrl: firstAnyUrl };
     else if (skill.kind === "video-bg-remove") body = { videoUrl: firstVideoUrl || firstAnyUrl };
     else if (skill.kind === "export") body = { videoUrl: firstVideoUrl || firstAnyUrl, preset: text.trim() };
+    else if (skill.kind === "virtual-try-on") body = { modelImageUrl: attachedImageUrls[0], garmentImageUrl: attachedImageUrls[1] };
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);

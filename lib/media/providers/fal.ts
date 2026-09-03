@@ -113,3 +113,34 @@ export async function scaleVideoToPreset(videoUrl: string, preset: ExportPreset)
 export async function trimVideo(videoUrl: string, startTime: number, endTime: number): Promise<{ url: string }> {
   return callFalWorkflowUtility(FAL_TRIM_VIDEO_MODEL, { video_url: videoUrl, start_time: startTime, end_time: endTime });
 }
+// Virtual Try-On (42-tool spec, layer 3, item 17) -- real, commercial-use
+// endpoint verified 2026-09-03 against fal.ai/models/fal-ai/fashn/tryon/
+// v1.6's live API docs: model_image (person photo) + garment_image
+// (clothing photo) -> images:[{url}]. $0.075/generation. Category left
+// at "auto" (FASHN detects tops/bottoms/one-pieces itself) -- not
+// exposing the picker in v1 UI, real API supports more if ever needed.
+const FAL_VIRTUAL_TRY_ON_MODEL = "fal-ai/fashn/tryon/v1.6";
+
+export async function virtualTryOn(modelImageUrl: string, garmentImageUrl: string): Promise<{ url: string }> {
+  if (!process.env.FAL_API_KEY) {
+    throw new Error("FAL_API_KEY is not set.");
+  }
+  const res = await fetch(`https://fal.run/${FAL_VIRTUAL_TRY_ON_MODEL}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Key ${process.env.FAL_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model_image: modelImageUrl, garment_image: garmentImageUrl, category: "auto" }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Fal.ai request failed (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as any;
+  const url = data?.images?.[0]?.url;
+  if (!url) {
+    throw new Error("Fal.ai response did not include an image URL.");
+  }
+  return { url };
+}

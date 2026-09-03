@@ -26,6 +26,7 @@ export const MEDIA_KINDS = [
   "voice-enhance",
   "video-bg-remove",
   "export",
+  "virtual-try-on",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -52,6 +53,7 @@ export const MEDIA_CREDIT_COST: Record<MediaKind, number> = {
   "voice-enhance": 60,
   "video-bg-remove": 60, // ~$0.044/run (Replicate, arielreplicate/robust_video_matting, community model)
   export: 20, // ~$0.001/compute-second (Fal.ai workflow-utilities scale-video/trim-video) -- pure ffmpeg crop/resize, cheapest real cost in this file
+  "virtual-try-on": 225, // ~$0.075/generation x2 margin (Fal.ai fashn/tryon/v1.6)
 };
 
 // Which env var must be set for a kind to actually run. Every route
@@ -74,13 +76,14 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
   "voice-enhance": "ELEVENLABS_API_KEY",
   "video-bg-remove": "REPLICATE_API_TOKEN",
   export: "FAL_API_KEY",
+  "virtual-try-on": "FAL_API_KEY",
 };
 
 // Kinds whose provider call is a single request/response (fast, no job
 // polling needed). Everything else (video, avatar, music) returns a
 // provider_job_id immediately and the client polls
 // GET /api/media/[id]/status until status is "done" or "failed".
-export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit", "script", "sound-effect", "voice-enhance", "export"];
+export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit", "script", "sound-effect", "voice-enhance", "export", "virtual-try-on"];
 // reframe and video-upscale are intentionally NOT in this list -- both
 // run on the same async prediction lifecycle as video/avatar/music (up
 // to several minutes for video-upscale), so the client polls
