@@ -32,6 +32,15 @@ export const IAP_PRODUCT_IDS: Record<PricingPlan["id"], string> = {
   plan_builder: "io.gysm.app.plan_builder.monthly",
   plan_pro: "io.gysm.app.plan_pro.monthly",
   plan_studio: "io.gysm.app.plan_studio.monthly",
+  // VOIIE plans (lib/stripe.ts) are quoted and paid for a hunted lead
+  // from the /voiie dashboard's web checkout flow only -- there's no
+  // native-app surface that sells them, so no real product IDs exist for
+  // these in App Store Connect. Present so this Record type-checks
+  // against PricingPlan["id"]; getPlanByIapProductId simply never
+  // resolves them since no StoreKit purchase will ever carry these ids.
+  voiie_starter: "io.gysm.app.voiie_starter.unused",
+  voiie_pro: "io.gysm.app.voiie_pro.unused",
+  voiie_agency: "io.gysm.app.voiie_agency.unused",
 };
 
 export function getPlanByIapProductId(productId: string): PricingPlan | undefined {

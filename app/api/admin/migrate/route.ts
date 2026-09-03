@@ -152,6 +152,72 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
     id: "0013_project_view_events_idx",
     run: () => sql`create index if not exists project_view_events_project_id_idx on project_view_events (project_id, viewed_at desc)`,
   },
+  // 0016_voiie.sql -- VOIIE hunter/closer/builder: lead records, the
+  // outreach thread, and in-progress consultation answers. Copied
+  // verbatim from that file; see it for the full design rationale.
+  {
+    id: "0016_voiie_leads",
+    run: () => sql`
+      create table if not exists voiie_leads (
+        id                 uuid primary key default gen_random_uuid(),
+        owner_user_id      text not null,
+        platform           text not null default 'twitter',
+        handle             text not null,
+        display_name       text,
+        bio                text,
+        signal             text,
+        contact_email      text,
+        contact_phone      text,
+        status             text not null default 'new',
+        demo_project_id    uuid references projects(id) on delete set null,
+        plan_id            text,
+        stripe_checkout_session_id text,
+        converted_user_id  text,
+        converted_at       timestamptz,
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0016_voiie_leads_owner_status_idx",
+    run: () => sql`create index if not exists voiie_leads_owner_status_idx on voiie_leads (owner_user_id, status, created_at desc)`,
+  },
+  {
+    id: "0016_voiie_leads_owner_platform_handle_idx",
+    run: () => sql`create unique index if not exists voiie_leads_owner_platform_handle_idx on voiie_leads (owner_user_id, platform, lower(handle))`,
+  },
+  {
+    id: "0016_voiie_messages",
+    run: () => sql`
+      create table if not exists voiie_messages (
+        id         uuid primary key default gen_random_uuid(),
+        lead_id    uuid not null references voiie_leads(id) on delete cascade,
+        direction  text not null,
+        channel    text not null,
+        body       text not null,
+        meta       jsonb,
+        created_at timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0016_voiie_messages_lead_id_created_at_idx",
+    run: () => sql`create index if not exists voiie_messages_lead_id_created_at_idx on voiie_messages (lead_id, created_at asc)`,
+  },
+  {
+    id: "0016_voiie_consultations",
+    run: () => sql`
+      create table if not exists voiie_consultations (
+        lead_id          uuid primary key references voiie_leads(id) on delete cascade,
+        answers          jsonb not null default '{}'::jsonb,
+        current_question integer not null default 0,
+        completed_at     timestamptz,
+        created_at       timestamptz not null default now(),
+        updated_at       timestamptz not null default now()
+      )
+    `,
+  },
 ];
 
 export async function POST(_req: NextRequest) {

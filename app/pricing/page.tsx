@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 // match the tiering in lib/stripe.ts, plus a hardcoded Enterprise card since
 // Enterprise is a custom quote, not a purchasable Stripe Price.
 export default function PricingPage() {
-  const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time");
-  const monthly = PRICING_PLANS.filter((p) => p.interval === "month");
+  const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time" && !p.hidden);
+  const monthly = PRICING_PLANS.filter((p) => p.interval === "month" && !p.hidden);
 
   return (
     <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A]">
