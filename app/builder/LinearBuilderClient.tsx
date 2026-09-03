@@ -459,6 +459,16 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     needsText: false,
     placeholder: "Attach an audio/video clip, then send",
   },
+  {
+    id: "video-bg-remove",
+    kind: "video-bg-remove",
+    label: "Remove video background",
+    desc: `Attach a video, green-screen the background -- ${MEDIA_CREDIT_COST["video-bg-remove"]} credits`,
+    cost: MEDIA_CREDIT_COST["video-bg-remove"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach a video, then send",
+  },
 ];
 
 /** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
@@ -1104,7 +1114,7 @@ function MessageBubble({
 /** Kinds worth showing in the public Flow TV gallery (see app/flow-tv)
  *  -- excludes captions/script, which are text-shaped, not visual/audio
  *  media (same list as lib/flowTv.ts's GALLERY_KINDS -- keep in sync). */
-const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance"];
+const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance", "video-bg-remove"];
 
 function MediaResultCard({ media }: { media: MediaMsgState }) {
   const [published, setPublished] = useState(false);
@@ -1159,7 +1169,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "image" || media.kind === "edit") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
-          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale") && (
+          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
           {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music" || media.kind === "sound-effect" || media.kind === "voice-enhance") && (
@@ -3013,6 +3023,7 @@ export default function LinearBuilderApp({
     else if (skill.kind === "script") body = { topic: text };
     else if (skill.kind === "sound-effect") body = { text };
     else if (skill.kind === "voice-enhance") body = { audioUrl: firstAnyUrl };
+    else if (skill.kind === "video-bg-remove") body = { videoUrl: firstVideoUrl || firstAnyUrl };
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);

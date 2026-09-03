@@ -24,6 +24,7 @@ export const MEDIA_KINDS = [
   "script",
   "sound-effect",
   "voice-enhance",
+  "video-bg-remove",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -48,6 +49,7 @@ export const MEDIA_CREDIT_COST: Record<MediaKind, number> = {
   // a precise 2x-margin calculation.
   "sound-effect": 60,
   "voice-enhance": 60,
+  "video-bg-remove": 60, // ~$0.044/run (Replicate, arielreplicate/robust_video_matting, community model)
 };
 
 // Which env var must be set for a kind to actually run. Every route
@@ -68,6 +70,7 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
   script: "OPENAI_API_KEY",
   "sound-effect": "ELEVENLABS_API_KEY",
   "voice-enhance": "ELEVENLABS_API_KEY",
+  "video-bg-remove": "REPLICATE_API_TOKEN",
 };
 
 // Kinds whose provider call is a single request/response (fast, no job

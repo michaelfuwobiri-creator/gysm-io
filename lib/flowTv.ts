@@ -16,7 +16,7 @@ export interface FlowTvItem {
 // captions/script are text-shaped output (no real image/video/audio to
 // show in a visual gallery) -- excluded here, not in the DB constraint,
 // so that decision stays easy to revisit without a migration.
-const GALLERY_KINDS = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance"];
+const GALLERY_KINDS = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance", "video-bg-remove"];
 
 export async function listPublicGenerations(): Promise<FlowTvItem[]> {
   const rows = await sql`

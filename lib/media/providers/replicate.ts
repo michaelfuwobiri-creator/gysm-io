@@ -10,7 +10,7 @@
 // confirm the exact version hash on the model's page before relying on
 // this in production; wrong/stale version hashes are the most likely
 // first bug once real testing starts.
-export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove" | "reframe" | "video-upscale", string> = {
+export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove" | "reframe" | "video-upscale" | "video-bg-remove", string> = {
   video: "minimax/video-01",
   music: "meta/musicgen",
   upscale: "nightmareai/real-esrgan",
@@ -25,6 +25,12 @@ export const REPLICATE_MODELS: Record<"video" | "music" | "upscale" | "bg-remove
   // A100 GPU time so cost varies with clip length -- credit price in
   // mediaCreditsConstants.ts is an estimate, not a hard guarantee.
   "video-upscale": "lucataco/real-esrgan-video",
+  // Real, verified model (confirmed 2026-09-03 against
+  // replicate.com/arielreplicate/robust_video_matting/api/schema):
+  // input { input_video, output_type? }, output a single video uri
+  // (green-screen composite by default). ~$0.044/run, L40S GPU,
+  // typically finishes in well under a minute.
+  "video-bg-remove": "arielreplicate/robust_video_matting",
 };
 
 export function isReplicateConfigured(): boolean {
