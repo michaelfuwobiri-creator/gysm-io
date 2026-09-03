@@ -66,7 +66,7 @@ export type RenewalType = "domain" | "hosting" | "upgrade" | "repair" | "add_fea
 export type RenewalStatus = "pending" | "sent" | "paid";
 export type SupportTicketStatus = "open" | "in_progress" | "resolved";
 
-export type Platform = "twitter" | "threads" | "manual";
+export type Platform = "twitter" | "threads" | "places" | "manual";
 export type OutreachChannel = "twitter" | "whatsapp" | "email";
 
 /** Mirrors the "voiie_*" entries in lib/stripe.ts PRICING_PLANS -- kept in

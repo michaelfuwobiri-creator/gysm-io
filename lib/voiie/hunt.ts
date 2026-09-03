@@ -7,15 +7,19 @@
 import { countLeadsHuntedToday, createLeadIfNew, getSettings } from "@/lib/voiie/db";
 import { searchTweets } from "@/lib/voiie/twitter";
 import { searchThreads } from "@/lib/voiie/threads";
-import { DEFAULT_HUNT_QUERY } from "@/lib/voiie/constants";
+import { searchBusinessesWithoutWebsite } from "@/lib/voiie/places";
+import { DEFAULT_HUNT_QUERY, DEFAULT_PLACES_QUERY } from "@/lib/voiie/constants";
 import type { Platform } from "@/types/voiie";
 
-export { DEFAULT_HUNT_QUERY };
+export { DEFAULT_HUNT_QUERY, DEFAULT_PLACES_QUERY };
 
 interface Candidate {
   handle: string;
   platform: Platform;
   pain: string;
+  displayName?: string | null;
+  bio?: string | null;
+  contactPhone?: string | null;
 }
 
 const PAIN_PATTERNS: Array<{ re: RegExp; label: string }> = [
@@ -45,8 +49,29 @@ export function isLead(text: string): boolean {
   return needsSomething && aboutWeb && notHiringAgency;
 }
 
-async function collectCandidates(query: string, platforms: Platform[]): Promise<Candidate[]> {
+async function collectCandidates(query: string, platforms: Platform[], placesQuery?: string): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
+
+  if (platforms.includes("places") && placesQuery) {
+    try {
+      const businesses = await searchBusinessesWithoutWebsite(placesQuery, 20);
+      for (const b of businesses) {
+        candidates.push({
+          // Place ID, not a handle -- it's the stable, unique identifier
+          // that db.ts's (owner_user_id, platform, lower(handle)) unique
+          // index dedupes on, same role @handle plays for Twitter/Threads.
+          handle: b.placeId,
+          platform: "places",
+          pain: `${b.category}, no website listed${b.rating ? ` (${b.rating}★ on Google)` : ""}`,
+          displayName: b.name,
+          bio: b.address,
+          contactPhone: b.phone,
+        });
+      }
+    } catch (err) {
+      console.warn("[voiie/hunt] Google Places search unavailable:", (err as Error).message);
+    }
+  }
 
   if (platforms.includes("twitter")) {
     try {
@@ -92,6 +117,10 @@ function normalizeHandle(handle: string): string {
 export async function huntClients(params: {
   ownerUserId: string;
   query?: string;
+  /** Category + location for the Places source, e.g. "plumbers in Austin, TX".
+   *  Only used when "places" is in `platforms`; leaving it unset simply
+   *  skips Places for this run rather than erroring. */
+  placesQuery?: string;
   platforms?: Platform[];
 }): Promise<HuntResult> {
   const settings = await getSettings(params.ownerUserId);
@@ -107,10 +136,11 @@ export async function huntClients(params: {
   }
 
   const query = params.query ?? DEFAULT_HUNT_QUERY;
+  const placesQuery = params.placesQuery ?? (DEFAULT_PLACES_QUERY || undefined);
   const platforms = params.platforms ?? (["twitter", "threads"] as Platform[]);
 
   const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
-  const candidates = (await collectCandidates(query, platforms))
+  const candidates = (await collectCandidates(query, platforms, placesQuery))
     .filter((c) => !blacklist.has(normalizeHandle(c.handle)))
     .slice(0, remaining); // never create more leads than the daily cap has left
 
@@ -121,6 +151,9 @@ export async function huntClients(params: {
       platform: c.platform,
       handle: c.handle,
       signal: c.pain,
+      displayName: c.displayName,
+      bio: c.bio,
+      contactPhone: c.contactPhone,
     });
     if (id) leadIds.push(id);
   }
