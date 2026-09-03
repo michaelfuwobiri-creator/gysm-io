@@ -2,6 +2,7 @@ import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
 import { getCreditBalance } from "@/lib/credits";
+import { getBrandKit } from "@/lib/brandKit";
 import LinearBuilderClient from "./LinearBuilderClient";
 
 // Middleware already gates /builder(.*) via Clerk, so getUser() here is
@@ -28,7 +29,7 @@ import LinearBuilderClient from "./LinearBuilderClient";
 export default async function BuilderPage({
   searchParams,
 }: {
-  searchParams: { projectId?: string; template?: string; prompt?: string };
+  searchParams: { projectId?: string; template?: string; prompt?: string; remixSkill?: string; remixPrompt?: string };
 }) {
   let initialHtml: string | null = null;
   let initialPrompt = "";
@@ -41,6 +42,23 @@ export default async function BuilderPage({
   // visitor is fine, the /sign-in redirect on first generate attempt is
   // the actual gate, not this display value.
   const credits = user ? await getCreditBalance(user.id) : 0;
+  // Brand Kit / Style Lock (42-tool spec item 36) -- null for a
+  // logged-out visitor or a user who hasn't set one up yet, both of
+  // which the composer's "Brand" toggle treats as "nothing to apply".
+  // Wrapped in try/catch like every other DB call on this page --
+  // HOTFIX: this was missing the guard and took down all of /builder
+  // for every signed-in user when db/migrations/0016_brand_kits.sql
+  // hadn't been run yet (NeonDbError: relation "brand_kits" does not
+  // exist). A missing/late migration should degrade this one feature,
+  // not the whole builder page.
+  let brandKit: Awaited<ReturnType<typeof getBrandKit>> = null;
+  if (user) {
+    try {
+      brandKit = await getBrandKit(user.id);
+    } catch (error: any) {
+      console.error("[builder] failed to load brand kit (has db/migrations/0016_brand_kits.sql been run?):", error.message);
+    }
+  }
 
   const projectId = searchParams?.projectId;
   const templateId = searchParams?.template;
@@ -79,7 +97,13 @@ export default async function BuilderPage({
     }
   } else if (searchParams?.prompt) {
     initialPrompt = searchParams.prompt;
+  } else if (searchParams?.remixPrompt) {
+    // From Flow TV's Remix button (see app/flow-tv/FlowTvCard.tsx) --
+    // prefills both the prompt text and which Media Factory skill is
+    // pre-selected, same "never auto-submit" rule as ?prompt= above.
+    initialPrompt = searchParams.remixPrompt;
   }
+  const initialMediaSkillId = searchParams?.remixPrompt ? searchParams?.remixSkill : undefined;
 
   return (
     <div style={{ fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
@@ -92,6 +116,8 @@ export default async function BuilderPage({
         userName={user?.name || "there"}
         userEmail={user?.email ?? null}
         credits={credits}
+        initialBrandKit={brandKit}
+        initialMediaSkillId={initialMediaSkillId}
       />
     </div>
   );

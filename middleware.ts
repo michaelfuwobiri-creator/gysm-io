@@ -3,7 +3,7 @@ import { NextResponse, NextRequest, NextFetchEvent } from 'next/server'
 import { neon } from '@neondatabase/serverless'
 
 const isPublicRoute = createRouteMatcher(['/', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
-const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/dashboard(.*)', '/voiie(.*)'])
+const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)'])
 
 const clerkHandler = clerkMiddleware(async (auth, req) => {
   if (isBuilderRoute(req)) {

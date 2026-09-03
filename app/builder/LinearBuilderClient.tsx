@@ -30,6 +30,9 @@ import React, {
 import { useRouter } from "next/navigation";
 import { BUILD_TAGS, MAX_TAGS_PER_BUILD } from "@/lib/buildTags";
 import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
+import type { BrandKit } from "@/lib/brandKit";
+import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
+import type { MediaTemplate } from "@/lib/mediaTemplates";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -308,11 +311,18 @@ interface MediaSkillDef {
   needsAttachment?: boolean;
   needsText?: boolean;
   placeholder: string;
-  /** Reframe only -- the composer's text field doubles as an aspect-ratio
-   *  picker instead of a free-form prompt (see submit()'s validation and
-   *  runMediaGeneration's body assembly below). */
-  aspectRatioOptions?: string[];
+  /** Skills where the composer's text field doubles as a fixed-choice
+   *  picker (aspect ratio, resolution, ...) instead of a free-form prompt
+   *  -- see submit()'s validation and runMediaGeneration's body assembly
+   *  below. */
+  pickOptions?: string[];
 }
+
+/** Prompt template for the "Thumbnail" skill (item 32) -- same @image
+ *  route/model/cost, just steered toward a bold, high-contrast,
+ *  video-cover composition instead of a generic image. */
+const THUMBNAIL_PROMPT_PREFIX =
+  "Bold, high-contrast video thumbnail / cover image, eye-catching composition, clear focal subject, YouTube/social-cover style: ";
 
 const MEDIA_SKILLS: MediaSkillDef[] = [
   {
@@ -403,10 +413,678 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     desc: `Attach a video, type 9:16 / 1:1 / 16:9 -- ${MEDIA_CREDIT_COST.reframe} credits`,
     cost: MEDIA_CREDIT_COST.reframe,
     needsAttachment: true,
-    aspectRatioOptions: ["9:16", "1:1", "16:9"],
+    pickOptions: ["9:16", "1:1", "16:9"],
     placeholder: "Attach a video (max 10s), then type 9:16, 1:1, or 16:9...",
   },
+  {
+    id: "video-upscale",
+    kind: "video-upscale",
+    label: "Upscale video",
+    desc: `Attach a video, type FHD / 2k / 4k -- ${MEDIA_CREDIT_COST["video-upscale"]} credits`,
+    cost: MEDIA_CREDIT_COST["video-upscale"],
+    needsAttachment: true,
+    pickOptions: ["FHD", "2k", "4k"],
+    placeholder: "Attach a video, then type FHD, 2k, or 4k...",
+  },
+  {
+    id: "thumbnail",
+    kind: "image",
+    label: "Thumbnail",
+    desc: `YouTube/video-cover style image -- ${MEDIA_CREDIT_COST.image} credits`,
+    cost: MEDIA_CREDIT_COST.image,
+    placeholder: "Describe the thumbnail (subject, mood, bold text idea)...",
+  },
+  {
+    id: "script",
+    kind: "script",
+    label: "Script generator",
+    desc: `Topic -> scene-by-scene script -- ${MEDIA_CREDIT_COST.script} credits`,
+    cost: MEDIA_CREDIT_COST.script,
+    placeholder: "What's the video about? (e.g. \"3 productivity tips for founders\")",
+  },
+  {
+    id: "sound-effect",
+    kind: "sound-effect",
+    label: "Sound effect",
+    desc: `Describe a sound -- ${MEDIA_CREDIT_COST["sound-effect"]} credits`,
+    cost: MEDIA_CREDIT_COST["sound-effect"],
+    placeholder: "Describe the sound (e.g. \"whoosh, cinematic hit\")...",
+  },
+  {
+    id: "voice-enhance",
+    kind: "voice-enhance",
+    label: "Voice enhance",
+    desc: `Attach audio, remove background noise -- ${MEDIA_CREDIT_COST["voice-enhance"]} credits`,
+    cost: MEDIA_CREDIT_COST["voice-enhance"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an audio/video clip, then send",
+  },
+  {
+    id: "video-bg-remove",
+    kind: "video-bg-remove",
+    label: "Remove video background",
+    desc: `Attach a video, green-screen the background -- ${MEDIA_CREDIT_COST["video-bg-remove"]} credits`,
+    cost: MEDIA_CREDIT_COST["video-bg-remove"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach a video, then send",
+  },
+  {
+    id: "export",
+    kind: "export",
+    label: "Export for platform",
+    desc: `Attach a video, type 16:9 / 9:16 / 1:1 -- ${MEDIA_CREDIT_COST.export} credits`,
+    cost: MEDIA_CREDIT_COST.export,
+    needsAttachment: true,
+    pickOptions: ["16:9", "9:16", "1:1"],
+    placeholder: "Attach a video, then type 16:9, 9:16, or 1:1...",
+  },
+  {
+    id: "virtual-try-on",
+    kind: "virtual-try-on",
+    label: "Virtual try-on",
+    desc: `Attach 2 images: model photo, then garment photo -- ${MEDIA_CREDIT_COST["virtual-try-on"]} credits`,
+    cost: MEDIA_CREDIT_COST["virtual-try-on"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach a model/person photo, then a garment photo, then send",
+  },
+  {
+    id: "remove-object",
+    kind: "inpaint",
+    label: "Remove object",
+    desc: `Attach an image, then paint over what to remove -- ${MEDIA_CREDIT_COST.inpaint} credits`,
+    cost: MEDIA_CREDIT_COST.inpaint,
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an image, then send to open the paint tool",
+  },
+  {
+    id: "outpaint",
+    kind: "inpaint",
+    label: "Extend image (outpaint)",
+    desc: `Attach an image, type Left / Right / Top / Bottom / All sides -- ${MEDIA_CREDIT_COST.inpaint} credits`,
+    cost: MEDIA_CREDIT_COST.inpaint,
+    needsAttachment: true,
+    pickOptions: ["Left", "Right", "Top", "Bottom", "All sides"],
+    placeholder: "Attach an image, then type Left, Right, Top, Bottom, or All sides...",
+  },
 ];
+
+/** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
+ *  see that file for why this can't just be imported here. Used by
+ *  runMediaGeneration below when the composer's Brand toggle is on. */
+function brandSuffix(kit: BrandKit | null): string {
+  if (!kit) return "";
+  const parts: string[] = [];
+  if (kit.primaryColor) parts.push(`primary brand color ${kit.primaryColor}`);
+  if (kit.secondaryColor) parts.push(`secondary brand color ${kit.secondaryColor}`);
+  if (kit.fontFamily) parts.push(`typography in the style of ${kit.fontFamily}`);
+  if (kit.name) parts.push(`consistent with the "${kit.name}" brand`);
+  if (parts.length === 0) return "";
+  return ` -- brand style lock: ${parts.join(", ")}.`;
+}
+
+function hasBrandKitContent(kit: BrandKit | null): boolean {
+  return !!kit && !!(kit.primaryColor || kit.secondaryColor || kit.fontFamily || kit.name || kit.logoUrl);
+}
+
+/** Loads an <img> element for canvas work (Image Outpainting / Object
+ *  Removal, items 26/31) -- crossOrigin "anonymous" so canvas export
+ *  (toDataURL) doesn't throw for same-origin data: URLs (the common
+ *  case -- most attached/generated MediaItem.url values already are
+ *  one) or for a remote host that happens to send CORS headers; a
+ *  remote host that doesn't will still throw a SecurityError, which
+ *  callers surface as a real, honest error rather than silently
+ *  producing a blank mask. */
+function loadImageEl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Couldn't load that image for editing."));
+    img.src = url;
+  });
+}
+
+const OUTPAINT_EXTEND_RATIO = 0.4;
+
+/** Image Outpainting (item 26) -- builds the padded image + auto-mask
+ *  pair FLUX.1 [pro] Fill needs (see lib/media/providers/fal.ts's
+ *  inpaintImage) entirely client-side: a plain canvas resize/pad, no
+ *  free-hand drawing required, unlike Object Removal below. The new
+ *  border area is painted white in the mask (repaint) and the original
+ *  photo's footprint stays black (keep) -- standard FLUX Fill
+ *  convention. */
+async function buildOutpaintPayload(imageUrl: string, direction: string): Promise<{ paddedImageDataUrl: string; maskDataUrl: string }> {
+  const img = await loadImageEl(imageUrl);
+  const extraW = Math.round(img.naturalWidth * OUTPAINT_EXTEND_RATIO);
+  const extraH = Math.round(img.naturalHeight * OUTPAINT_EXTEND_RATIO);
+  const dir = direction.trim().toLowerCase();
+  let padLeft = 0, padRight = 0, padTop = 0, padBottom = 0;
+  if (dir === "left" || dir === "all sides") padLeft = extraW;
+  if (dir === "right" || dir === "all sides") padRight = extraW;
+  if (dir === "top" || dir === "all sides") padTop = extraH;
+  if (dir === "bottom" || dir === "all sides") padBottom = extraH;
+
+  const width = img.naturalWidth + padLeft + padRight;
+  const height = img.naturalHeight + padTop + padBottom;
+
+  const imgCanvas = document.createElement("canvas");
+  imgCanvas.width = width;
+  imgCanvas.height = height;
+  const ictx = imgCanvas.getContext("2d");
+  if (!ictx) throw new Error("Canvas isn't supported in this browser.");
+  ictx.fillStyle = "#808080"; // repainted entirely per the mask below, so this color is irrelevant
+  ictx.fillRect(0, 0, width, height);
+  ictx.drawImage(img, padLeft, padTop);
+
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = width;
+  maskCanvas.height = height;
+  const mctx = maskCanvas.getContext("2d");
+  if (!mctx) throw new Error("Canvas isn't supported in this browser.");
+  mctx.fillStyle = "white";
+  mctx.fillRect(0, 0, width, height);
+  mctx.fillStyle = "black";
+  mctx.fillRect(padLeft, padTop, img.naturalWidth, img.naturalHeight);
+
+  return { paddedImageDataUrl: imgCanvas.toDataURL("image/png"), maskDataUrl: maskCanvas.toDataURL("image/png") };
+}
+
+/** Object Removal (item 31) -- the free-hand counterpart to
+ *  buildOutpaintPayload above. The user brushes over the object; on
+ *  confirm this exports a same-dimension black/white mask (white =
+ *  painted = repaint) for FLUX.1 [pro] Fill. Pointer events (not mouse)
+ *  so it works with touch/pen too. */
+function MaskEditorModal({
+  imageUrl,
+  onCancel,
+  onConfirm,
+}: {
+  imageUrl: string;
+  onCancel: () => void;
+  onConfirm: (maskDataUrl: string) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [brushSize, setBrushSize] = useState(50);
+  const [hasStrokes, setHasStrokes] = useState(false);
+  const strokesRef = useRef<{ x: number; y: number }[]>([]);
+  const drawingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadImageEl(imageUrl)
+      .then((img) => {
+        if (!cancelled) setImgEl(img);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err?.message || "Couldn't load that image for editing.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
+
+  const redraw = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !imgEl) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "rgba(255,0,128,0.55)";
+    for (const p of strokesRef.current) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  useEffect(() => {
+    if (!imgEl || !canvasRef.current) return;
+    canvasRef.current.width = imgEl.naturalWidth;
+    canvasRef.current.height = imgEl.naturalHeight;
+    redraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imgEl]);
+
+  function pointFromEvent(e: React.PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    drawingRef.current = true;
+    strokesRef.current.push(pointFromEvent(e));
+    setHasStrokes(true);
+    redraw();
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    strokesRef.current.push(pointFromEvent(e));
+    redraw();
+  }
+  function stopDrawing() {
+    drawingRef.current = false;
+  }
+
+  function clearMask() {
+    strokesRef.current = [];
+    setHasStrokes(false);
+    redraw();
+  }
+
+  function confirm() {
+    if (!imgEl) return;
+    try {
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = imgEl.naturalWidth;
+      maskCanvas.height = imgEl.naturalHeight;
+      const mctx = maskCanvas.getContext("2d");
+      if (!mctx) throw new Error("Canvas isn't supported in this browser.");
+      mctx.fillStyle = "black";
+      mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+      mctx.fillStyle = "white";
+      for (const p of strokesRef.current) {
+        mctx.beginPath();
+        mctx.arc(p.x, p.y, brushSize / 2, 0, Math.PI * 2);
+        mctx.fill();
+      }
+      onConfirm(maskCanvas.toDataURL("image/png"));
+    } catch (err: any) {
+      setLoadError(err?.message || "Couldn't export the mask -- this image may be blocked by a cross-origin restriction.");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl">
+        <div className="text-[14px] font-semibold text-white mb-1">Paint over the object to remove</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Brush over the object -- the painted area gets removed and filled in naturally (real FLUX.1 [pro] Fill inpainting).
+        </p>
+        {loadError ? (
+          <p className="text-[12px] text-red-400 mb-3">{loadError}</p>
+        ) : !imgEl ? (
+          <p className="text-[12px] text-white/40 mb-3">Loading image...</p>
+        ) : (
+          <div className="rounded-lg overflow-hidden border border-white/10 bg-black/30">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-auto cursor-crosshair touch-none"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={stopDrawing}
+              onPointerLeave={stopDrawing}
+            />
+          </div>
+        )}
+        <div className="mt-3 flex items-center gap-3">
+          <label className="text-[11px] text-white/50 flex items-center gap-2">
+            Brush size
+            <input type="range" min={15} max={150} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} />
+          </label>
+          <button onClick={clearMask} className="ml-auto text-[11px] text-white/50 hover:text-white underline">
+            Clear
+          </button>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onCancel} className="flex-1 h-9 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Cancel
+          </button>
+          <button
+            onClick={confirm}
+            disabled={!hasStrokes}
+            className={`flex-1 h-9 rounded-lg text-[13px] font-semibold transition-colors ${
+              hasStrokes ? "bg-[#FF0080] text-white hover:brightness-110" : "bg-white/10 text-white/30 cursor-not-allowed"
+            }`}
+          >
+            Use this mask
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Brand Kit / Style Lock editor (42-tool spec item 36) -- five plain
+ *  fields, PUT to /api/brand-kit (see lib/brandKit.ts), no new provider
+ *  or npm dep. Logo reuses the same FileReader-to-data-URL pattern
+ *  addMedia() already uses for chat attachments below. */
+function BrandKitModal({
+  kit,
+  onClose,
+  onSaved,
+}: {
+  kit: BrandKit | null;
+  onClose: () => void;
+  onSaved: (kit: BrandKit) => void;
+}) {
+  const [name, setName] = useState(kit?.name || "");
+  const [primaryColor, setPrimaryColor] = useState(kit?.primaryColor || "#FF0080");
+  const [secondaryColor, setSecondaryColor] = useState(kit?.secondaryColor || "");
+  const [fontFamily, setFontFamily] = useState(kit?.fontFamily || "");
+  const [logoUrl, setLogoUrl] = useState(kit?.logoUrl || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/brand-kit", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, primaryColor, secondaryColor, fontFamily, logoUrl }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(data?.error || "Failed to save.");
+        return;
+      }
+      onSaved(data.kit);
+      onClose();
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Brand Kit</div>
+        <p className="text-[11px] text-white/40 mb-4">
+          Applied as a style-lock suffix to image/video/music prompts when the Brand toggle is on -- not a cosmetic label,
+          it's actually appended to what gets sent to the real model.
+        </p>
+        <div className="space-y-2.5">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Brand name"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <div className="flex gap-2">
+            <input
+              value={primaryColor}
+              onChange={(e) => setPrimaryColor(e.target.value)}
+              placeholder="Primary color #FF0080"
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+            />
+            <input
+              value={secondaryColor}
+              onChange={(e) => setSecondaryColor(e.target.value)}
+              placeholder="Secondary color"
+              className="w-1/2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+            />
+          </div>
+          <input
+            value={fontFamily}
+            onChange={(e) => setFontFamily(e.target.value)}
+            placeholder="Font family (e.g. Inter)"
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <label className="flex items-center gap-2 text-[12px] text-white/50 cursor-pointer">
+            <span className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:bg-white/5">Upload logo</span>
+            {logoUrl && <span className="text-[10px] text-white/30">Logo set</span>}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setLogoUrl(typeof reader.result === "string" ? reader.result : "");
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+        {error && <p className="text-[11px] text-red-400 mt-2">{error}</p>}
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 h-9 rounded-lg bg-[#FF0080] text-white text-[13px] font-medium disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ASSET_CATEGORY_LABELS: Record<AssetCategory, string> = { cast: "Cast", setting: "Settings", object: "Objects" };
+
+/** Asset Management / "Ingredients" panel (42-tool spec, layer 2, item
+ *  10) -- save named Cast/Settings/Objects reference images, reuse them
+ *  across generations by attaching one to the active chat (see
+ *  LinearBuilderApp's useAssetAsAttachment), which flows into the same
+ *  firstImageUrl the image/video routes already read for image-to-image
+ *  / image-to-video. GET/POST/DELETE against /api/media-assets (see
+ *  lib/mediaAssets.ts). */
+function AssetsModal({
+  assets,
+  onClose,
+  onCreated,
+  onDeleted,
+  onUse,
+}: {
+  assets: MediaAsset[];
+  onClose: () => void;
+  onCreated: (asset: MediaAsset) => void;
+  onDeleted: (id: string) => void;
+  onUse: (asset: MediaAsset) => void;
+}) {
+  const [tab, setTab] = useState<AssetCategory>("cast");
+  const [name, setName] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function add() {
+    if (!name.trim() || !imageUrl) {
+      setError("Name and a reference image are both required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/media-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: tab, name: name.trim(), referenceImageUrl: imageUrl }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(data?.error || "Failed to save.");
+        return;
+      }
+      onCreated(data.asset);
+      setName("");
+      setImageUrl("");
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id: string) {
+    onDeleted(id);
+    try {
+      await fetch(`/api/media-assets/${id}`, { method: "DELETE" });
+    } catch {
+      // Best-effort -- the row is a per-user convenience list, not
+      // something a failed delete needs to roll back in the UI for.
+    }
+  }
+
+  const shown = assets.filter((a) => a.category === tab);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Asset Management</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Save a character, location, or prop once, then reuse it as a real image-to-image / image-to-video reference
+          instead of re-describing it every time.
+        </p>
+        <div className="flex gap-1 mb-3">
+          {(Object.keys(ASSET_CATEGORY_LABELS) as AssetCategory[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setTab(c)}
+              className={`px-3 py-1 rounded-lg text-[12px] ${
+                tab === c ? "bg-[#FF0080]/15 text-[#FF0080]" : "text-white/50 hover:bg-white/5"
+              }`}
+            >
+              {ASSET_CATEGORY_LABELS[c]}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1.5 mb-3">
+          {shown.length === 0 && <p className="text-[11px] text-white/30">No {ASSET_CATEGORY_LABELS[tab].toLowerCase()} saved yet.</p>}
+          {shown.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 rounded-lg border border-white/10 p-1.5">
+              <img src={a.referenceImageUrl} alt="" className="h-8 w-8 rounded object-cover bg-black/30" />
+              <span className="flex-1 text-[12px] text-white truncate">{a.name}</span>
+              <button
+                onClick={() => {
+                  onUse(a);
+                  onClose();
+                }}
+                className="text-[11px] text-[#FF0080] hover:underline"
+              >
+                Use
+              </button>
+              <button onClick={() => remove(a.id)} className="text-[11px] text-white/30 hover:text-red-400">
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={`New ${ASSET_CATEGORY_LABELS[tab].toLowerCase().replace(/s$/, "")} name`}
+            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-[#FF0080]/50"
+          />
+          <label className="px-2.5 py-2 rounded-lg border border-white/10 text-[11px] text-white/50 hover:bg-white/5 cursor-pointer whitespace-nowrap">
+            {imageUrl ? "Image set" : "Upload image"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setImageUrl(typeof reader.result === "string" ? reader.result : "");
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
+        {error && <p className="text-[11px] text-red-400 mb-2">{error}</p>}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={add}
+            disabled={saving}
+            className="flex-1 h-9 rounded-lg bg-[#FF0080] text-white text-[13px] font-medium disabled:opacity-50"
+          >
+            {saving ? "Saving..." : `Save to ${ASSET_CATEGORY_LABELS[tab]}`}
+          </button>
+          <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Template System (42-tool spec, layer 6, item 37) -- lists a user's
+ *  saved composer states (skill + prompt/pick-value), reload one with
+ *  "Use". Saving happens inline in the composer (see ChatCenter's
+ *  saveCurrentAsTemplate) rather than from this modal -- it always
+ *  saves *the current* skill+prompt, so there's nothing else to fill in
+ *  here. */
+function TemplatesModal({
+  templates,
+  onClose,
+  onUse,
+  onRemove,
+}: {
+  templates: MediaTemplate[];
+  onClose: () => void;
+  onUse: (t: MediaTemplate) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#15151a] p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-[14px] font-semibold text-white mb-1">Templates</div>
+        <p className="text-[11px] text-white/40 mb-3">
+          Saved skill + prompt combos -- pick a Media Factory skill, type a prompt, then hit "Save as template" next to
+          it to add one.
+        </p>
+        <div className="max-h-64 overflow-y-auto space-y-1.5">
+          {templates.length === 0 && <p className="text-[11px] text-white/30">No templates saved yet.</p>}
+          {templates.map((t) => {
+            const skill = MEDIA_SKILLS.find((s) => s.id === t.skillId);
+            return (
+              <div key={t.id} className="flex items-center gap-2 rounded-lg border border-white/10 p-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] text-white truncate">{t.name}</div>
+                  <div className="text-[10px] text-white/35 truncate">
+                    {skill?.label || t.skillId} -- {t.prompt}
+                  </div>
+                </div>
+                <button onClick={() => onUse(t)} className="text-[11px] text-[#FF0080] hover:underline shrink-0">
+                  Use
+                </button>
+                <button onClick={() => onRemove(t.id)} className="text-[11px] text-white/30 hover:text-red-400 shrink-0">
+                  Remove
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full h-9 rounded-lg border border-white/10 text-white/60 text-[13px] hover:bg-white/5"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const PROGRAM_ACTION_TYPES = [
   "Find leads on Twitter",
@@ -759,7 +1437,28 @@ function MessageBubble({
  *  player, or a transcript + .vtt download for captions), or the error
  *  the route returned (credits are always refunded server-side on
  *  failure -- see lib/media/service.ts's markFailed). */
+/** Kinds worth showing in the public Flow TV gallery (see app/flow-tv)
+ *  -- excludes captions/script, which are text-shaped, not visual/audio
+ *  media (same list as lib/flowTv.ts's GALLERY_KINDS -- keep in sync). */
+const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance", "video-bg-remove", "inpaint"];
+
 function MediaResultCard({ media }: { media: MediaMsgState }) {
+  const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  async function publish() {
+    if (!media.genId) return;
+    setPublishing(true);
+    try {
+      const res = await fetch(`/api/media/${media.genId}/publish`, { method: "POST" });
+      if (res.ok) setPublished(true);
+    } catch {
+      // Best-effort -- the user can just try the button again.
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   return (
     <div className="mt-1 rounded-xl border border-white/10 bg-white/[0.03] p-3 max-w-sm">
       <div className="flex items-center gap-2 text-[10px] text-white/40 mb-2">
@@ -788,20 +1487,35 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           )}
         </div>
       )}
-      {media.status === "done" && media.kind !== "captions" && media.url && (
+      {media.status === "done" && media.kind === "script" && media.transcript && (
+        <p className="text-[12px] text-white/70 whitespace-pre-wrap">{media.transcript}</p>
+      )}
+      {media.status === "done" && media.kind !== "captions" && media.kind !== "script" && media.url && (
         <>
-          {(media.kind === "image" || media.kind === "edit") && (
+          {(media.kind === "image" || media.kind === "edit" || media.kind === "virtual-try-on" || media.kind === "inpaint") && (
             <img src={media.url} alt="" className="rounded-lg max-h-64 w-full object-contain bg-black/30" />
           )}
-          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe") && (
+          {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale" || media.kind === "video-bg-remove" || media.kind === "export") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
-          {(media.kind === "tts" || media.kind === "voice-clone") && (
+          {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music" || media.kind === "sound-effect" || media.kind === "voice-enhance") && (
             <audio src={media.url} controls className="w-full" />
           )}
-          <a href={media.url} download className="mt-2 inline-block text-[11px] text-[#FF0080] hover:underline">
-            Download
-          </a>
+          <div className="mt-2 flex items-center gap-3">
+            <a href={media.url} download className="text-[11px] text-[#FF0080] hover:underline">
+              Download
+            </a>
+            {media.genId && FLOW_TV_ELIGIBLE_KINDS.includes(media.kind) && (
+              <button
+                onClick={publish}
+                disabled={publishing || published}
+                title="Publish this to the public Flow TV gallery (see /flow-tv) -- shows your exact prompt, anyone can remix it"
+                className="text-[11px] text-white/40 hover:text-white disabled:opacity-60"
+              >
+                {published ? "Published to Flow TV" : publishing ? "Publishing..." : "Publish to Flow TV"}
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -1806,10 +2520,16 @@ function ChatCenter({
   tier,
   onChangeTier,
   initialInput,
+  brandOn,
+  onToggleBrand,
+  hasBrandKit,
+  onOpenBrandSettings,
+  onOpenAssets,
+  initialMediaSkillId,
 }: {
   chat: Chat | null;
   media: MediaItem[];
-  onSend: (text: string, mediaIds: string[], mediaSkillId?: string) => void;
+  onSend: (text: string, mediaIds: string[], mediaSkillId?: string, batchCount?: number, maskDataUrl?: string) => void;
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -1823,12 +2543,86 @@ function ChatCenter({
   tier: ModelTier;
   onChangeTier: (t: ModelTier) => void;
   initialInput?: string;
+  /** Brand Kit / Style Lock toggle (42-tool spec item 36) -- state lives
+   *  in LinearBuilderApp (see brandKit/brandOn there) since it's a
+   *  per-user setting, not per-chat; runMediaGeneration reads it via
+   *  closure rather than through onSend. */
+  brandOn: boolean;
+  onToggleBrand: () => void;
+  hasBrandKit: boolean;
+  onOpenBrandSettings: () => void;
+  /** Opens AssetsModal (Cast/Settings/Objects, item 10) -- see
+   *  LinearBuilderApp's assets state + useAssetAsAttachment. */
+  onOpenAssets: () => void;
+  initialMediaSkillId?: string;
 }) {
   const [input, setInput] = useState(initialInput || "");
   const [showSchedule, setShowSchedule] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(null);
+  const [pickedMedia, setPickedMedia] = useState<MediaSkillDef | null>(() =>
+    initialMediaSkillId ? MEDIA_SKILLS.find((s) => s.kind === initialMediaSkillId) || null : null
+  );
+  /** Batch Generation (42-tool spec item 35) -- run the same prompt N
+   *  times in one send, producing N independent result cards/credit
+   *  charges instead of one. Scoped to image generation only (the
+   *  synchronous, cheapest-per-unit skill, and the one where "give me a
+   *  few options" is the real, common use case) rather than every kind. */
+  const [batchCount, setBatchCount] = useState<1 | 2 | 4>(1);
+  useEffect(() => {
+    if (pickedMedia?.kind !== "image") setBatchCount(1);
+  }, [pickedMedia]);
+  /** Object Removal (item 31) -- submit() opens MaskEditorModal instead
+   *  of sending on the first click (see below); the drawn mask is held
+   *  here until the user clicks Send again to actually submit. Reset
+   *  whenever a different skill is picked so a leftover mask from a
+   *  previous attempt can't leak into an unrelated send. */
+  const [maskDataUrl, setMaskDataUrl] = useState<string | null>(null);
+  const [showMaskEditor, setShowMaskEditor] = useState(false);
+  useEffect(() => {
+    if (pickedMedia?.id !== "remove-object") setMaskDataUrl(null);
+  }, [pickedMedia]);
   const [mediaError, setMediaError] = useState("");
+  const [templates, setTemplates] = useState<MediaTemplate[]>([]);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/media-templates")
+      .then((r) => r.json())
+      .then((d) => setTemplates(d?.templates || []))
+      .catch(() => {});
+  }, []);
+
+  /** Saves the composer's current skill+prompt as a reusable Template
+   *  (see TemplatesModal above) -- always saves what's live right now,
+   *  so there's no separate "new template" form to fill in. */
+  function saveCurrentAsTemplate() {
+    if (!pickedMedia || !input.trim()) return;
+    const name = window.prompt("Name this template:");
+    if (!name) return;
+    fetch("/api/media-templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, skillId: pickedMedia.id, prompt: input.trim() }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.template) setTemplates((prev) => [d.template, ...prev]);
+      })
+      .catch(() => {});
+  }
+
+  function useTemplate(t: MediaTemplate) {
+    const skill = MEDIA_SKILLS.find((s) => s.id === t.skillId);
+    if (skill) setPickedMedia(skill);
+    setInput(t.prompt);
+    setMediaError("");
+    setShowTemplatesModal(false);
+  }
+
+  function removeTemplate(id: string) {
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+    fetch(`/api/media-templates/${id}`, { method: "DELETE" }).catch(() => {});
+  }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1848,22 +2642,36 @@ function ChatCenter({
         setMediaError("Attach a file first.");
         return;
       }
+      if (pickedMedia.kind === "virtual-try-on" && chatMedia.filter((m) => m.type === "image").length < 2) {
+        setMediaError("Attach two images: a model/person photo, then a garment photo.");
+        return;
+      }
       if (pickedMedia.kind === "avatar" && !text.includes("|")) {
         setMediaError("Format: avatarId | script");
         return;
       }
-      if (pickedMedia.aspectRatioOptions && !pickedMedia.aspectRatioOptions.includes(text.trim())) {
-        setMediaError(`Type one of: ${pickedMedia.aspectRatioOptions.join(", ")}`);
+      if (pickedMedia.pickOptions && !pickedMedia.pickOptions.includes(text.trim())) {
+        setMediaError(`Type one of: ${pickedMedia.pickOptions.join(", ")}`);
         return;
       }
       if (pickedMedia.needsText !== false && !text) {
         setMediaError("Type a prompt first.");
         return;
       }
-      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id);
+      // Object Removal (item 31): the first Send opens the paint tool
+      // instead of submitting -- there's nothing to send yet until a
+      // mask exists. Once MaskEditorModal's onConfirm stores one below,
+      // a second Send actually submits with it attached.
+      if (pickedMedia.id === "remove-object" && !maskDataUrl) {
+        setShowMaskEditor(true);
+        return;
+      }
+      onSend(text, chatMedia.map((m) => m.id), pickedMedia.id, pickedMedia.kind === "image" ? batchCount : 1, maskDataUrl || undefined);
       setInput("");
       setMediaError("");
       setPickedMedia(null);
+      setBatchCount(1);
+      setMaskDataUrl(null);
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
@@ -1965,20 +2773,54 @@ function ChatCenter({
             <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-[#FF0080]/30 bg-[#FF0080]/10 px-2.5 py-1.5 text-[11px] text-white/80">
               <span className="font-semibold text-[#FF0080]">Media Factory:</span>
               <span>
-                {pickedMedia.label} -- {pickedMedia.cost} credits
+                {pickedMedia.label} -- {pickedMedia.cost * (pickedMedia.kind === "image" ? batchCount : 1)} credits
+                {pickedMedia.kind === "image" && batchCount > 1 ? ` (${batchCount}x)` : ""}
+                {pickedMedia.id === "remove-object" && maskDataUrl ? " -- mask ready, send again to submit" : ""}
               </span>
+              {pickedMedia.kind === "image" && (
+                <button
+                  onClick={() => setBatchCount((n) => (n === 1 ? 2 : n === 2 ? 4 : 1))}
+                  title="Generate multiple variations from the same prompt in one send"
+                  className="rounded-md border border-white/15 px-1.5 py-0.5 text-[10px] text-white/60 hover:text-white hover:border-white/30"
+                >
+                  Batch: {batchCount}x
+                </button>
+              )}
+              {input.trim() && (
+                <button onClick={saveCurrentAsTemplate} className="ml-auto text-white/50 hover:text-white underline">
+                  Save as template
+                </button>
+              )}
               <button
                 onClick={() => {
                   setPickedMedia(null);
                   setMediaError("");
                 }}
-                className="ml-auto text-white/40 hover:text-white"
+                className={input.trim() ? "text-white/40 hover:text-white" : "ml-auto text-white/40 hover:text-white"}
               >
                 &times;
               </button>
             </div>
           )}
           {mediaError && <div className="mb-1.5 text-[11px] text-red-400">{mediaError}</div>}
+      {showTemplatesModal && (
+        <TemplatesModal
+          templates={templates}
+          onClose={() => setShowTemplatesModal(false)}
+          onUse={useTemplate}
+          onRemove={removeTemplate}
+        />
+      )}
+      {showMaskEditor && chatMedia.find((m) => m.type === "image") && (
+        <MaskEditorModal
+          imageUrl={chatMedia.find((m) => m.type === "image")!.url}
+          onCancel={() => setShowMaskEditor(false)}
+          onConfirm={(dataUrl) => {
+            setMaskDataUrl(dataUrl);
+            setShowMaskEditor(false);
+          }}
+        />
+      )}
           <div
             className={`rounded-2xl border bg-white/[0.03] px-3 py-2.5 transition-shadow ${
               dragOver ? "border-[#FF0080]/60 shadow-[0_0_0_3px_rgba(255,0,128,0.15)]" : "border-white/10 focus-within:border-[#FF0080]/50 focus-within:shadow-[0_0_0_3px_rgba(255,0,128,0.12)]"
@@ -2033,6 +2875,40 @@ function ChatCenter({
                   setMediaError("");
                 }}
               />
+              <button
+                onClick={onToggleBrand}
+                title={
+                  hasBrandKit
+                    ? "Apply your Brand Kit's colors/font as a style-lock suffix to image/video/music prompts"
+                    : "Set up a Brand Kit first (gear icon) -- nothing to apply yet"
+                }
+                className={`h-7 px-2 flex items-center gap-1 rounded-lg text-[12px] transition-colors ${
+                  brandOn ? "bg-[#FF0080]/15 text-[#FF0080]" : "text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                Brand{brandOn ? " ON" : ""}
+              </button>
+              <button
+                onClick={onOpenBrandSettings}
+                title="Edit Brand Kit"
+                className="h-7 px-2 flex items-center justify-center rounded-lg text-white/40 hover:text-white hover:bg-white/10 text-[11px]"
+              >
+                Edit
+              </button>
+              <button
+                onClick={onOpenAssets}
+                title="Cast / Settings / Objects -- reuse a saved reference image"
+                className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
+              >
+                Assets
+              </button>
+              <button
+                onClick={() => setShowTemplatesModal(true)}
+                title="Saved skill + prompt combos"
+                className="h-7 px-2 flex items-center gap-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-[12px] transition-colors"
+              >
+                Templates
+              </button>
               {showSchedule && (
                 <SchedulePicker
                   onClose={() => setShowSchedule(false)}
@@ -2091,6 +2967,15 @@ interface LinearBuilderAppProps {
   userName?: string;
   userEmail?: string | null;
   credits?: number;
+  /** Real Brand Kit row from getBrandKit() in page.tsx (see
+   *  lib/brandKit.ts) -- null for a logged-out visitor or a user who
+   *  hasn't set one up yet. */
+  initialBrandKit?: BrandKit | null;
+  /** From Flow TV's Remix button (see app/flow-tv/FlowTvCard.tsx and
+   *  page.tsx's ?remixSkill=) -- pre-selects a Media Factory skill
+   *  alongside initialPrompt, so remixing a video generation actually
+   *  reopens the @video skill instead of just prefilling plain text. */
+  initialMediaSkillId?: string;
 }
 
 export default function LinearBuilderApp({
@@ -2106,6 +2991,8 @@ export default function LinearBuilderApp({
   userName = "there",
   userEmail = null,
   credits = 0,
+  initialBrandKit = null,
+  initialMediaSkillId,
 }: LinearBuilderAppProps) {
   const [state, setState] = useLinearStore();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2115,9 +3002,21 @@ export default function LinearBuilderApp({
   const [rightMode, setRightMode] = useState<"artifact" | "program">("artifact");
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL);
   const [tier, setTier] = useState<ModelTier>("fast");
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(initialBrandKit);
+  const [brandOn, setBrandOn] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [showAssetsModal, setShowAssetsModal] = useState(false);
   const resizing = useRef(false);
   const router = useRouter();
   const hydrated = useRef(false);
+
+  useEffect(() => {
+    fetch("/api/media-assets")
+      .then((r) => r.json())
+      .then((d) => setAssets(d?.assets || []))
+      .catch(() => {});
+  }, []);
 
   const activeChat = state.chats.find((c) => c.id === state.activeChatId) || null;
   const activeArtifact = activeChat?.artifactId ? state.artifacts[activeChat.artifactId] : null;
@@ -2241,6 +3140,23 @@ export default function LinearBuilderApp({
 
   function renameChat(id: string, title: string) {
     setState((s) => ({ ...s, chats: s.chats.map((c) => (c.id === id ? { ...c, title } : c)) }));
+  }
+
+  /** Attaches a saved Cast/Settings/Object (see AssetsModal) to the
+   *  active chat exactly like a freshly-dropped file would -- it then
+   *  flows through the same chatMedia/firstImageUrl path addMedia()
+   *  populates below, so @image (image-to-image) and @video
+   *  (image-to-video) pick it up with zero extra plumbing. */
+  function useAssetAsAttachment(asset: MediaAsset) {
+    if (!activeChat) return;
+    const item: MediaItem = {
+      id: uid("media"),
+      chatId: activeChat.id,
+      url: asset.referenceImageUrl,
+      type: "image",
+      name: asset.name,
+    };
+    setState((s) => ({ ...s, media: [...s.media, item] }));
   }
 
   function addMedia(files: FileList) {
@@ -2500,7 +3416,7 @@ export default function LinearBuilderApp({
    *  Media Factory skill (see MEDIA_SKILLS), shows a live-updating
    *  generation card in the assistant bubble, and polls to completion
    *  for async kinds. Redirects on 401/402 exactly like runGeneration. */
-  async function runMediaGeneration(chatId: string, text: string, mediaIds: string[], skill: MediaSkillDef) {
+  async function runMediaGeneration(chatId: string, text: string, mediaIds: string[], skill: MediaSkillDef, maskDataUrl?: string) {
     const msgId = uid("msg");
     const placeholderMedia: MediaMsgState = { kind: skill.kind, label: skill.label, cost: skill.cost, status: "processing" };
     setState((s) => ({
@@ -2528,9 +3444,13 @@ export default function LinearBuilderApp({
     const firstImageUrl = attached.find((m) => m.type === "image")?.url;
     const firstVideoUrl = attached.find((m) => m.type === "video")?.url;
     const firstAnyUrl = attached[0]?.url;
+    const attachedImageUrls = attached.filter((m) => m.type === "image").map((m) => m.url);
 
     let body: Record<string, unknown> = {};
-    if (skill.kind === "image") body = { prompt: text };
+    if (skill.kind === "image") {
+      const prompt = skill.id === "thumbnail" ? `${THUMBNAIL_PROMPT_PREFIX}${text}` : text;
+      body = { prompt, referenceImageUrl: firstImageUrl };
+    }
     else if (skill.kind === "video") body = { prompt: text, imageUrl: firstImageUrl };
     else if (skill.kind === "avatar") {
       const idx = text.indexOf("|");
@@ -2541,6 +3461,38 @@ export default function LinearBuilderApp({
     else if (skill.kind === "music") body = { prompt: text };
     else if (skill.kind === "edit") body = { imageUrl: firstImageUrl, op: skill.op };
     else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
+    else if (skill.kind === "video-upscale") body = { videoUrl: firstVideoUrl || firstAnyUrl, resolution: text.trim() };
+    else if (skill.kind === "script") body = { topic: text };
+    else if (skill.kind === "sound-effect") body = { text };
+    else if (skill.kind === "voice-enhance") body = { audioUrl: firstAnyUrl };
+    else if (skill.kind === "video-bg-remove") body = { videoUrl: firstVideoUrl || firstAnyUrl };
+    else if (skill.kind === "export") body = { videoUrl: firstVideoUrl || firstAnyUrl, preset: text.trim() };
+    else if (skill.kind === "virtual-try-on") body = { modelImageUrl: attachedImageUrls[0], garmentImageUrl: attachedImageUrls[1] };
+    else if (skill.kind === "inpaint" && skill.id === "remove-object") {
+      body = { imageUrl: firstImageUrl, maskUrl: maskDataUrl };
+    } else if (skill.kind === "inpaint" && skill.id === "outpaint") {
+      // Image Outpainting (item 26): build the padded image + auto-mask
+      // client-side (see buildOutpaintPayload above) before this
+      // generation's real request goes out -- a canvas/load failure
+      // here (e.g. a cross-origin image) fails the message the same way
+      // a provider error would, without ever hitting the API or
+      // spending a credit.
+      try {
+        const { paddedImageDataUrl, maskDataUrl: outpaintMask } = await buildOutpaintPayload(firstImageUrl || firstAnyUrl || "", text.trim());
+        body = {
+          imageUrl: paddedImageDataUrl,
+          maskUrl: outpaintMask,
+          prompt: "Naturally extend the scene, seamlessly continuing the existing image, photorealistic, high detail.",
+        };
+      } catch (err: any) {
+        updateMediaMessage(chatId, msgId, { status: "failed", error: err?.message }, err?.message || "Couldn't prepare that image for outpainting.");
+        return;
+      }
+    }
+
+    if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
+      body.prompt = body.prompt + brandSuffix(brandKit);
+    }
 
     try {
       const res = await fetch(`/api/media/${skill.kind}`, {
@@ -2573,21 +3525,25 @@ export default function LinearBuilderApp({
         return;
       }
       const url = data.url ?? data.audioUrl;
-      updateMediaMessage(chatId, msgId, { status: "done", url, transcript: data.text }, "Done -- ready below.");
+      updateMediaMessage(chatId, msgId, { status: "done", url, transcript: data.text, genId: data.id }, "Done -- ready below.");
       router.refresh();
     } catch (err: any) {
       updateMediaMessage(chatId, msgId, { status: "failed", error: err?.message }, "Network error. Try again.");
     }
   }
 
-  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string) {
+  function sendMessage(text: string, mediaIds: string[], mediaSkillId?: string, batchCount: number = 1, maskDataUrl?: string) {
     if (!activeChat) return;
     const chatId = activeChat.id;
     const mediaSkill = mediaSkillId ? MEDIA_SKILLS.find((s) => s.id === mediaSkillId) : undefined;
+    // Batch Generation (item 35): clamp regardless of what the composer
+    // sent, and only meaningful for image (matches the composer's own
+    // kind === "image" gate on the batch toggle).
+    const count = mediaSkill?.kind === "image" ? Math.max(1, Math.min(4, Math.round(batchCount))) : 1;
     const userMsg: ChatMessage = {
       id: uid("msg"),
       role: "user",
-      content: text || (mediaSkill ? `[${mediaSkill.label}]` : ""),
+      content: (text || (mediaSkill ? `[${mediaSkill.label}]` : "")) + (count > 1 ? ` (batch of ${count})` : ""),
       createdAt: Date.now(),
       mediaIds: mediaIds.length ? mediaIds : undefined,
     };
@@ -2640,7 +3596,13 @@ export default function LinearBuilderApp({
     }
 
     if (mediaSkill) {
-      runMediaGeneration(chatId, text, mediaIds, mediaSkill);
+      // Fire all N generations concurrently -- each call creates its own
+      // placeholder message, its own credit deduction, and its own
+      // independent success/failure, exactly like N separate sends would,
+      // just issued in one go instead of one at a time.
+      for (let i = 0; i < count; i++) {
+        runMediaGeneration(chatId, text, mediaIds, mediaSkill, maskDataUrl);
+      }
     } else {
       runGeneration(chatId, text, firstImage);
     }
@@ -2682,7 +3644,25 @@ export default function LinearBuilderApp({
         tier={tier}
         onChangeTier={setTier}
         initialInput={!initialHtml ? initialPrompt : undefined}
+        initialMediaSkillId={initialMediaSkillId}
+        brandOn={brandOn}
+        onToggleBrand={() => setBrandOn((o) => !o)}
+        hasBrandKit={hasBrandKitContent(brandKit)}
+        onOpenBrandSettings={() => setShowBrandModal(true)}
+        onOpenAssets={() => setShowAssetsModal(true)}
       />
+      {showBrandModal && (
+        <BrandKitModal kit={brandKit} onClose={() => setShowBrandModal(false)} onSaved={setBrandKit} />
+      )}
+      {showAssetsModal && (
+        <AssetsModal
+          assets={assets}
+          onClose={() => setShowAssetsModal(false)}
+          onCreated={(a) => setAssets((prev) => [a, ...prev])}
+          onDeleted={(id) => setAssets((prev) => prev.filter((a) => a.id !== id))}
+          onUse={useAssetAsAttachment}
+        />
+      )}
 
       {rightOpen &&
         (rightMode === "program" && activeProgram ? (
