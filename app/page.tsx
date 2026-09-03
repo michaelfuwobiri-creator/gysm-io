@@ -80,10 +80,10 @@ function AppLogo({ name, className }: { name: string; className?: string }) {
 // object-cover" /> into that div in place of the placeholder <span> once
 // photography is ready -- everything else (overlap, shadow, copy) is final.
 const STORY_CARDS = [
-  { align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", title: "for the founders.", sub: "prompt to product // auth, database, payments, live preview", placeholder: "Founder photo -- drop in real photography here" },
-  { align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", title: "for the shippers.", sub: "ship in one click // idea to production", placeholder: "Launch / motion photo -- drop in real photography here" },
-  { align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", title: "for the agencies.", sub: "client portals // white-label SaaS factory", placeholder: "Skyline / architecture photo -- drop in real photography here" },
-  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here" },
+  { align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", title: "for the founders.", sub: "prompt to product // auth, database, payments, live preview", placeholder: "Founder photo -- drop in real photography here", image: "/media/story-founders.jpg" },
+  { align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", title: "for the shippers.", sub: "ship in one click // idea to production", placeholder: "Launch / motion photo -- drop in real photography here", image: "/media/story-shippers.jpg" },
+  { align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", title: "for the agencies.", sub: "client portals // white-label SaaS factory", placeholder: "Skyline / architecture photo -- drop in real photography here", image: "/media/story-agencies.jpg" },
+  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here", image: null },
 ];
 
 const INDEX_SECTIONS = [
@@ -319,8 +319,9 @@ export default function Page() {
             </button>
           </div>
 
-          {/* 4 overlapping story cards -- image slots are placeholders, see
-              the comment on STORY_CARDS above for how to drop in real photos. */}
+          {/* 4 overlapping story cards. Founders + agencies now use Mike's
+              own supplied photos; shippers + indie hackers still fall back to
+              the gradient placeholder until those two are sent over. */}
           <div className="relative mt-20">
             <div className="space-y-7 md:space-y-[-84px]">
               {STORY_CARDS.map((card, i) => (
@@ -329,8 +330,12 @@ export default function Page() {
                   className={`group relative w-full md:w-[76%] ${card.align === "left" ? "md:mr-auto" : "md:ml-auto"}`}
                   style={{ zIndex: 10 + i }}
                 >
-                  <div className={`relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] bg-gradient-to-br ${card.gradient} grid place-items-center transition duration-500 group-hover:scale-[1.01]`}>
-                    <span className="px-8 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-black/40">{card.placeholder}</span>
+                  <div className={`relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] ${card.image ? "" : `bg-gradient-to-br ${card.gradient}`} grid place-items-center transition duration-500 group-hover:scale-[1.01]`}>
+                    {card.image ? (
+                      <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                    ) : (
+                      <span className="px-8 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-black/40">{card.placeholder}</span>
+                    )}
                   </div>
                   <div className={`relative -mt-16 max-w-[320px] rounded-[20px] border border-black/5 bg-white p-6 shadow-lg ${card.align === "left" ? "ml-8" : "ml-auto mr-8"}`}>
                     <div className="text-[20px] font-bold leading-[1.1]">{card.title}</div>
