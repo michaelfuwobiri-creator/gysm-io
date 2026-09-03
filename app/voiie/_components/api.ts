@@ -24,3 +24,14 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) throw new ApiError(json?.error ?? `Request to ${path} failed (${res.status})`);
   return json as T;
 }
+
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(json?.error ?? `Request to ${path} failed (${res.status})`);
+  return json as T;
+}

@@ -1,18 +1,22 @@
 import { NextRequest } from "next/server";
-import { sql } from "@/lib/db";
+import { listDueRenewals, markRenewalStatus } from "@/lib/voiie/db";
+import { createRenewalCheckoutLink } from "@/lib/voiie/billing";
+import { sendWhatsAppText } from "@/lib/voiie/whatsapp";
+
+const RENEWAL_LABEL: Record<string, string> = {
+  domain: "Domain + hosting renewal",
+  hosting: "Hosting renewal",
+  upgrade: "Plan upgrade",
+  repair: "Site repair",
+  add_feature: "Add feature",
+};
 
 /**
- * Renewal/upgrade nudges for converted VOIIE customers.
- *
- * v1 scope note: VOIIE's plans (lib/stripe.ts's voiie_* entries) are
- * one-time Checkout payments, not Stripe subscriptions -- see
- * lib/voiie/billing.ts -- so there's no subscription renewal date on
- * file yet to act on here. This route is wired up (cron entry in
- * vercel.json, CRON_SECRET-gated like cron/hunt) so the schedule exists
- * and this is the one place to extend, but it intentionally does nothing
- * destructive until real renewal tracking is added: e.g. a
- * `voiie_leads.plan_expires_at` column set at conversion time, swept here
- * to WhatsApp/email a renewal offer as it approaches.
+ * Daily sweep (vercel.json cron) over voiie_renewals rows due in the next
+ * 30 days that haven't been sent yet: sends a WhatsApp reminder with a
+ * Stripe checkout link (falls back to just logging it if the customer has
+ * no phone on file) and flips status pending -> sent so the same renewal
+ * doesn't get re-sent every day until it's paid or its due_date passes.
  */
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -20,19 +24,37 @@ export async function GET(req: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  try {
-    const rows = await sql`
-      select count(*)::int as converted from voiie_leads where status = 'converted'
-    `;
-    return Response.json({
-      ok: true,
-      convertedCustomers: (rows[0] as any)?.converted ?? 0,
-      note: "No renewal date tracking configured yet -- see this file's comment to extend.",
-    });
-  } catch (error: any) {
-    console.error("[voiie/cron/renewals] failed:", error.message);
-    return Response.json({ ok: false, error: error.message }, { status: 500 });
+  const due = await listDueRenewals(30);
+  const results: { renewalId: string; ok: boolean; error?: string }[] = [];
+
+  for (const { renewal, customer, contactPhone } of due) {
+    try {
+      const label = `${RENEWAL_LABEL[renewal.type] ?? "Renewal"} — ${customer.business_name}`;
+      const { url, sessionId } = await createRenewalCheckoutLink({
+        renewalId: renewal.id,
+        customerId: customer.id,
+        label,
+        amountCents: renewal.amount_cents,
+      });
+
+      if (contactPhone) {
+        await sendWhatsAppText(
+          contactPhone,
+          `Hey ${customer.business_name}! Your ${label.toLowerCase()} for ${customer.gysm_subdomain} is due soon. Renew here: ${url}`
+        );
+      } else {
+        console.warn(`[voiie/cron/renewals] customer ${customer.id} has no phone on file -- link generated but not sent:`, url);
+      }
+
+      await markRenewalStatus(renewal.id, "sent", sessionId);
+      results.push({ renewalId: renewal.id, ok: true });
+    } catch (error: any) {
+      console.error(`[voiie/cron/renewals] failed for renewal ${renewal.id}:`, error.message);
+      results.push({ renewalId: renewal.id, ok: false, error: error.message });
+    }
   }
+
+  return Response.json({ ok: true, due: due.length, results });
 }
 
 export const dynamic = "force-dynamic";

@@ -51,12 +51,20 @@ export interface LeadAnswers {
 export type LeadStatus =
   | "new"
   | "contacted"
+  | "replied"
   | "consulting"
   | "demo_sent"
+  | "viewed"
   | "negotiating"
   | "paid"
   | "converted"
+  | "deployed"
   | "lost";
+
+export type CustomerStatus = "active" | "renewal_due" | "churned";
+export type RenewalType = "domain" | "hosting" | "upgrade" | "repair" | "add_feature";
+export type RenewalStatus = "pending" | "sent" | "paid";
+export type SupportTicketStatus = "open" | "in_progress" | "resolved";
 
 export type Platform = "twitter" | "threads" | "manual";
 export type OutreachChannel = "twitter" | "whatsapp" | "email";
@@ -106,6 +114,62 @@ export interface VoiieLead {
   stripe_checkout_session_id: string | null;
   converted_user_id: string | null;
   converted_at: string | null;
+  tags: string[];
+  do_not_contact: boolean;
+  demo_viewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Hunt-safety controls, one row per operator -- backs the Hunter panel's
+ *  "Anti-spam" section for real (daily cap, blacklist, spintax, kill
+ *  switch), rather than those toggles being cosmetic. */
+export interface VoiieSettings {
+  owner_user_id: string;
+  daily_hunt_limit: number;
+  spintax_enabled: boolean;
+  kill_switch: boolean;
+  blacklist: string[];
+  updated_at: string;
+}
+
+/** The renewal-relevant extension of a converted lead -- see
+ *  db/migrations/0017_voiie_v2.sql for why this doesn't duplicate
+ *  users/projects/subscriptions. */
+export interface VoiieCustomer {
+  id: string;
+  lead_id: string;
+  owner_user_id: string;
+  converted_user_id: string;
+  business_name: string;
+  slug: string;
+  gysm_subdomain: string;
+  custom_domain: string | null;
+  plan_id: VoiiePlanId;
+  brand_kit: { logoUrl?: string; colors?: string[]; theme?: string };
+  status: CustomerStatus;
+  expiry_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VoiieRenewal {
+  id: string;
+  customer_id: string;
+  type: RenewalType;
+  amount_cents: number;
+  status: RenewalStatus;
+  due_date: string;
+  stripe_checkout_session_id: string | null;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface VoiieSupportTicket {
+  id: string;
+  customer_id: string;
+  issue: string;
+  status: SupportTicketStatus;
   created_at: string;
   updated_at: string;
 }

@@ -4,7 +4,7 @@
 // (the "Hunt Now" button) and the Vercel Cron hitting
 // app/api/voiie/cron/hunt/route.ts on a schedule (see vercel.json).
 
-import { createLeadIfNew } from "@/lib/voiie/db";
+import { countLeadsHuntedToday, createLeadIfNew, getSettings } from "@/lib/voiie/db";
 import { searchTweets } from "@/lib/voiie/twitter";
 import { searchThreads } from "@/lib/voiie/threads";
 import { DEFAULT_HUNT_QUERY } from "@/lib/voiie/constants";
@@ -79,6 +79,14 @@ export interface HuntResult {
   scanned: number;
   newLeadsCreated: number;
   leadIds: string[];
+  skippedReason?: "kill_switch" | "daily_limit_reached";
+}
+
+/** Handle without the leading @, lowercased -- how both the blacklist and
+ *  Twitter/Threads handles are compared, so a blacklist entry works
+ *  whether it was typed as "@spamvictim" or "spamvictim". */
+function normalizeHandle(handle: string): string {
+  return handle.replace(/^@/, "").toLowerCase();
 }
 
 export async function huntClients(params: {
@@ -86,10 +94,26 @@ export async function huntClients(params: {
   query?: string;
   platforms?: Platform[];
 }): Promise<HuntResult> {
+  const settings = await getSettings(params.ownerUserId);
+
+  if (settings.kill_switch) {
+    return { scanned: 0, newLeadsCreated: 0, leadIds: [], skippedReason: "kill_switch" };
+  }
+
+  const alreadyToday = await countLeadsHuntedToday(params.ownerUserId);
+  const remaining = settings.daily_hunt_limit - alreadyToday;
+  if (remaining <= 0) {
+    return { scanned: 0, newLeadsCreated: 0, leadIds: [], skippedReason: "daily_limit_reached" };
+  }
+
   const query = params.query ?? DEFAULT_HUNT_QUERY;
   const platforms = params.platforms ?? (["twitter", "threads"] as Platform[]);
 
-  const candidates = await collectCandidates(query, platforms);
+  const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
+  const candidates = (await collectCandidates(query, platforms))
+    .filter((c) => !blacklist.has(normalizeHandle(c.handle)))
+    .slice(0, remaining); // never create more leads than the daily cap has left
+
   const leadIds: string[] = [];
 
   for (const c of candidates) {

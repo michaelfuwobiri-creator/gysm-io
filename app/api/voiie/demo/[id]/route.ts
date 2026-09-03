@@ -22,11 +22,19 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const demo = await buildFreeDemo(user.id, answers, lead.handle);
 
     await setDemoProject(lead.id, demo.projectId);
-    await addMessage(lead.id, "outbound", "system", `Free demo ready: ${demo.publicUrl}`);
+
+    // Prospects get the tracking-wrapped link (see app/api/voiie/track/[id])
+    // so opening it flips demo_sent -> viewed; the dashboard's own preview
+    // iframe uses demo.publicUrl directly, untracked, since that's the
+    // operator loading it, not the prospect.
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
+    const trackedUrl = `${siteUrl}/api/voiie/track/${lead.id}?to=${encodeURIComponent(demo.publicUrl)}`;
+
+    await addMessage(lead.id, "outbound", "system", `Free demo ready: ${trackedUrl}`);
 
     if (lead.contact_phone) {
       try {
-        await sendDemoReadyTemplate(lead.contact_phone, answers.business?.name || lead.handle, demo.publicUrl);
+        await sendDemoReadyTemplate(lead.contact_phone, answers.business?.name || lead.handle, trackedUrl);
       } catch (error: any) {
         console.error("[voiie/demo] WhatsApp send failed (demo still saved):", error.message);
       }

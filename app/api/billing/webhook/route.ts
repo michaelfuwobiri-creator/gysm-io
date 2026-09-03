@@ -4,6 +4,7 @@ import { getStripe, getPlanById } from "@/lib/stripe";
 import { sql } from "@/lib/db";
 import { addCredits } from "@/lib/credits";
 import { convertLeadToCustomer } from "@/lib/voiie/billing";
+import { markRenewalStatus } from "@/lib/voiie/db";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,19 @@ export async function POST(req: NextRequest) {
             break;
           }
           await convertLeadToCustomer(leadId, planId, email);
+          break;
+        }
+
+        // VOIIE renewal/repair/upgrade/add-feature charge (see
+        // lib/voiie/billing.ts createRenewalCheckoutLink) -- a returning
+        // customer paying an ad-hoc amount, not a new conversion.
+        if (session.metadata?.source === "voiie_renewal") {
+          const renewalId = session.metadata.renewalId;
+          if (!renewalId) {
+            console.error("[billing/webhook] voiie_renewal checkout.session.completed missing renewalId");
+            break;
+          }
+          await markRenewalStatus(renewalId, "paid", session.id);
           break;
         }
 

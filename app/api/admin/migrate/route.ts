@@ -218,6 +218,105 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
       )
     `,
   },
+
+  // 0017_voiie_v2.sql -- lead compliance/engagement columns, real hunt-safety
+  // settings, and the renewal-side customer/renewal/support-ticket tables.
+  // See db/migrations/0017_voiie_v2.sql for the full rationale.
+  {
+    id: "0017_voiie_leads_tags_dnc_viewed",
+    run: () => sql`
+      alter table voiie_leads add column if not exists tags text[] not null default '{}';
+      alter table voiie_leads add column if not exists do_not_contact boolean not null default false;
+      alter table voiie_leads add column if not exists demo_viewed_at timestamptz;
+    `,
+  },
+  {
+    id: "0017_voiie_leads_tags_idx",
+    run: () => sql`
+      create index if not exists voiie_leads_owner_tags_idx on voiie_leads using gin (tags)
+    `,
+  },
+  {
+    id: "0017_voiie_settings",
+    run: () => sql`
+      create table if not exists voiie_settings (
+        owner_user_id     text primary key,
+        daily_hunt_limit  integer not null default 50,
+        spintax_enabled   boolean not null default true,
+        kill_switch       boolean not null default false,
+        blacklist         jsonb not null default '[]'::jsonb,
+        updated_at        timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0017_voiie_customers",
+    run: () => sql`
+      create table if not exists voiie_customers (
+        id                 uuid primary key default gen_random_uuid(),
+        lead_id            uuid not null unique references voiie_leads(id) on delete cascade,
+        owner_user_id      text not null,
+        converted_user_id  text not null,
+        business_name      text not null,
+        slug               text not null unique,
+        gysm_subdomain     text not null,
+        custom_domain      text,
+        plan_id            text not null,
+        brand_kit          jsonb not null default '{}'::jsonb,
+        status             text not null default 'active',
+        expiry_date        timestamptz not null,
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0017_voiie_customers_owner_status_idx",
+    run: () => sql`
+      create index if not exists voiie_customers_owner_status_idx on voiie_customers (owner_user_id, status, expiry_date)
+    `,
+  },
+  {
+    id: "0017_voiie_renewals",
+    run: () => sql`
+      create table if not exists voiie_renewals (
+        id                     uuid primary key default gen_random_uuid(),
+        customer_id            uuid not null references voiie_customers(id) on delete cascade,
+        type                   text not null,
+        amount_cents           integer not null,
+        status                 text not null default 'pending',
+        due_date               timestamptz not null,
+        stripe_checkout_session_id text,
+        paid_at                timestamptz,
+        created_at             timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0017_voiie_renewals_customer_status_idx",
+    run: () => sql`
+      create index if not exists voiie_renewals_customer_status_idx on voiie_renewals (customer_id, status, due_date)
+    `,
+  },
+  {
+    id: "0017_voiie_support_tickets",
+    run: () => sql`
+      create table if not exists voiie_support_tickets (
+        id           uuid primary key default gen_random_uuid(),
+        customer_id  uuid not null references voiie_customers(id) on delete cascade,
+        issue        text not null,
+        status       text not null default 'open',
+        created_at   timestamptz not null default now(),
+        updated_at   timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0017_voiie_support_tickets_customer_status_idx",
+    run: () => sql`
+      create index if not exists voiie_support_tickets_customer_status_idx on voiie_support_tickets (customer_id, status)
+    `,
+  },
 ];
 
 export async function POST(_req: NextRequest) {

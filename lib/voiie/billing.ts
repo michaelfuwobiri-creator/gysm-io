@@ -10,8 +10,49 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { getStripe, getPlanById, getPriceId } from "@/lib/stripe";
 import { addCredits } from "@/lib/credits";
 import { sql } from "@/lib/db";
-import { getLeadUnscoped, setPlanQuote, markConverted } from "@/lib/voiie/db";
-import type { VoiiePlanId } from "@/types/voiie";
+import { addDomainToProject } from "@/lib/vercelDomains";
+import { getLeadUnscoped, setPlanQuote, markConverted, createCustomer, createRenewal, getConsultationAnswers } from "@/lib/voiie/db";
+import type { LeadAnswers, VoiiePlanId } from "@/types/voiie";
+
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 40) || "customer"
+  );
+}
+
+/** $15/mo-equivalent baseline renewal (domain + hosting), matching the
+ *  brief's "Renew $15" figure -- flat regardless of plan, since domain +
+ *  hosting cost doesn't scale with which of the 3 build plans they bought. */
+const ANNUAL_RENEWAL_CENTS = 1500;
+
+/**
+ * Ad-hoc Stripe Checkout link for a renewal/repair/upgrade/add-feature
+ * charge (see voiie_renewals) -- these are one-off amounts that don't map
+ * to one of the 3 fixed voiie_* Prices in lib/stripe.ts, so (like gysm.io's
+ * own one-time-credit-pack flow) this uses inline `price_data` on a
+ * Checkout Session rather than a pre-created Price.
+ */
+export async function createRenewalCheckoutLink(params: { renewalId: string; customerId: string; label: string; amountCents: number }): Promise<{ url: string; sessionId: string }> {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
+  const session = await getStripe().checkout.sessions.create({
+    mode: "payment",
+    line_items: [
+      {
+        price_data: { currency: "usd", product_data: { name: params.label }, unit_amount: params.amountCents },
+        quantity: 1,
+      },
+    ],
+    metadata: { source: "voiie_renewal", renewalId: params.renewalId, customerId: params.customerId },
+    success_url: `${siteUrl}/voiie?renewalId=${params.renewalId}&success=true`,
+    cancel_url: `${siteUrl}/voiie?renewalId=${params.renewalId}&canceled=true`,
+  });
+  if (!session.url) throw new Error("Stripe did not return a checkout URL.");
+  return { url: session.url, sessionId: session.id };
+}
 
 export async function createVoiieCheckoutSession(leadId: string, planId: VoiiePlanId): Promise<{ url: string }> {
   const lead = await getLeadUnscoped(leadId);
@@ -105,4 +146,63 @@ export async function convertLeadToCustomer(leadId: string, planId: string, emai
 
   // 5. Close the loop on the lead record.
   await markConverted(lead.id, clerkUserId);
+
+  // 6. Production/renewal bookkeeping (voiie_customers + voiie_renewals --
+  // see db/migrations/0017_voiie_v2.sql). Best-effort and non-fatal: the
+  // account + demo transfer above are the part that must succeed for the
+  // customer to actually have a working, owned site; a slug collision or
+  // an unconfigured Vercel/domains API shouldn't undo that.
+  try {
+    const { answers } = await getConsultationAnswers(lead.id);
+    const typedAnswers = answers as LeadAnswers;
+    const businessName = typedAnswers.business?.name || lead.handle.replace(/^@/, "");
+    const baseSlug = slugify(businessName);
+
+    let slug = baseSlug;
+    for (let n = 2; n < 20; n++) {
+      const clash = await sql`select 1 from voiie_customers where slug = ${slug} limit 1`;
+      if (!clash[0]) break;
+      slug = `${baseSlug}-${n}`;
+    }
+
+    const gysmSubdomain = `${slug}.gysm.io`;
+    try {
+      const result = await addDomainToProject(gysmSubdomain);
+      await sql`
+        update projects
+        set custom_domain = ${gysmSubdomain},
+            custom_domain_status = ${result.verified ? "verified" : "pending"},
+            custom_domain_verification = ${JSON.stringify(result.verification)}
+        where id = ${lead.demo_project_id}
+      `;
+    } catch (err) {
+      // Not fatal -- the site is already live at /publish/[id] regardless;
+      // this only adds the prettier <slug>.gysm.io vanity domain, which
+      // needs gysm.io's DNS zone reachable from the Vercel Domains API.
+      console.warn(`[voiie/billing] could not provision ${gysmSubdomain} (site is still live at /publish/${lead.demo_project_id}):`, (err as Error).message);
+    }
+
+    const rawDomain = (typedAnswers.domain ?? "").split(" — ")[0]?.trim();
+    const hasCustomDomain = Boolean(rawDomain) && /\./.test(rawDomain);
+
+    const expiryDate = new Date();
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+    const customer = await createCustomer({
+      leadId: lead.id,
+      ownerUserId: lead.owner_user_id,
+      convertedUserId: clerkUserId,
+      businessName,
+      slug,
+      gysmSubdomain,
+      customDomain: hasCustomDomain ? rawDomain : null,
+      planId,
+      brandKit: typedAnswers.assets ? { logoUrl: typedAnswers.assets.logoUrl, colors: typedAnswers.assets.colors, theme: typedAnswers.assets.theme } : {},
+      expiryDate,
+    });
+
+    await createRenewal({ customerId: customer.id, type: "domain", amountCents: ANNUAL_RENEWAL_CENTS, dueDate: expiryDate });
+  } catch (err) {
+    console.error("[voiie/billing] production/renewal bookkeeping failed (account + demo transfer already succeeded):", (err as Error).message);
+  }
 }
