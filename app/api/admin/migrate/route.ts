@@ -329,13 +329,24 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
   // settings, and the renewal-side customer/renewal/support-ticket tables.
   // Renumbered from 0017 for the same reason as above -- see
   // db/migrations/0017_voiie_v2.sql for the full rationale.
+  // Split into 3 single-statement entries -- the combined version (one sql``
+  // call with all 3 semicolon-separated ALTERs) failed live with "cannot
+  // insert multiple commands into a prepared statement": Neon's serverless
+  // driver runs each sql`` call as one prepared statement, and Postgres
+  // prepared statements can't hold more than one command. That failure
+  // then cascaded into 0021_voiie_leads_tags_idx below ("column tags does
+  // not exist"), since the tags column never actually got added.
   {
-    id: "0021_voiie_leads_tags_dnc_viewed",
-    run: () => sql`
-      alter table voiie_leads add column if not exists tags text[] not null default '{}';
-      alter table voiie_leads add column if not exists do_not_contact boolean not null default false;
-      alter table voiie_leads add column if not exists demo_viewed_at timestamptz;
-    `,
+    id: "0021_voiie_leads_tags",
+    run: () => sql`alter table voiie_leads add column if not exists tags text[] not null default '{}'`,
+  },
+  {
+    id: "0021_voiie_leads_dnc",
+    run: () => sql`alter table voiie_leads add column if not exists do_not_contact boolean not null default false`,
+  },
+  {
+    id: "0021_voiie_leads_demo_viewed",
+    run: () => sql`alter table voiie_leads add column if not exists demo_viewed_at timestamptz`,
   },
   {
     id: "0021_voiie_leads_tags_idx",
