@@ -15,7 +15,7 @@ export default function FlowTvCard({ item }: { item: FlowTvItem }) {
       <div className="aspect-video bg-black flex items-center justify-center overflow-hidden">
         {item.kind === "video" || item.kind === "avatar" || item.kind === "reframe" || item.kind === "video-upscale" ? (
           <video src={item.outputUrl} controls className="w-full h-full object-cover" />
-        ) : item.kind === "tts" || item.kind === "voice-clone" || item.kind === "music" ? (
+        ) : item.kind === "tts" || item.kind === "voice-clone" || item.kind === "music" || item.kind === "sound-effect" || item.kind === "voice-enhance" ? (
           <audio src={item.outputUrl} controls className="w-full px-3" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element

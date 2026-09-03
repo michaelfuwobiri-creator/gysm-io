@@ -441,6 +441,24 @@ const MEDIA_SKILLS: MediaSkillDef[] = [
     cost: MEDIA_CREDIT_COST.script,
     placeholder: "What's the video about? (e.g. \"3 productivity tips for founders\")",
   },
+  {
+    id: "sound-effect",
+    kind: "sound-effect",
+    label: "Sound effect",
+    desc: `Describe a sound -- ${MEDIA_CREDIT_COST["sound-effect"]} credits`,
+    cost: MEDIA_CREDIT_COST["sound-effect"],
+    placeholder: "Describe the sound (e.g. \"whoosh, cinematic hit\")...",
+  },
+  {
+    id: "voice-enhance",
+    kind: "voice-enhance",
+    label: "Voice enhance",
+    desc: `Attach audio, remove background noise -- ${MEDIA_CREDIT_COST["voice-enhance"]} credits`,
+    cost: MEDIA_CREDIT_COST["voice-enhance"],
+    needsAttachment: true,
+    needsText: false,
+    placeholder: "Attach an audio/video clip, then send",
+  },
 ];
 
 /** Client-safe duplicate of lib/brandKit.ts's brandKitPromptSuffix() --
@@ -1086,7 +1104,7 @@ function MessageBubble({
 /** Kinds worth showing in the public Flow TV gallery (see app/flow-tv)
  *  -- excludes captions/script, which are text-shaped, not visual/audio
  *  media (same list as lib/flowTv.ts's GALLERY_KINDS -- keep in sync). */
-const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone"];
+const FLOW_TV_ELIGIBLE_KINDS: MediaKind[] = ["image", "video", "avatar", "music", "reframe", "video-upscale", "edit", "tts", "voice-clone", "sound-effect", "voice-enhance"];
 
 function MediaResultCard({ media }: { media: MediaMsgState }) {
   const [published, setPublished] = useState(false);
@@ -1144,7 +1162,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
           {(media.kind === "video" || media.kind === "avatar" || media.kind === "reframe" || media.kind === "video-upscale") && (
             <video src={media.url} controls className="rounded-lg max-h-64 w-full" />
           )}
-          {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music") && (
+          {(media.kind === "tts" || media.kind === "voice-clone" || media.kind === "music" || media.kind === "sound-effect" || media.kind === "voice-enhance") && (
             <audio src={media.url} controls className="w-full" />
           )}
           <div className="mt-2 flex items-center gap-3">
@@ -2993,6 +3011,8 @@ export default function LinearBuilderApp({
     else if (skill.kind === "reframe") body = { videoUrl: firstVideoUrl || firstAnyUrl, aspectRatio: text.trim() };
     else if (skill.kind === "video-upscale") body = { videoUrl: firstVideoUrl || firstAnyUrl, resolution: text.trim() };
     else if (skill.kind === "script") body = { topic: text };
+    else if (skill.kind === "sound-effect") body = { text };
+    else if (skill.kind === "voice-enhance") body = { audioUrl: firstAnyUrl };
 
     if (brandOn && (skill.kind === "image" || skill.kind === "video" || skill.kind === "music") && typeof body.prompt === "string") {
       body.prompt = body.prompt + brandSuffix(brandKit);

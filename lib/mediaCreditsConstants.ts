@@ -22,6 +22,8 @@ export const MEDIA_KINDS = [
   "reframe",
   "video-upscale",
   "script",
+  "sound-effect",
+  "voice-enhance",
 ] as const;
 
 export type MediaKind = (typeof MEDIA_KINDS)[number];
@@ -39,6 +41,13 @@ export const MEDIA_CREDIT_COST: Record<MediaKind, number> = {
   reframe: 800, // ~$0.60 for a 10s clip (Replicate, Luma Reframe Video @ $0.06/sec output, 10s input cap)
   "video-upscale": 550, // ~$0.40/run (Replicate, lucataco/real-esrgan-video, community model, A100 GPU-time billed -- varies with clip length)
   script: 40, // ~$0.01-0.02 per script (OpenAI gpt-4o-mini chat completion, ~700 output tokens)
+  // ElevenLabs bills sound-generation/audio-isolation against the account's
+  // character/credit quota rather than a clean per-request USD price --
+  // these two are rougher estimates than the other real-cost comments in
+  // this file, priced in the same ballpark as voice-clone/edit rather than
+  // a precise 2x-margin calculation.
+  "sound-effect": 60,
+  "voice-enhance": 60,
 };
 
 // Which env var must be set for a kind to actually run. Every route
@@ -57,13 +66,15 @@ export const MEDIA_KIND_ENV_VAR: Record<MediaKind, string> = {
   reframe: "REPLICATE_API_TOKEN",
   "video-upscale": "REPLICATE_API_TOKEN",
   script: "OPENAI_API_KEY",
+  "sound-effect": "ELEVENLABS_API_KEY",
+  "voice-enhance": "ELEVENLABS_API_KEY",
 };
 
 // Kinds whose provider call is a single request/response (fast, no job
 // polling needed). Everything else (video, avatar, music) returns a
 // provider_job_id immediately and the client polls
 // GET /api/media/[id]/status until status is "done" or "failed".
-export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit", "script"];
+export const SYNCHRONOUS_MEDIA_KINDS: readonly MediaKind[] = ["image", "captions", "tts", "voice-clone", "edit", "script", "sound-effect", "voice-enhance"];
 // reframe and video-upscale are intentionally NOT in this list -- both
 // run on the same async prediction lifecycle as video/avatar/music (up
 // to several minutes for video-upscale), so the client polls
