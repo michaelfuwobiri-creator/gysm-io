@@ -3,6 +3,8 @@ import type Stripe from "stripe";
 import { getStripe, getPlanById } from "@/lib/stripe";
 import { sql } from "@/lib/db";
 import { addCredits } from "@/lib/credits";
+import { convertLeadToCustomer } from "@/lib/voiie/billing";
+import { markRenewalStatus } from "@/lib/voiie/db";
 
 export const runtime = "nodejs";
 
@@ -29,6 +31,44 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // VOIIE-sourced payment (see lib/voiie/billing.ts
+        // createVoiieCheckoutSession): distinguished by metadata.source
+        // rather than client_reference_id/userId, because there's no
+        // signed-in gysm.io user on this path yet -- the whole point of
+        // this branch is to create one. Handled separately from, not
+        // alongside, the normal credit-grant path below: a VOIIE
+        // conversion creates its account and transfers a project instead
+        // of crediting an already-known userId.
+        if (session.metadata?.source === "voiie") {
+          const leadId = session.metadata.leadId;
+          const planId = session.metadata.planId;
+          const email = session.customer_email || session.customer_details?.email;
+          if (!leadId || !planId || !email) {
+            console.error("[billing/webhook] voiie checkout.session.completed missing leadId/planId/email", {
+              leadId,
+              planId,
+              email,
+            });
+            break;
+          }
+          await convertLeadToCustomer(leadId, planId, email);
+          break;
+        }
+
+        // VOIIE renewal/repair/upgrade/add-feature charge (see
+        // lib/voiie/billing.ts createRenewalCheckoutLink) -- a returning
+        // customer paying an ad-hoc amount, not a new conversion.
+        if (session.metadata?.source === "voiie_renewal") {
+          const renewalId = session.metadata.renewalId;
+          if (!renewalId) {
+            console.error("[billing/webhook] voiie_renewal checkout.session.completed missing renewalId");
+            break;
+          }
+          await markRenewalStatus(renewalId, "paid", session.id);
+          break;
+        }
+
         const userId = session.client_reference_id || session.metadata?.userId;
         const planId = session.metadata?.planId;
         const plan = getPlanById(planId);

@@ -8,7 +8,7 @@ import { sql } from "@/lib/db";
 // why), so db/migrations/*.sql files can't be applied by running psql
 // locally the way they normally would be -- but the deployed app already
 // has DATABASE_URL configured in Vercel, and every statement below is
-// copied verbatim from db/migrations/0010_*.sql through 0019_*.sql (IF NOT
+// copied verbatim from db/migrations/0010_*.sql through 0021_*.sql (IF NOT
 // EXISTS / ADD COLUMN IF NOT EXISTS throughout, so hitting this twice is harmless). Admin-gated,
 // POST-only, and each statement runs and reports individually so a
 // partial failure is visible instead of silent.
@@ -254,6 +254,175 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
   {
     id: "0019_media_templates_user_id_idx",
     run: () => sql`create index if not exists media_templates_user_id_idx on media_templates (user_id, created_at desc)`,
+  },
+
+  // 0020_voiie.sql -- VOIIE hunter/closer/builder: lead records, the
+  // outreach thread, and in-progress consultation answers. Renumbered
+  // from 0016 (its original number on this branch) to 0020 to clear of
+  // main's own, unrelated 0014-0019 range above -- copied verbatim from
+  // db/migrations/0016_voiie.sql; see it for the full design rationale.
+  {
+    id: "0020_voiie_leads",
+    run: () => sql`
+      create table if not exists voiie_leads (
+        id                 uuid primary key default gen_random_uuid(),
+        owner_user_id      text not null,
+        platform           text not null default 'twitter',
+        handle             text not null,
+        display_name       text,
+        bio                text,
+        signal             text,
+        contact_email      text,
+        contact_phone      text,
+        status             text not null default 'new',
+        demo_project_id    uuid references projects(id) on delete set null,
+        plan_id            text,
+        stripe_checkout_session_id text,
+        converted_user_id  text,
+        converted_at       timestamptz,
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0020_voiie_leads_owner_status_idx",
+    run: () => sql`create index if not exists voiie_leads_owner_status_idx on voiie_leads (owner_user_id, status, created_at desc)`,
+  },
+  {
+    id: "0020_voiie_leads_owner_platform_handle_idx",
+    run: () => sql`create unique index if not exists voiie_leads_owner_platform_handle_idx on voiie_leads (owner_user_id, platform, lower(handle))`,
+  },
+  {
+    id: "0020_voiie_messages",
+    run: () => sql`
+      create table if not exists voiie_messages (
+        id         uuid primary key default gen_random_uuid(),
+        lead_id    uuid not null references voiie_leads(id) on delete cascade,
+        direction  text not null,
+        channel    text not null,
+        body       text not null,
+        meta       jsonb,
+        created_at timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0020_voiie_messages_lead_id_created_at_idx",
+    run: () => sql`create index if not exists voiie_messages_lead_id_created_at_idx on voiie_messages (lead_id, created_at asc)`,
+  },
+  {
+    id: "0020_voiie_consultations",
+    run: () => sql`
+      create table if not exists voiie_consultations (
+        lead_id          uuid primary key references voiie_leads(id) on delete cascade,
+        answers          jsonb not null default '{}'::jsonb,
+        current_question integer not null default 0,
+        completed_at     timestamptz,
+        created_at       timestamptz not null default now(),
+        updated_at       timestamptz not null default now()
+      )
+    `,
+  },
+
+  // 0021_voiie_v2.sql -- lead compliance/engagement columns, real hunt-safety
+  // settings, and the renewal-side customer/renewal/support-ticket tables.
+  // Renumbered from 0017 for the same reason as above -- see
+  // db/migrations/0017_voiie_v2.sql for the full rationale.
+  {
+    id: "0021_voiie_leads_tags_dnc_viewed",
+    run: () => sql`
+      alter table voiie_leads add column if not exists tags text[] not null default '{}';
+      alter table voiie_leads add column if not exists do_not_contact boolean not null default false;
+      alter table voiie_leads add column if not exists demo_viewed_at timestamptz;
+    `,
+  },
+  {
+    id: "0021_voiie_leads_tags_idx",
+    run: () => sql`
+      create index if not exists voiie_leads_owner_tags_idx on voiie_leads using gin (tags)
+    `,
+  },
+  {
+    id: "0021_voiie_settings",
+    run: () => sql`
+      create table if not exists voiie_settings (
+        owner_user_id     text primary key,
+        daily_hunt_limit  integer not null default 50,
+        spintax_enabled   boolean not null default true,
+        kill_switch       boolean not null default false,
+        blacklist         jsonb not null default '[]'::jsonb,
+        updated_at        timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0021_voiie_customers",
+    run: () => sql`
+      create table if not exists voiie_customers (
+        id                 uuid primary key default gen_random_uuid(),
+        lead_id            uuid not null unique references voiie_leads(id) on delete cascade,
+        owner_user_id      text not null,
+        converted_user_id  text not null,
+        business_name      text not null,
+        slug               text not null unique,
+        gysm_subdomain     text not null,
+        custom_domain      text,
+        plan_id            text not null,
+        brand_kit          jsonb not null default '{}'::jsonb,
+        status             text not null default 'active',
+        expiry_date        timestamptz not null,
+        created_at         timestamptz not null default now(),
+        updated_at         timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0021_voiie_customers_owner_status_idx",
+    run: () => sql`
+      create index if not exists voiie_customers_owner_status_idx on voiie_customers (owner_user_id, status, expiry_date)
+    `,
+  },
+  {
+    id: "0021_voiie_renewals",
+    run: () => sql`
+      create table if not exists voiie_renewals (
+        id                     uuid primary key default gen_random_uuid(),
+        customer_id            uuid not null references voiie_customers(id) on delete cascade,
+        type                   text not null,
+        amount_cents           integer not null,
+        status                 text not null default 'pending',
+        due_date               timestamptz not null,
+        stripe_checkout_session_id text,
+        paid_at                timestamptz,
+        created_at             timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0021_voiie_renewals_customer_status_idx",
+    run: () => sql`
+      create index if not exists voiie_renewals_customer_status_idx on voiie_renewals (customer_id, status, due_date)
+    `,
+  },
+  {
+    id: "0021_voiie_support_tickets",
+    run: () => sql`
+      create table if not exists voiie_support_tickets (
+        id           uuid primary key default gen_random_uuid(),
+        customer_id  uuid not null references voiie_customers(id) on delete cascade,
+        issue        text not null,
+        status       text not null default 'open',
+        created_at   timestamptz not null default now(),
+        updated_at   timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0021_voiie_support_tickets_customer_status_idx",
+    run: () => sql`
+      create index if not exists voiie_support_tickets_customer_status_idx on voiie_support_tickets (customer_id, status)
+    `,
   },
 ];
 

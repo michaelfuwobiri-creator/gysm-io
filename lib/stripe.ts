@@ -32,7 +32,16 @@ export function getStripe(): Stripe {
 }
 
 export type PricingPlan = {
-  id: "credits_starter" | "credits_popular" | "credits_bulk" | "plan_builder" | "plan_pro" | "plan_studio";
+  id:
+    | "credits_starter"
+    | "credits_popular"
+    | "credits_bulk"
+    | "plan_builder"
+    | "plan_pro"
+    | "plan_studio"
+    | "voiie_starter"
+    | "voiie_pro"
+    | "voiie_agency";
   name: string;
   price: number;
   currency: "usd";
@@ -47,6 +56,12 @@ export type PricingPlan = {
   highlight?: boolean;
   /** Name of the Vercel env var holding the real Stripe Price ID for this plan. */
   priceIdEnvVar: string;
+  /** True for a plan that's real (checkoutable, in PRICING_PLANS) but
+   *  never shown on the public /pricing page -- currently just the VOIIE
+   *  tiers, which are quoted 1:1 to a specific hunted lead by
+   *  lib/voiie/billing.ts, not something a random visitor should be able
+   *  to self-serve buy. */
+  hidden?: boolean;
 };
 
 /**
@@ -136,6 +151,53 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "For agencies shipping at scale. 600 builds/mo.",
     tagline: "Ship without limits",
     priceIdEnvVar: "STRIPE_PLAN_STUDIO_PRICE_ID",
+  },
+  // VOIIE plans -- one-time payment a hunted lead makes to take their
+  // free demo (see lib/voiie/demo.ts) live for real. Not shown on
+  // /pricing (hidden: true) -- lib/voiie/billing.ts's checkout route is
+  // the only place that reads these, quoted to one specific lead at a
+  // time by whoever's running VOIIE. Paying converts the lead into a
+  // real GYSM.IO account that owns the build (see convertLeadToCustomer
+  // in lib/voiie/billing.ts and the checkout.session.completed handler
+  // in app/api/billing/webhook/route.ts).
+  {
+    id: "voiie_starter",
+    name: "VOIIE Starter Site",
+    price: 79,
+    currency: "usd",
+    interval: "one_time",
+    credits: CREDITS_PER_PLAN.voiie_starter,
+    builds: BUILDS_PER_PLAN.voiie_starter,
+    description: "Your free demo, live on the web with your own account to manage it.",
+    tagline: "Get online",
+    priceIdEnvVar: "STRIPE_VOIIE_STARTER_PRICE_ID",
+    hidden: true,
+  },
+  {
+    id: "voiie_pro",
+    name: "VOIIE Pro Site",
+    price: 199,
+    currency: "usd",
+    interval: "one_time",
+    credits: CREDITS_PER_PLAN.voiie_pro,
+    builds: BUILDS_PER_PLAN.voiie_pro,
+    description: "Your site live, plus a custom domain and priority repairs/upgrades.",
+    tagline: "Get online, on your domain",
+    priceIdEnvVar: "STRIPE_VOIIE_PRO_PRICE_ID",
+    hidden: true,
+  },
+  {
+    id: "voiie_agency",
+    name: "VOIIE Agency Site",
+    price: 499,
+    currency: "usd",
+    interval: "one_time",
+    credits: CREDITS_PER_PLAN.voiie_agency,
+    builds: BUILDS_PER_PLAN.voiie_agency,
+    description: "Full build-out with custom domain, ongoing renewals, and hands-on support.",
+    tagline: "Done for you, fully managed",
+    priceIdEnvVar: "STRIPE_VOIIE_AGENCY_PRICE_ID",
+    hidden: true,
   },
 ];
 

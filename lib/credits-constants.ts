@@ -31,6 +31,17 @@ export const BUILDS_PER_PLAN = {
   plan_builder: 40,
   plan_pro: 150,
   plan_studio: 600,
+  // VOIIE (see lib/voiie/*) -- a hunted lead pays one of these one-time
+  // tiers to take their free demo live. The credit grant isn't for more
+  // AI builds of the demo itself (VOIIE already built and paid for that
+  // via the orchestrator) -- it's a welcome balance so the newly
+  // converted customer (see lib/voiie/billing.ts convertLeadToCustomer)
+  // can immediately make a few self-serve edits in the regular builder
+  // without hitting "out of credits" on day one. Scaled with price the
+  // same way the DIY packs are.
+  voiie_starter: 3,
+  voiie_pro: 10,
+  voiie_agency: 30,
 } as const;
 
 export const CREDITS_PER_PLAN = Object.fromEntries(
