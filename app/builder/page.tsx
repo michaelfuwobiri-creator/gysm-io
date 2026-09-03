@@ -45,7 +45,20 @@ export default async function BuilderPage({
   // Brand Kit / Style Lock (42-tool spec item 36) -- null for a
   // logged-out visitor or a user who hasn't set one up yet, both of
   // which the composer's "Brand" toggle treats as "nothing to apply".
-  const brandKit = user ? await getBrandKit(user.id) : null;
+  // Wrapped in try/catch like every other DB call on this page --
+  // HOTFIX: this was missing the guard and took down all of /builder
+  // for every signed-in user when db/migrations/0016_brand_kits.sql
+  // hadn't been run yet (NeonDbError: relation "brand_kits" does not
+  // exist). A missing/late migration should degrade this one feature,
+  // not the whole builder page.
+  let brandKit: Awaited<ReturnType<typeof getBrandKit>> = null;
+  if (user) {
+    try {
+      brandKit = await getBrandKit(user.id);
+    } catch (error: any) {
+      console.error("[builder] failed to load brand kit (has db/migrations/0016_brand_kits.sql been run?):", error.message);
+    }
+  }
 
   const projectId = searchParams?.projectId;
   const templateId = searchParams?.template;
