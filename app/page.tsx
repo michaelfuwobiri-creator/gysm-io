@@ -83,7 +83,7 @@ const STORY_CARDS = [
   { align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", title: "for the founders.", sub: "prompt to product // auth, database, payments, live preview", placeholder: "Founder photo -- drop in real photography here", image: "/media/story-founders.jpg" },
   { align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", title: "for the shippers.", sub: "ship in one click // idea to production", placeholder: "Launch / motion photo -- drop in real photography here", image: "/media/story-shippers.jpg" },
   { align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", title: "for the agencies.", sub: "client portals // white-label SaaS factory", placeholder: "Skyline / architecture photo -- drop in real photography here", image: "/media/story-agencies.jpg" },
-  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here", image: null },
+  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here", image: "/media/story-indie-hackers.webp" },
 ];
 
 const INDEX_SECTIONS = [
