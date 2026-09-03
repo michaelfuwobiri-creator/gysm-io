@@ -27,6 +27,10 @@ export interface NewLeadCandidate {
   displayName?: string | null;
   bio?: string | null;
   signal?: string | null;
+  /** E.164-ish phone, when the source hands one over directly (Google
+   *  Places always does; Twitter/Threads never do -- outreach.ts's
+   *  WhatsApp channel just has a head start on those leads). */
+  contactPhone?: string | null;
 }
 
 /** Inserts a hunted candidate as a new lead, or silently does nothing if
@@ -35,8 +39,8 @@ export interface NewLeadCandidate {
  *  lead id on insert, or null if it already existed. */
 export async function createLeadIfNew(ownerUserId: string, candidate: NewLeadCandidate): Promise<string | null> {
   const rows = await sql`
-    insert into voiie_leads (owner_user_id, platform, handle, display_name, bio, signal)
-    values (${ownerUserId}, ${candidate.platform}, ${candidate.handle}, ${candidate.displayName ?? null}, ${candidate.bio ?? null}, ${candidate.signal ?? null})
+    insert into voiie_leads (owner_user_id, platform, handle, display_name, bio, signal, contact_phone)
+    values (${ownerUserId}, ${candidate.platform}, ${candidate.handle}, ${candidate.displayName ?? null}, ${candidate.bio ?? null}, ${candidate.signal ?? null}, ${candidate.contactPhone ?? null})
     on conflict (owner_user_id, platform, lower(handle)) do nothing
     returning id
   `;

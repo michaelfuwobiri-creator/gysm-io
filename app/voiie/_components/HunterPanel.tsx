@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/app/voiie/_components/icons";
 import { apiGet, apiPatch, apiPost } from "@/app/voiie/_components/api";
-import { DEFAULT_HUNT_QUERY, DEFAULT_OUTREACH_TEMPLATE as DEFAULT_TEMPLATE } from "@/lib/voiie/constants";
+import { DEFAULT_HUNT_QUERY, DEFAULT_PLACES_QUERY, DEFAULT_OUTREACH_TEMPLATE as DEFAULT_TEMPLATE } from "@/lib/voiie/constants";
 import type { Toast } from "@/app/voiie/_components/useToasts";
 import type { VoiieLead } from "@/app/voiie/_components/types";
 import type { VoiieSettings } from "@/types/voiie";
@@ -18,7 +18,8 @@ export function HunterPanel({
   pushToast: (text: string, tone?: Toast["tone"]) => void;
 }) {
   const [huntQuery, setHuntQuery] = useState(DEFAULT_HUNT_QUERY);
-  const [platforms, setPlatforms] = useState({ Twitter: true, Threads: true });
+  const [placesQuery, setPlacesQuery] = useState(DEFAULT_PLACES_QUERY);
+  const [platforms, setPlatforms] = useState({ Twitter: true, Threads: true, Places: false });
   const [scanning, setScanning] = useState(false);
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [channels, setChannels] = useState({ twitter: true, whatsapp: true, email: true });
@@ -66,6 +67,7 @@ export function HunterPanel({
         .map(([p]) => p.toLowerCase());
       const result = await apiPost<{ newLeadsCreated: number; scanned: number; skippedReason?: "kill_switch" | "daily_limit_reached" }>("/api/voiie/hunt", {
         query: huntQuery,
+        placesQuery,
         platforms: platformList,
       });
       onHunted();
@@ -153,19 +155,38 @@ export function HunterPanel({
             {[
               ["Twitter", "#1d9bf0"],
               ["Threads", "#8b5cf6"],
+              ["Places", "#34d399"],
             ].map(([p, c]) => (
               <div key={p} className="flex items-center justify-between">
                 <span style={{ fontSize: 12, color: "var(--text-dim)", display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: 9999, background: c }} />
                   {p}
                 </span>
-                <div className={"toggle " + (platforms[p as "Twitter" | "Threads"] ? "on" : "")} onClick={() => setPlatforms((s) => ({ ...s, [p]: !s[p as "Twitter" | "Threads"] }))}>
+                <div className={"toggle " + (platforms[p as "Twitter" | "Threads" | "Places"] ? "on" : "")} onClick={() => setPlatforms((s) => ({ ...s, [p]: !s[p as "Twitter" | "Threads" | "Places"] }))}>
                   <div className="knob" />
                 </div>
               </div>
             ))}
           </div>
         </div>
+
+        {platforms.Places && (
+          <div style={{ marginTop: 14 }}>
+            <div className="field-label" style={{ marginBottom: 6 }}>
+              Places Location (e.g. &quot;plumbers in Austin, TX&quot;)
+            </div>
+            <input
+              value={placesQuery}
+              onChange={(e) => setPlacesQuery(e.target.value)}
+              placeholder="category in city, state"
+              className="font-mono"
+              style={{ width: "100%", background: "#0a0a0d", border: "1px solid var(--border)", borderRadius: 10, padding: 9, fontSize: 10.5, color: "var(--text-dim)" }}
+            />
+            <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-dim)", opacity: 0.7 }}>
+              Finds real local businesses in this area with no website on file &mdash; needs GOOGLE_PLACES_API_KEY configured.
+            </div>
+          </div>
+        )}
 
         <button
           onClick={huntNow}

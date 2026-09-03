@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { huntClients } from "@/lib/voiie/hunt";
+import type { Platform } from "@/types/voiie";
 
 /** Vercel Cron hits this on a schedule (see vercel.json). Vercel signs
  *  cron requests with an `Authorization: Bearer ${CRON_SECRET}` header
@@ -19,7 +20,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await huntClients({ ownerUserId });
+    // VOIIE_PLACES_QUERY (e.g. "plumbers in Austin, TX") is optional --
+    // unset, this sweep just runs Twitter/Threads same as before. Set it
+    // to also fold Google Places' no-website-on-file businesses into the
+    // daily unattended sweep, same as the dashboard's Hunt Now can.
+    const placesQuery = process.env.VOIIE_PLACES_QUERY || undefined;
+    const platforms: Platform[] = placesQuery ? ["twitter", "threads", "places"] : ["twitter", "threads"];
+    const result = await huntClients({ ownerUserId, placesQuery, platforms });
     return Response.json({ ok: true, ...result });
   } catch (error: any) {
     console.error("[voiie/cron/hunt] sweep failed:", error.message);
