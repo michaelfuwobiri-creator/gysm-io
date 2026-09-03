@@ -1,33 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import CookiePreferencesLink from "./components/CookiePreferencesLink";
 
 const NavAuthLink = dynamic(() => import("./components/NavAuthLink"), { ssr: false });
-
-const FEATURES = [
-  { icon: "✦", title: "Prompt to product", body: "Type what you want. Get a real, working app — not a mockup you have to rebuild." },
-  { icon: "◆", title: "Auth, done for you", body: "Sign-up, login, and sessions are wired in automatically, from the first prompt." },
-  { icon: "$", title: "Payments that work", body: "Stripe checkout and subscriptions, no integration required on your end." },
-  { icon: "▲", title: "Ship in one click", body: "Every build gets a live preview instantly — deploy it or keep iterating." },
-];
-
-// avatar: initials badges, not photos -- these were previously
-// AI-generated headshot images hosted on design.canva.ai (a Canva share-link
-// host); those links expired and started 503ing, breaking all 5 images on
-// every homepage load. Replaced with a plain initials badge (no external
-// image dependency, so it can't go dead again). Per the note Mike already
-// received and decided on: Sarah/Marcus/Priya/David/Alex remain labeled as
-// example quotes, not real customers.
-
-const TESTIMONIALS = [
-  { name: "Sarah J.", role: "Weekend project, shipped", text: "Turned a weekend idea into a live product before Monday.", initials: "SJ", color: "from-fuchsia-500 to-violet-600" },
-  { name: "Marcus T.", role: "Solo founder", text: "Went from prompt to Stripe checkout in one sitting.", initials: "MT", color: "from-indigo-500 to-blue-600" },
-  { name: "Priya K.", role: "Indie hacker", text: "Looks like a funded startup's product. It's just me and GYSM.", initials: "PK", color: "from-emerald-500 to-teal-600" },
-  { name: "David L.", role: "Agency owner", text: "Fastest I've ever gone from client idea to something they could click through.", initials: "DL", color: "from-orange-500 to-amber-600" },
-  { name: "Alex R.", role: "Product designer", text: "This is what I wanted every AI builder to be — it actually ships.", initials: "AR", color: "from-pink-500 to-rose-600" },
-];
 
 // Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
 // (below) instead of a stock emoji, so the grid reads like an actual app
@@ -45,16 +22,13 @@ const APPS = [
   { name: "VelocityRun", tag: "Live", projectId: "01d17652-6489-42d2-bfdf-61e12810e285", color: "from-indigo-600 to-fuchsia-600", desc: "Racing game" },
 ];
 
-// Recreates each real app's actual generated mark (icon shape + letter +
-// wordmark), not a generic placeholder glyph -- verified against the live
-// build at /publish/[projectId] for each entry in APPS.
+// Every mark below is a purpose-drawn glyph tied to what that app actually
+// does (a burst for orbit's zodiac matching, a sun for Studio Sol's salon
+// bookings, a repeat cycle for loop's habit tracking, a speed chevron for
+// VelocityRun's racing game) -- not an initial in a box. Same rounded-app-icon
+// shape across all four so the row reads as a real home-screen icon grid,
+// something you'd actually tap, rather than a plain lettered tile set.
 function AppLogo({ name, className }: { name: string; className?: string }) {
-  // Every mark below is a purpose-drawn glyph tied to what that app actually
-  // does (a burst for orbit's zodiac matching, a sun for Studio Sol's salon
-  // bookings, a repeat cycle for loop's habit tracking, a speed chevron for
-  // VelocityRun's racing game) -- not an initial in a box. Same rounded-app-icon
-  // shape across all four so the row reads as a real home-screen icon grid,
-  // something you'd actually tap, rather than a plain lettered tile set.
   switch (name) {
     case "orbit.":
       return (
@@ -98,18 +72,69 @@ function AppLogo({ name, className }: { name: string; className?: string }) {
   }
 }
 
-const FAQ = [
-  { q: "Is GYSM.IO really no-code?", a: "Yes. You describe the app you want in plain English and GYSM.IO's AI writes and assembles the full-stack code for you -- pages, auth, database, and payments -- with zero manual coding required. If you're technical, you can still view and export the code to customize further." },
-  { q: "How does pricing work?", a: "Every build costs credits. Starter and Agency are monthly plans with a set number of builds; credit packs are pay-as-you-go with no subscription." },
-  { q: "What can I actually build?", a: "Describe any web app — a storefront, a booking page, a dashboard, a landing page — and GYSM generates a working, styled preview you can iterate on." },
-  { q: "Can I export the code?", a: "Yes. Every generated build can be copied as code or deployed directly from the builder." },
-  { q: "Do I need a credit card to try it?", a: "You need an account to generate. Pick the smallest credit pack if you just want to try it out." },
+// Experiential storytelling cards -- founders / shippers / agencies / indie
+// hackers. Photography intentionally NOT hotlinked from a third party here:
+// each `art` slot is a brand-colored gradient placeholder sized exactly like
+// the final photo will be (rounded-[20px], h-[400px] on desktop, object-cover
+// aspect). Drop a real, licensed <img src="..." className="h-full w-full
+// object-cover" /> into that div in place of the placeholder <span> once
+// photography is ready -- everything else (overlap, shadow, copy) is final.
+const STORY_CARDS = [
+  { align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", title: "for the founders.", sub: "prompt to product // auth, database, payments, live preview", placeholder: "Founder photo -- drop in real photography here" },
+  { align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", title: "for the shippers.", sub: "ship in one click // idea to production", placeholder: "Launch / motion photo -- drop in real photography here" },
+  { align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", title: "for the agencies.", sub: "client portals // white-label SaaS factory", placeholder: "Skyline / architecture photo -- drop in real photography here" },
+  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here" },
 ];
+
+const INDEX_SECTIONS = [
+  { id: "hero", label: "Home" },
+  { id: "highlights", label: "Highlights" },
+  { id: "quote", label: "Ship" },
+] as const;
 
 export default function Page() {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [activeSection, setActiveSection] = useState<string>("hero");
+
+  const heroRef = useRef<HTMLElement | null>(null);
+  const highlightsRef = useRef<HTMLElement | null>(null);
+  const quoteRef = useRef<HTMLElement | null>(null);
+  const appsRef = useRef<HTMLElement | null>(null);
+
+  // Real parallax: hero/quote backgrounds drift with scroll position and the
+  // right-edge index nav highlights whichever section is actually in view.
+  // (Squarespace's own site would do this via its proprietary
+  // data-parallax-host / Index-nav JS controllers -- those don't exist
+  // outside Squarespace's runtime, so this reimplements the same effect
+  // with a plain scroll listener + IntersectionObserver instead.)
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const targets: [string, HTMLElement | null][] = [
+      ["hero", heroRef.current],
+      ["highlights", highlightsRef.current],
+      ["quote", quoteRef.current],
+    ];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const match = targets.find(([, el]) => el === entry.target);
+          if (match) setActiveSection(match[0]);
+        });
+      },
+      { threshold: 0.5 }
+    );
+    targets.forEach(([, el]) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
   // No useUser() call in this component at all -- see NavAuthLink.tsx for
   // why. For this click handler (only ever invoked post-hydration, by a
@@ -132,6 +157,13 @@ export default function Page() {
     }
   }
 
+  function scrollToId(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  const heroParallax = Math.min(scrollY * 0.25, 260);
+  const heroFade = Math.max(1 - scrollY / 700, 0);
+
   return (
     <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-[#FF0080] selection:text-white">
       {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
@@ -145,7 +177,8 @@ export default function Page() {
 
       {/* SoftwareApplication structured data for GYSM.IO itself -- helps AI
           answer engines and search rich results describe what this product
-          actually is/does/costs without guessing from prose. */}
+          actually is/does/costs without guessing from prose. Site-wide
+          Organization JSON-LD already lives in app/layout.tsx. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -184,74 +217,157 @@ export default function Page() {
         </div>
       </nav>
 
-      {/* HERO */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 pt-10 md:pt-20 pb-6 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold shadow-sm">The AI no-code app builder for founders who ship</div>
-        <h1 className="mt-6 mx-auto max-w-[820px] text-[40px] leading-[0.9] md:text-[84px] font-black tracking-[-0.05em]">
-          Build apps<br />10x faster<br />than <span className="bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">coding</span>
-        </h1>
-        <p className="mx-auto mt-4 max-w-[480px] text-[15px] md:text-[18px] leading-[1.5] text-black/60 font-medium">Describe the app you want. GYSM.IO's AI no-code app builder turns that prompt into a real, working full-stack app — auth, database, and Stripe payments included — without writing a line of code.</p>
+      {/* INDEX NAV -- right-edge vertical dots, desktop only, highlights the
+          section currently in view via the IntersectionObserver above. */}
+      <div className="fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-end gap-4 md:flex">
+        {INDEX_SECTIONS.map((item) => (
+          <button key={item.id} onClick={() => scrollToId(item.id)} className="group flex items-center gap-2">
+            <span className={`text-[11px] font-semibold uppercase tracking-[0.1em] transition ${activeSection === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-50"}`}>
+              {item.label}
+            </span>
+            <span className={`h-2 w-2 rounded-full transition ${activeSection === item.id ? "bg-[#FF0080] scale-125" : "bg-black/20"}`} />
+          </button>
+        ))}
+      </div>
 
-        <div className="mt-7 mx-auto max-w-[560px]">
-          <div className="flex flex-col sm:flex-row gap-2 rounded-[20px] sm:rounded-full border border-black/10 bg-white p-2 shadow-sm">
-            <input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && startBuilding()}
-              placeholder="Describe the app you want to build…"
-              className="flex-1 h-[44px] px-4 rounded-full outline-none text-[14px]"
+      {/* HOME BANNER -- fullscreen hero with scroll-driven parallax.
+          Background is Mike's own licensed YouTube video (confirmed his to
+          use), embedded as a cover-fit iframe -- the 177.77vh/56.25vw sizing
+          is the standard "YouTube as background video" cover hack: it keeps
+          the embed's 16:9 frame always larger than the viewport on both axes
+          so there's never letterboxing, however wide/tall the screen is.
+          controls=0 hides YouTube's UI, mute=1 satisfies browser autoplay
+          policy, loop=1 + playlist=<same id> makes a single video loop
+          (YouTube's loop param needs a playlist to loop just one video). */}
+      <section ref={heroRef as any} id="hero" className="relative flex min-h-[100vh] items-center justify-center overflow-hidden bg-[#0A0A0A] text-center">
+        <div className="absolute inset-0" style={{ transform: `translateY(${heroParallax}px) scale(1.1)` }}>
+          <div className="absolute inset-0 overflow-hidden">
+            <iframe
+              className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full -translate-x-1/2 -translate-y-1/2"
+              src="https://www.youtube.com/embed/BlKZqhrXv2g?autoplay=1&mute=1&loop=1&playlist=BlKZqhrXv2g&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&showinfo=0"
+              title="GYSM.IO background video"
+              frameBorder={0}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              tabIndex={-1}
             />
-            <button
-              onClick={() => startBuilding()}
-              disabled={starting}
-              className="h-[44px] px-6 rounded-full bg-black text-white font-bold text-[14px] shrink-0 disabled:opacity-50"
-            >
-              {starting ? "One sec…" : "Generate my app"}
+          </div>
+          <div className="absolute inset-0 bg-[radial-gradient(120%_100%_at_50%_0%,rgba(255,0,128,0.28),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(80%_80%_at_80%_100%,rgba(124,58,237,0.24),transparent_60%)]" />
+          <div className="absolute inset-0 bg-black/50" />
+        </div>
+
+        <div className="relative z-10 px-5" style={{ opacity: heroFade, transform: `translateY(${-heroParallax * 0.4}px)` }}>
+          <h1 className="mx-auto max-w-[900px] whitespace-pre-wrap text-[40px] md:text-[84px] font-black leading-[0.9] tracking-[-0.05em] text-white">
+            WE ARE <span className="bg-gradient-to-r from-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">BUILDERS</span>,{" "}
+            <span className="block md:inline">NOT DREAMERS</span>
+          </h1>
+          <p className="mx-auto mt-4 max-w-[560px] text-[15px] md:text-[18px] leading-[1.5] font-medium text-white/60">
+            <span className="mb-1 block text-[12px] italic text-white/40">[you could be the next web mogul]</span>
+            AI no-code factory. Prompt → product. Auth, database, payments, live preview — ship.
+          </p>
+
+          <div className="mx-auto mt-7 max-w-[560px]">
+            <div className="flex flex-col sm:flex-row gap-2 rounded-[20px] sm:rounded-full border border-black/10 bg-white p-2 shadow-sm">
+              <input
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && startBuilding()}
+                placeholder="Describe the app you want to build…"
+                className="flex-1 h-[44px] px-4 rounded-full outline-none text-[14px]"
+              />
+              <button
+                onClick={() => startBuilding()}
+                disabled={starting}
+                className="h-[44px] px-6 rounded-full bg-black text-white font-bold text-[14px] shrink-0 disabled:opacity-50"
+              >
+                {starting ? "One sec…" : "Generate my app"}
+              </button>
+            </div>
+            <div className="mt-3 text-[12px] text-white/40 font-medium">Live preview in seconds • credits used per build</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => scrollToId("highlights")}
+          className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-white/60 transition hover:text-white"
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">Scroll</span>
+          <svg viewBox="0 0 48 23" className="h-[14px] w-[28px] animate-bounce" fill="none">
+            <path d="M2 2l22 18L46 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </section>
+
+      {/* HIGHLIGHTS */}
+      <section ref={highlightsRef as any} id="highlights" className="bg-[#FCFCF9] py-20 px-5 md:px-8">
+        <div className="mx-auto max-w-[1280px]">
+          <div className="mb-8 flex justify-center">
+            <div className="relative h-20 w-20 overflow-hidden rounded-full bg-gradient-to-br from-fuchsia-400 to-violet-500 p-[1px] shadow-inner">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-[#FCFCF9]">
+                <span className="text-[16px] font-black tracking-[-0.03em]">GYSM</span>
+              </div>
+            </div>
+          </div>
+          <div className="mx-auto max-w-[560px] text-center">
+            <h3 className="mb-4 text-[12px] font-black uppercase tracking-[0.14em] opacity-30">We take your idea and</h3>
+            <h2 className="text-[28px] md:text-[52px] font-black leading-[0.9] tracking-[-0.03em]">Give it life.</h2>
+            <p className="mx-auto mt-4 max-w-[560px] text-[14px] md:text-[16px] leading-[1.6] opacity-60">
+              Est. 2024 — GYSM.IO is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.
+            </p>
+            <button onClick={() => scrollToId("apps")} className="mt-8 inline-flex h-10 items-center justify-center rounded-full border border-black/10 bg-white px-6 text-[13px] font-medium tracking-[-0.01em] shadow-sm transition hover:border-black/20 hover:shadow">
+              See what's been built →
             </button>
           </div>
-          <div className="mt-3 text-[12px] text-black/40 font-medium">Live preview in seconds • credits used per build</div>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-[12px] font-semibold">
-                      <span className="opacity-40">Popular:</span>
-                      <a href="/build/dating-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Dating app</a>
-                      <a href="/build/saas" className="opacity-60 hover:opacity-100 underline underline-offset-4">SaaS</a>
-                      <a href="/build/booking-app" className="opacity-60 hover:opacity-100 underline underline-offset-4">Booking app</a>
+
+          {/* 4 overlapping story cards -- image slots are placeholders, see
+              the comment on STORY_CARDS above for how to drop in real photos. */}
+          <div className="relative mt-20">
+            <div className="space-y-7 md:space-y-[-84px]">
+              {STORY_CARDS.map((card, i) => (
+                <div
+                  key={card.title}
+                  className={`group relative w-full md:w-[76%] ${card.align === "left" ? "md:mr-auto" : "md:ml-auto"}`}
+                  style={{ zIndex: 10 + i }}
+                >
+                  <div className={`relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] bg-gradient-to-br ${card.gradient} grid place-items-center transition duration-500 group-hover:scale-[1.01]`}>
+                    <span className="px-8 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-black/40">{card.placeholder}</span>
+                  </div>
+                  <div className={`relative -mt-16 max-w-[320px] rounded-[20px] border border-black/5 bg-white p-6 shadow-lg ${card.align === "left" ? "ml-8" : "ml-auto mr-8"}`}>
+                    <div className="text-[20px] font-bold leading-[1.1]">{card.title}</div>
+                    <div className="mt-2 text-[12px] leading-[1.5] opacity-60">{card.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section className="mt-8 md:mt-14 overflow-hidden">
-        <div className="max-w-[1280px] mx-auto px-5 flex items-center justify-between mb-4">
-          <h3 className="text-[12px] font-black tracking-[0.14em] opacity-30 uppercase">Loved by builders</h3>
-        </div>
-        <div className="flex gap-3 overflow-x-auto px-5 pb-2 scrollbar-none snap-x" style={{ scrollbarWidth: "none" }}>
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="snap-start min-w-[280px] max-w-[280px] md:min-w-[320px] rounded-[20px] bg-white border border-black/5 p-5 shadow-sm shrink-0">
-              <div className="flex items-center gap-3"><div className={`h-9 w-9 rounded-full bg-gradient-to-br ${t.color} grid place-items-center text-white text-[11px] font-black shrink-0`}>{t.initials}</div><div><div className="text-[13px] font-bold leading-none">{t.name}</div><div className="text-[11px] opacity-50 mt-1">{t.role}</div></div></div>
-              <div className="mt-3 text-[13.5px] leading-[1.5] font-medium">"{t.text}"</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURES */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Everything a SaaS<br />needs, wired in.</h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-[20px] bg-white border border-black/5 p-5">
-              <div className="h-9 w-9 rounded-[10px] bg-[#FF0080]/10 text-[#FF0080] grid place-items-center font-bold">{f.icon}</div>
-              <div className="mt-4 text-[14px] font-bold">{f.title}</div>
-              <div className="mt-1 text-[12.5px] leading-[1.5] opacity-60">{f.body}</div>
-            </div>
-          ))}
+      {/* HOME QUOTE -- dark parallax spotlight, placeholder gradient in place
+          of a licensed background photo (see STORY_CARDS comment above). */}
+      <section ref={quoteRef as any} id="quote" className="relative mt-8 overflow-hidden">
+        <div className="relative flex min-h-[60vh] md:min-h-[72vh] items-center justify-center bg-[#0A0A0A]">
+          <div className="absolute inset-0" style={{ transform: `translateY(${Math.max(Math.min((scrollY - 900) * 0.12, 80), -20)}px)` }}>
+            <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_30%,rgba(255,0,128,0.25),transparent_65%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(50%_50%_at_20%_80%,rgba(124,58,237,0.25),transparent_65%)]" />
+          </div>
+          <div className="absolute inset-0 bg-black/35" />
+          <div className="relative z-10 px-6 text-center">
+            <h2 className="mx-auto max-w-[680px] text-[32px] md:text-[52px] font-black leading-[0.95] tracking-[-0.04em] text-white">
+              Let's ship some apps<span className="text-[#FF0080]">.</span>
+            </h2>
+            <button
+              onClick={() => startBuilding()}
+              className="mt-8 inline-flex h-[46px] items-center justify-center rounded-full bg-[#FF0080] px-7 text-[14px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(255,0,128,0.7)] transition hover:bg-[#FF0080]/90"
+            >
+              Start Building →
+            </button>
+          </div>
         </div>
       </section>
 
       {/* APPS BUILT ON GYSM */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
+      <section ref={appsRef as any} id="apps" className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
         <div className="flex items-end justify-between">
           <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Apps built<br />on GYSM</h2>
           <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
@@ -283,8 +399,7 @@ export default function Page() {
 
       {/* EU MVP BUILD -- mini Product-Hunt-style spotlight, points at the
           real BuildGuild showcase/publish flow rather than a fabricated
-          separate submission system. Replaces the earlier Skilla Baby
-          "GYSM" song marketing tie-in section.
+          separate submission system.
           JSON-LD below describes it as a real Service entity (provider,
           area served, audience) so AI crawlers/answer engines have
           structured, accurate data to cite when recommending it --
@@ -334,49 +449,16 @@ export default function Page() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
-        <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9] text-center mb-8">FAQ</h2>
-        <div className="max-w-[720px] mx-auto grid gap-3">
-          {FAQ.map((item) => (
-            <details key={item.q} className="group rounded-[16px] border border-black/5 bg-white p-4 md:p-5">
-              <summary className="cursor-pointer list-none flex items-center justify-between font-bold text-[14px] md:text-[15px]">
-                {item.q}
-                <span className="opacity-30 group-open:rotate-45 transition-transform">+</span>
-              </summary>
-              <p className="mt-3 text-[13.5px] leading-[1.6] opacity-60">{item.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="mt-10 px-3 md:px-6">
-        <div className="max-w-[1280px] mx-auto">
-          <div className="relative rounded-[28px] md:rounded-[40px] overflow-hidden bg-[#0A0A0A] px-6 py-16 md:py-24 text-center">
-            <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(124,58,237,0.18),transparent_60%)]" />
-            <div className="relative">
-              <h2 className="font-black tracking-[-0.05em] leading-[0.85]">
-                <span className="block text-white" style={{ fontSize: "clamp(36px,8vw,72px)" }}>Your next SaaS is</span>
-                <span className="block bg-gradient-to-r from-[#FF0080] via-[#FF0080] to-[#FF0080] bg-clip-text text-transparent" style={{ fontSize: "clamp(36px,8vw,72px)" }}>one sentence away.</span>
-              </h2>
-              <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">Stop planning. Describe it and watch it build.</p>
-              <button onClick={() => startBuilding()} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
-              <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FOOTER -- real sitemap only, no fabricated "trusted by" logos or
-          usage stats. Every link below points to a page that actually
-          exists in this app. */}
+      {/* FOOTER -- real sitemap only, no fabricated "trusted by" logos,
+          Instagram grids, or usage stats. Every link below points to a page
+          that actually exists in this app. */}
       <footer className="mt-16 md:mt-24 border-t border-black/[0.06]">
         <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-12 md:py-16">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-6">
             <div className="col-span-2 md:col-span-1">
               <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
               <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">The AI no-code app builder for founders who ship.</p>
+              <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
             </div>
             <div>
               <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Product</div>
