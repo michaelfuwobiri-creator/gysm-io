@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TemplateCard } from "./page";
 import { toThumbnailHtml } from "@/lib/thumbnailHtml";
+import { trackEvent } from "@/lib/analytics/track";
 
 // Card grid + click-to-preview modal for /templates. Mirrors the pattern
 // from competitor "no-code AI builder" template galleries -- a real
@@ -109,7 +110,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
               return (
                 <div
                   key={t.id}
-                  onClick={() => setOpenId(t.id)}
+                  onClick={() => { trackEvent("template_viewed", { templateId: t.id, title }); setOpenId(t.id); }}
                   className="group cursor-pointer rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-[#FF0080]/30 hover:shadow-md"
                 >
                   <div className="relative h-[170px] bg-white overflow-hidden pointer-events-none border-b border-black/5">

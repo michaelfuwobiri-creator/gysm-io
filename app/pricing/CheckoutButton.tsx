@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getPlanById } from "@/lib/stripe";
+import { trackEvent } from "@/lib/analytics/track";
 
 // No useUser() here -- see app/components/NavAuthLink.tsx for why. This
 // component only ever needed the user for an imperative check inside a
@@ -25,6 +26,7 @@ export default function CheckoutButton({
   const [error, setError] = useState("");
 
   async function handleClick() {
+    trackEvent("checkout_started", { planId });
     setLoading(true);
     setError("");
     try {

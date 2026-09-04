@@ -33,6 +33,7 @@ import { MEDIA_CREDIT_COST, type MediaKind } from "@/lib/mediaCreditsConstants";
 import type { BrandKit } from "@/lib/brandKit";
 import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
 import type { MediaTemplate } from "@/lib/mediaTemplates";
+import { trackEvent } from "@/lib/analytics/track";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -3314,6 +3315,10 @@ export default function LinearBuilderApp({
         onAuthRequired: () => router.push(`/sign-in?redirect_url=${encodeURIComponent(builderPath)}`),
         onNoCredits: () => router.push("/pricing?reason=no_credits"),
       });
+
+      if (!existingArtifact?.projectId && result.projectId) {
+        trackEvent("project_created", { projectId: result.projectId, tier });
+      }
 
       const host = typeof window !== "undefined" ? window.location.host : "gysm.io";
       const url = `${host}/publish/${result.projectId ?? ""}`;

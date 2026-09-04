@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
+import TrackTemplateViewed from "./TrackTemplateViewed";
 
 // Shared renderer for the 4 curated /templates/<slug> landing pages
 // (clinic, agency, zodiac, stripe). Each page.tsx just supplies the
@@ -33,6 +34,7 @@ export default async function TemplateLandingPage({ id, eyebrow, title, descript
 
   return (
     <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] p-8">
+      <TrackTemplateViewed id={id} title={title} />
       <Link href="/templates" className="text-black/50 text-sm">
         ← Back to Templates
       </Link>

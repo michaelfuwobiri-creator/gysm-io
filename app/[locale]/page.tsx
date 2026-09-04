@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import CookiePreferencesLink from "../components/CookiePreferencesLink";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { trackEvent } from "@/lib/analytics/track";
 
 const NavAuthLink = dynamic(() => import("../components/NavAuthLink"), { ssr: false });
 
@@ -150,6 +151,7 @@ export default function Page() {
   // documented singleton @clerk/nextjs's hooks read from internally.
   function startBuilding(promptText?: string) {
     const p = (promptText ?? prompt).trim();
+    trackEvent("build_clicked", { hasPrompt: !!p });
     setStarting(true);
     if (p) {
       window.localStorage.setItem("gysm_pending_prompt", p);
