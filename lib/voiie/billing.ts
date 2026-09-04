@@ -7,7 +7,7 @@
 // GYSM.IO account that owns the demo build going forward.
 
 import { clerkClient } from "@clerk/nextjs/server";
-import { getStripe, getPlanById, getPriceId } from "@/lib/stripe";
+import { getStripe, getPlanById, getPriceId, DEFAULT_LIVE_PRICE_IDS } from "@/lib/stripe";
 import { addCredits } from "@/lib/credits";
 import { sql } from "@/lib/db";
 import { addDomainToProject } from "@/lib/vercelDomains";
@@ -66,19 +66,44 @@ export async function createVoiieCheckoutSession(leadId: string, planId: VoiiePl
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
-  const session = await getStripe().checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [{ price: priceId, quantity: 1 }],
-    customer_email: lead.contact_email,
-    // source + leadId (not client_reference_id/userId, which the normal
-    // gysm.io checkout path uses) is how the webhook tells a VOIIE
-    // conversion apart from a regular plan purchase -- see the branch in
-    // app/api/billing/webhook/route.ts.
-    metadata: { source: "voiie", leadId: lead.id, planId: plan.id },
-    success_url: `${siteUrl}/voiie?leadId=${lead.id}&success=true&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/voiie?leadId=${lead.id}&canceled=true`,
-  });
+  function createSession(price: string) {
+    return getStripe().checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{ price, quantity: 1 }],
+      customer_email: lead.contact_email,
+      // source + leadId (not client_reference_id/userId, which the normal
+      // gysm.io checkout path uses) is how the webhook tells a VOIIE
+      // conversion apart from a regular plan purchase -- see the branch in
+      // app/api/billing/webhook/route.ts.
+      metadata: { source: "voiie", leadId: lead.id, planId: plan!.id },
+      success_url: `${siteUrl}/voiie?leadId=${lead.id}&success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/voiie?leadId=${lead.id}&canceled=true`,
+    });
+  }
+
+  // See app/api/billing/checkout/route.ts for why this retries once
+  // against DEFAULT_LIVE_PRICE_IDS -- a stale/deactivated Price in this
+  // plan's Vercel env var already took down gysm.io's own checkout once
+  // (STRIPE_*_PRICE_ID pointed at a Price this session deactivated during
+  // a repricing); VOIIE's checkout reads the exact same env vars via
+  // getPriceId, so it's exposed to the identical failure mode.
+  let session;
+  try {
+    session = await createSession(priceId);
+  } catch (err: any) {
+    const looksStale = /inactive|no such price|resource_missing/i.test(err?.message || err?.code || "");
+    const fallbackPriceId = DEFAULT_LIVE_PRICE_IDS[plan.id];
+    if (looksStale && fallbackPriceId && fallbackPriceId !== priceId) {
+      console.error(
+        `[voiie/billing] ${plan.priceIdEnvVar}="${priceId}" is rejected by Stripe (${err?.message || err}) -- ` +
+          `retrying with known-good price ${fallbackPriceId}. Fix ${plan.priceIdEnvVar} in Vercel to clear this warning.`
+      );
+      session = await createSession(fallbackPriceId);
+    } else {
+      throw err;
+    }
+  }
 
   if (!session.url) throw new Error("Stripe did not return a checkout URL.");
   await setPlanQuote(lead.id, plan.id, session.id);

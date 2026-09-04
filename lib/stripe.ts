@@ -291,9 +291,47 @@ export function getPlanById(planId: string | undefined | null): PricingPlan | un
   return PRICING_PLANS.find((p) => p.id === planId);
 }
 
-/** Reads the real Stripe Price ID for a plan out of its configured env var. */
+/**
+ * Known-good live Stripe Price IDs, pulled straight from the Stripe
+ * account right after the Sep 2026 repricing (the 9 Prices that are
+ * actually `active: true` today). This is a SAFETY NET, not the primary
+ * source of truth -- STRIPE_*_PRICE_ID env vars in Vercel (priceIdEnvVar
+ * above) are still what's meant to drive checkout day to day, since
+ * that's what lets a price change without a code deploy.
+ *
+ * It exists because that hand-maintained env var step already went stale
+ * for real: right after repricing every plan and deactivating the old
+ * Stripe Prices, one of the STRIPE_*_PRICE_ID vars in Vercel was left
+ * pointing at a now-deactivated Price, and checkout started throwing
+ * "The price specified is inactive" for every customer on that plan --
+ * silently, until someone happened to try buying it. There's no tool
+ * available in this workflow that can read or fix a Vercel env var
+ * directly, so app/api/billing/checkout/route.ts now falls back to this
+ * map (and loudly logs which env var was wrong) whenever Stripe rejects
+ * the configured price as inactive/missing -- a stale env var degrades to
+ * "checkout still works, log a warning" instead of "checkout is down for
+ * that plan until a human notices."
+ *
+ * Keep this in sync whenever a plan's Stripe Price is recreated -- same
+ * discipline the env vars already require, just with a safety net under
+ * it now instead of a silent single point of failure.
+ */
+export const DEFAULT_LIVE_PRICE_IDS: Record<PricingPlan["id"], string> = {
+  credits_starter: "price_1UByxVDE5QfMC9H1FKBdHVIk",
+  credits_popular: "price_1UByxjDE5QfMC9H1Rc5Km9vo",
+  credits_bulk: "price_1UByxlDE5QfMC9H1eQsGbept",
+  plan_builder: "price_1UByxmDE5QfMC9H1h1uruCcC",
+  plan_pro: "price_1UByxnDE5QfMC9H1G9POfwzL",
+  plan_studio: "price_1UByxpDE5QfMC9H1HBSD1DIv",
+  voiie_starter: "price_1UByxqDE5QfMC9H1nWSHLHQM",
+  voiie_pro: "price_1UByxsDE5QfMC9H1vpBrUsdu",
+  voiie_agency: "price_1UByxtDE5QfMC9H1srTxLqVX",
+};
+
+/** Reads the real Stripe Price ID for a plan: the Vercel env var if set,
+ *  else the known-good default above (see DEFAULT_LIVE_PRICE_IDS). */
 export function getPriceId(planId: string): string | undefined {
   const plan = getPlanById(planId);
   if (!plan) return undefined;
-  return process.env[plan.priceIdEnvVar];
+  return process.env[plan.priceIdEnvVar] || DEFAULT_LIVE_PRICE_IDS[plan.id];
 }

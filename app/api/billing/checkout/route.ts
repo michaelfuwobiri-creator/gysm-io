@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe, getPlanById, getPriceId } from "@/lib/stripe";
+import { getStripe, getPlanById, getPriceId, DEFAULT_LIVE_PRICE_IDS } from "@/lib/stripe";
 import { getUser } from "@/lib/auth";
 
 // This route did not exist at all in the repo -- app/pricing/page.tsx was
@@ -39,19 +39,44 @@ export async function POST(req: NextRequest) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
-  try {
-    const session = await getStripe().checkout.sessions.create({
+  function createSession(price: string) {
+    return getStripe().checkout.sessions.create({
       mode: plan.interval === "month" ? "subscription" : "payment",
       payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price, quantity: 1 }],
       client_reference_id: user.id,
       customer_email: user.email ?? undefined,
       metadata: { userId: user.id, planId: plan.id },
       success_url: `${siteUrl}/builder?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/pricing?canceled=true`,
     });
+  }
+
+  try {
+    const session = await createSession(priceId);
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
+    // A stale/deactivated Price in the STRIPE_*_PRICE_ID env var (see
+    // DEFAULT_LIVE_PRICE_IDS in lib/stripe.ts for the real incident this
+    // guards against) shouldn't take checkout down for that plan -- retry
+    // once against the known-good live Price ID before giving up, and log
+    // loudly so the actual env var mismatch gets fixed instead of masked
+    // forever.
+    const looksStale = /inactive|no such price|resource_missing/i.test(err?.message || err?.code || "");
+    const fallbackPriceId = DEFAULT_LIVE_PRICE_IDS[plan.id];
+    if (looksStale && fallbackPriceId && fallbackPriceId !== priceId) {
+      console.error(
+        `[billing/checkout] ${plan.priceIdEnvVar}="${priceId}" is rejected by Stripe (${err?.message || err}) -- ` +
+          `retrying with known-good price ${fallbackPriceId}. Fix ${plan.priceIdEnvVar} in Vercel to clear this warning.`
+      );
+      try {
+        const session = await createSession(fallbackPriceId);
+        return NextResponse.json({ url: session.url });
+      } catch (err2: any) {
+        console.error("[billing/checkout] Stripe error (fallback price also failed):", err2?.message || err2);
+        return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
+      }
+    }
     console.error("[billing/checkout] Stripe error:", err?.message || err);
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
   }
