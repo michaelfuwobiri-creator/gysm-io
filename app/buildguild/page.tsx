@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import BuildCard from "./BuildCard";
 import SubmitBuildModal from "./SubmitBuildModal";
+import FeaturedApps from "./FeaturedApps";
 
 // BuildGuild -- public gallery of every app users have opted to publish
 // (projects.is_public = true, set via POST /api/projects/[id]/publish).
@@ -259,6 +260,10 @@ export default async function BuildGuildPage({
             </div>
           ))}
         </div>
+
+        {/* Pinned, hand-picked builds -- see FeaturedApps.tsx for why these
+            live here now instead of on the homepage. */}
+        <FeaturedApps />
 
         {/* Category chips -- real tags, real counts (see tagChips above).
             Only rendered if at least one published build has a tag. */}

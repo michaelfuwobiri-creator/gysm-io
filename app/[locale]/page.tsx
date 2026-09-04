@@ -2,103 +2,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import CookiePreferencesLink from "../components/CookiePreferencesLink";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProductsNavMenu from "../components/ProductsNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
-import { IMAGE_BLUR } from "@/lib/imagePlaceholders";
 
 const NavAuthLink = dynamic(() => import("../components/NavAuthLink"), { ssr: false });
-
-// Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
-// (below) instead of a stock emoji, so the grid reads like an actual app
-// showcase/portfolio rather than a placeholder tile set.
-// Real apps published to BuildGuild by GYSM's own founder while testing the
-// platform (verified live at /publish/[id] as of writing) -- swapped in for
-// the earlier fictional placeholder tiles so this grid links to real,
-// clickable builds instead of names nothing points to. Each `mark` recreates
-// that app's actual generated logo (icon shape + color + wordmark), not a
-// generic placeholder glyph.
-const APPS = [
-  { name: "orbit.", tag: "Live", projectId: "5b983815-8702-4bde-b4d6-712ae95d95c0", color: "from-fuchsia-500 to-violet-600", desc: "Zodiac dating app" },
-  { name: "Studio Sol", tag: "Live", projectId: "2f736c3e-f255-4ec2-80f6-60dac7d3afd3", color: "from-pink-500 to-orange-500", desc: "Salon booking" },
-  { name: "loop.", tag: "Live", projectId: "7ce589a2-76aa-4a38-98c4-a915423d347c", color: "from-indigo-500 to-purple-600", desc: "Habit tracker" },
-  { name: "VelocityRun", tag: "Live", projectId: "01d17652-6489-42d2-bfdf-61e12810e285", color: "from-indigo-600 to-fuchsia-600", desc: "Racing game" },
-];
-
-// Every mark below is a purpose-drawn glyph tied to what that app actually
-// does (a burst for orbit's zodiac matching, a sun for Studio Sol's salon
-// bookings, a repeat cycle for loop's habit tracking, a speed chevron for
-// VelocityRun's racing game) -- not an initial in a box. Same rounded-app-icon
-// shape across all four so the row reads as a real home-screen icon grid,
-// something you'd actually tap, rather than a plain lettered tile set.
-function AppLogo({ name, className }: { name: string; className?: string }) {
-  switch (name) {
-    case "orbit.":
-      return (
-        <div className={`${className} rounded-[18px] bg-gradient-to-br from-fuchsia-400 to-violet-500 grid place-items-center shadow-inner`}>
-          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
-            <path d="M12 4l1.6 5.4L19 11l-5.4 1.6L12 18l-1.6-5.4L5 11l5.4-1.6L12 4Z" fill="white" />
-          </svg>
-        </div>
-      );
-    case "Studio Sol":
-      return (
-        <div className={`${className} rounded-[18px] bg-gradient-to-br from-pink-500 to-orange-400 grid place-items-center shadow-inner`}>
-          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
-            <circle cx="12" cy="12" r="4" fill="white" />
-            <g stroke="white" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 2.5v3M12 18.5v3M3.8 3.8l2.1 2.1M18.1 18.1l2.1 2.1M2.5 12h3M18.5 12h3M3.8 20.2l2.1-2.1M18.1 5.9l2.1-2.1" />
-            </g>
-          </svg>
-        </div>
-      );
-    case "loop.":
-      return (
-        <div className={`${className} rounded-[18px] bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center shadow-inner`}>
-          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
-            <path d="M4 12a8 8 0 0 1 8-8c2.5 0 4.7 1.2 6.1 3M20 4v4h-4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M20 12a8 8 0 0 1-8 8c-2.5 0-4.7-1.2-6.1-3M4 20v-4h4" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-      );
-    case "VelocityRun":
-      return (
-        <div className={`${className} rounded-[18px] bg-gradient-to-br from-indigo-600 to-fuchsia-600 grid place-items-center shadow-inner`}>
-          <svg viewBox="0 0 24 24" fill="none" className="h-[55%] w-[55%]">
-            <path d="M2.5 7.5h9M2.5 12h13M2.5 16.5h6" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-            <path d="M14.5 5.5l6.5 6.5-6.5 6.5" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-      );
-    default:
-      return null;
-  }
-}
-
-// Experiential storytelling cards -- founders / shippers / agencies / indie
-// hackers. Photography intentionally NOT hotlinked from a third party here:
-// each `art` slot is a brand-colored gradient placeholder sized exactly like
-// the final photo will be (rounded-[20px], h-[400px] on desktop, object-cover
-// aspect). Drop a real, licensed <img src="..." className="h-full w-full
-// object-cover" /> into that div in place of the placeholder <span> once
-// photography is ready -- everything else (overlap, shadow, copy) is final.
-// Copy for each card now lives in messages/*.json (Home.story.<id>) so it
-// translates per locale -- this array only keeps the locale-independent
-// visual metadata (layout, gradient fallback, photo).
-const STORY_CARDS_META = [
-  { id: "founders", align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", image: "/media/story-founders.webp" },
-  { id: "shippers", align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", image: "/media/story-shippers.webp" },
-  { id: "agencies", align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", image: "/media/story-agencies.webp" },
-  { id: "indieHackers", align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", image: "/media/story-indie-hackers.webp" },
-] as const;
 
 const INDEX_SECTIONS = [
   { id: "hero", label: "Home" },
   { id: "highlights", label: "Highlights" },
-  { id: "quote", label: "Ship" },
 ] as const;
 
 export default function Page() {
@@ -111,10 +25,8 @@ export default function Page() {
 
   const heroRef = useRef<HTMLElement | null>(null);
   const highlightsRef = useRef<HTMLElement | null>(null);
-  const quoteRef = useRef<HTMLElement | null>(null);
-  const appsRef = useRef<HTMLElement | null>(null);
 
-  // Real parallax: hero/quote backgrounds drift with scroll position and the
+  // Real parallax: the hero background drifts with scroll position and the
   // right-edge index nav highlights whichever section is actually in view.
   // (Squarespace's own site would do this via its proprietary
   // data-parallax-host / Index-nav JS controllers -- those don't exist
@@ -130,7 +42,6 @@ export default function Page() {
     const targets: [string, HTMLElement | null][] = [
       ["hero", heroRef.current],
       ["highlights", highlightsRef.current],
-      ["quote", quoteRef.current],
     ];
     const observer = new IntersectionObserver(
       (entries) => {
@@ -174,12 +85,6 @@ export default function Page() {
 
   const heroParallax = Math.min(scrollY * 0.25, 260);
   const heroFade = Math.max(1 - scrollY / 700, 0);
-
-  const STORY_CARDS = STORY_CARDS_META.map((card) => ({
-    ...card,
-    title: t(`story.${card.id}.title`),
-    sub: t(`story.${card.id}.sub`),
-  }));
 
   return (
     <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-[#FF0080] selection:text-white">
@@ -332,146 +237,21 @@ export default function Page() {
             <p className="mx-auto mt-4 max-w-[560px] text-[14px] md:text-[16px] leading-[1.6] opacity-60">
               {t("highlights.subtitle")}
             </p>
-            <button onClick={() => scrollToId("apps")} className="mt-8 inline-flex h-10 items-center justify-center rounded-full border border-black/10 bg-white px-6 text-[13px] font-medium tracking-[-0.01em] shadow-sm transition hover:border-black/20 hover:shadow">
+            {/* Bug fix / restructure: this used to scrollToId("apps") into
+                a long homepage that kept going for another 5 sections
+                (story cards, a repeat CTA, an app showcase grid, an EU MVP
+                spotlight, a pricing teaser) before the footer. Mike asked
+                to end the homepage right here, at this button -- so it now
+                links straight to /buildguild, where that showcase grid
+                actually lives now (see app/buildguild/FeaturedApps.tsx).
+                The removed sections weren't deleted outright: the EU MVP
+                spotlight and pricing teaser were pure duplicates of
+                content /buildguild and /pricing already cover in full, and
+                the app showcase grid was moved rather than dropped. */}
+            <a href="/buildguild" className="mt-8 inline-flex h-10 items-center justify-center rounded-full border border-black/10 bg-white px-6 text-[13px] font-medium tracking-[-0.01em] shadow-sm transition hover:border-black/20 hover:shadow">
               {t("highlights.cta")}
-            </button>
-          </div>
-
-          {/* 4 overlapping story cards -- founders, shippers, agencies,
-              indie hackers -- each with a real supplied photo. */}
-          <div className="relative mt-20">
-            <div className="space-y-7 md:space-y-[-84px]">
-              {STORY_CARDS.map((card, i) => (
-                <div
-                  key={card.id}
-                  className={`group relative w-full md:w-[76%] ${card.align === "left" ? "md:mr-auto" : "md:ml-auto"}`}
-                  style={{ zIndex: 10 + i }}
-                >
-                  <div className="relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] grid place-items-center transition duration-500 group-hover:scale-[1.01]">
-                    <Image
-                      src={card.image}
-                      alt={card.title}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 76vw"
-                      className="object-cover transition duration-700 group-hover:scale-[1.04]"
-                      placeholder="blur"
-                      blurDataURL={IMAGE_BLUR[card.image]}
-                    />
-                  </div>
-                  <div className={`relative -mt-16 max-w-[320px] rounded-[20px] border border-black/5 bg-white p-6 shadow-lg ${card.align === "left" ? "ml-8" : "ml-auto mr-8"}`}>
-                    <div className="text-[20px] font-bold leading-[1.1]">{card.title}</div>
-                    <div className="mt-2 text-[12px] leading-[1.5] opacity-60">{card.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOME QUOTE -- dark parallax spotlight, placeholder gradient in place
-          of a licensed background photo (see STORY_CARDS comment above). */}
-      <section ref={quoteRef as any} id="quote" className="relative mt-8 overflow-hidden">
-        <div className="relative flex min-h-[60vh] md:min-h-[72vh] items-center justify-center bg-[#0A0A0A]">
-          <div className="absolute inset-0" style={{ transform: `translateY(${Math.max(Math.min((scrollY - 900) * 0.12, 80), -20)}px)` }}>
-            <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_30%,rgba(255,0,128,0.25),transparent_65%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(50%_50%_at_20%_80%,rgba(124,58,237,0.25),transparent_65%)]" />
-          </div>
-          <div className="absolute inset-0 bg-black/35" />
-          <div className="relative z-10 px-6 text-center">
-            <h2 className="mx-auto max-w-[680px] text-[32px] md:text-[52px] font-black leading-[0.95] tracking-[-0.04em] text-white">
-              {t("quote.title")}
-            </h2>
-            <button
-              onClick={() => startBuilding()}
-              className="mt-8 inline-flex h-[46px] items-center justify-center rounded-full bg-[#FF0080] px-7 text-[14px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(255,0,128,0.7)] transition hover:bg-[#FF0080]/90"
-            >
-              {t("quote.cta")}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* APPS BUILT ON GYSM */}
-      <section ref={appsRef as any} id="apps" className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
-        <div className="flex items-end justify-between">
-          <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">{t("apps.heading1")}<br />{t("apps.heading2")}</h2>
-          <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">{t("apps.explore")}</a>
-        </div>
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {APPS.map((app) => (
-            <a
-              key={app.name}
-              href={`/publish/${app.projectId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group relative rounded-[20px] bg-white border border-black/5 p-3 md:p-4 hover:shadow-lg hover:-translate-y-[2px] transition-all"
-            >
-              <div className="relative h-[88px] md:h-[110px] rounded-[14px] bg-zinc-50 border border-black/5 grid place-items-center overflow-hidden">
-                <AppLogo name={app.name} className="h-11 w-11 md:h-14 md:w-14 text-[18px] md:text-[22px] transition-transform duration-300 group-hover:scale-110" />
-                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-white border border-black/10 grid place-items-center text-[12px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">↗</div>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <div>
-                  <div className="text-[13px] font-bold">{app.name}</div>
-                  <div className="text-[11px] opacity-50 mt-0.5">{app.desc}</div>
-                </div>
-                <div className="text-[10px] font-bold px-2 py-1 rounded-full bg-black text-white shrink-0">{app.tag}</div>
-              </div>
             </a>
-          ))}
-        </div>
-      </section>
-
-      {/* EU MVP BUILD -- mini Product-Hunt-style spotlight, points at the
-          real BuildGuild showcase/publish flow rather than a fabricated
-          separate submission system.
-          JSON-LD below describes it as a real Service entity (provider,
-          area served, audience) so AI crawlers/answer engines have
-          structured, accurate data to cite when recommending it --
-          matching the existing SoftwareApplication schema block above
-          for the product itself. */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Service",
-            name: "EU MVP Build",
-            serviceType: "Startup product showcase and discovery",
-            description:
-              "EU MVP Build is GYSM.IO's community spotlight where founders and creators publish the apps they built with GYSM to BuildGuild for European exposure and discovery. Published builds are public, live, and open for comments.",
-            provider: { "@type": "Organization", name: "GYSM.IO", url: "https://www.gysm.io" },
-            areaServed: { "@type": "Place", name: "Europe" },
-            audience: { "@type": "Audience", audienceType: "Founders and creators" },
-            url: "https://www.gysm.io/buildguild",
-          }),
-        }}
-      />
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
-        <div className="relative rounded-[28px] md:rounded-[40px] overflow-hidden bg-[#0A0A0A] p-6 md:p-12">
-          <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(255,0,128,0.18),transparent_60%)]" />
-          <div className="relative max-w-[720px] mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">{t("euMvp.badge")}</div>
-            <h2 className="mt-5 font-black tracking-[-0.04em] leading-[0.95] text-white" style={{ fontSize: "clamp(32px,5vw,52px)" }}>
-              {t("euMvp.title")}
-            </h2>
-            <p className="mt-4 text-[14px] md:text-[16px] text-white/50 leading-[1.6] max-w-[560px] mx-auto">
-              {t("euMvp.description")}
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a href="/buildguild" className="h-[46px] px-7 rounded-full bg-[#FF0080] text-white text-[14px] font-bold inline-flex items-center justify-center hover:opacity-90 transition">{t("euMvp.ctaPrimary")}</a>
-              <button onClick={() => startBuilding()} className="h-[46px] px-7 rounded-full bg-white text-black text-[14px] font-bold inline-flex items-center justify-center">{t("euMvp.ctaSecondary")}</button>
-            </div>
           </div>
-        </div>
-      </section>
-
-      {/* PRICING TEASER */}
-      <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
-        <div className="rounded-[24px] border border-black/5 bg-white p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">{t("pricing.text")}</div><div className="text-[12px] opacity-50">{t("pricing.sub")}</div></div></div>
-          <a href="/pricing" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">{t("pricing.cta")}</a>
         </div>
       </section>
 
