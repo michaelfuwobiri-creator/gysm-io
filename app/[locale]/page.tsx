@@ -2,9 +2,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import CookiePreferencesLink from "./components/CookiePreferencesLink";
+import { useTranslations } from "next-intl";
+import CookiePreferencesLink from "../components/CookiePreferencesLink";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
-const NavAuthLink = dynamic(() => import("./components/NavAuthLink"), { ssr: false });
+const NavAuthLink = dynamic(() => import("../components/NavAuthLink"), { ssr: false });
 
 // Real, named apps built on GYSM. Each gets an original hand-drawn SVG mark
 // (below) instead of a stock emoji, so the grid reads like an actual app
@@ -79,12 +81,15 @@ function AppLogo({ name, className }: { name: string; className?: string }) {
 // aspect). Drop a real, licensed <img src="..." className="h-full w-full
 // object-cover" /> into that div in place of the placeholder <span> once
 // photography is ready -- everything else (overlap, shadow, copy) is final.
-const STORY_CARDS = [
-  { align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", title: "for the founders.", sub: "prompt to product // auth, database, payments, live preview", placeholder: "Founder photo -- drop in real photography here", image: "/media/story-founders.jpg" },
-  { align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", title: "for the shippers.", sub: "ship in one click // idea to production", placeholder: "Launch / motion photo -- drop in real photography here", image: "/media/story-shippers.jpg" },
-  { align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", title: "for the agencies.", sub: "client portals // white-label SaaS factory", placeholder: "Skyline / architecture photo -- drop in real photography here", image: "/media/story-agencies.jpg" },
-  { align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", title: "for the indie hackers.", sub: "solo builder // ship it yourself", placeholder: "Studio / tech photo -- drop in real photography here", image: "/media/story-indie-hackers.webp" },
-];
+// Copy for each card now lives in messages/*.json (Home.story.<id>) so it
+// translates per locale -- this array only keeps the locale-independent
+// visual metadata (layout, gradient fallback, photo).
+const STORY_CARDS_META = [
+  { id: "founders", align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", image: "/media/story-founders.jpg" },
+  { id: "shippers", align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", image: "/media/story-shippers.jpg" },
+  { id: "agencies", align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", image: "/media/story-agencies.jpg" },
+  { id: "indieHackers", align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", image: "/media/story-indie-hackers.webp" },
+] as const;
 
 const INDEX_SECTIONS = [
   { id: "hero", label: "Home" },
@@ -93,6 +98,7 @@ const INDEX_SECTIONS = [
 ] as const;
 
 export default function Page() {
+  const t = useTranslations("Home");
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [starting, setStarting] = useState(false);
@@ -164,6 +170,12 @@ export default function Page() {
   const heroParallax = Math.min(scrollY * 0.25, 260);
   const heroFade = Math.max(1 - scrollY / 700, 0);
 
+  const STORY_CARDS = STORY_CARDS_META.map((card) => ({
+    ...card,
+    title: t(`story.${card.id}.title`),
+    sub: t(`story.${card.id}.sub`),
+  }));
+
   return (
     <div style={{ fontFamily: "Inter,sans-serif" }} className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] antialiased overflow-x-clip selection:bg-[#FF0080] selection:text-white">
       {/* A <link> tag, not an inline <style>@import> -- React HTML-escapes
@@ -207,12 +219,12 @@ export default function Page() {
           <div className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span></div>
           <div className="flex items-center gap-2">
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
-            <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Templates</a>
+            <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">{t("nav.templates")}</a>
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
-            <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
+            <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">{t("nav.pricing")}</a>
             <NavAuthLink />
-            <button onClick={() => startBuilding()} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">Start Building</button>
+            <button onClick={() => startBuilding()} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">{t("nav.startBuilding")}</button>
           </div>
         </div>
       </nav>
@@ -258,12 +270,12 @@ export default function Page() {
 
         <div className="relative z-10 px-5" style={{ opacity: heroFade, transform: `translateY(${-heroParallax * 0.4}px)` }}>
           <h1 className="mx-auto max-w-[900px] whitespace-pre-wrap text-[40px] md:text-[84px] font-black leading-[0.9] tracking-[-0.05em] text-white">
-            WE ARE <span className="bg-gradient-to-r from-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">BUILDERS</span>,{" "}
-            <span className="block md:inline">NOT DREAMERS</span>
+            {t("hero.titleLine1")} <span className="bg-gradient-to-r from-[#FF0080] to-[#FF0080] bg-clip-text text-transparent">{t("hero.titleHighlight")}</span>,{" "}
+            <span className="block md:inline">{t("hero.titleLine2")}</span>
           </h1>
           <p className="mx-auto mt-4 max-w-[560px] text-[15px] md:text-[18px] leading-[1.5] font-medium text-white/60">
-            <span className="mb-1 block text-[12px] italic text-white/40">[you could be the next web mogul]</span>
-            AI no-code factory. Prompt → product. Auth, database, payments, live preview — ship.
+            <span className="mb-1 block text-[12px] italic text-white/40">{t("hero.tagline")}</span>
+            {t("hero.subtitle")}
           </p>
 
           <div className="mx-auto mt-7 max-w-[560px]">
@@ -272,7 +284,7 @@ export default function Page() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && startBuilding()}
-                placeholder="Describe the app you want to build…"
+                placeholder={t("hero.placeholder")}
                 className="flex-1 h-[44px] px-4 rounded-full outline-none text-[14px]"
               />
               <button
@@ -280,10 +292,10 @@ export default function Page() {
                 disabled={starting}
                 className="h-[44px] px-6 rounded-full bg-black text-white font-bold text-[14px] shrink-0 disabled:opacity-50"
               >
-                {starting ? "One sec…" : "Generate my app"}
+                {starting ? t("hero.ctaLoading") : t("hero.cta")}
               </button>
             </div>
-            <div className="mt-3 text-[12px] text-white/40 font-medium">Live preview in seconds • credits used per build</div>
+            <div className="mt-3 text-[12px] text-white/40 font-medium">{t("hero.helper")}</div>
           </div>
         </div>
 
@@ -291,7 +303,7 @@ export default function Page() {
           onClick={() => scrollToId("highlights")}
           className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-white/60 transition hover:text-white"
         >
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">Scroll</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">{t("hero.scroll")}</span>
           <svg viewBox="0 0 48 23" className="h-[14px] w-[28px] animate-bounce" fill="none">
             <path d="M2 2l22 18L46 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -309,33 +321,28 @@ export default function Page() {
             </div>
           </div>
           <div className="mx-auto max-w-[560px] text-center">
-            <h3 className="mb-4 text-[12px] font-black uppercase tracking-[0.14em] opacity-30">We take your idea and</h3>
-            <h2 className="text-[28px] md:text-[52px] font-black leading-[0.9] tracking-[-0.03em]">Give it life.</h2>
+            <h3 className="mb-4 text-[12px] font-black uppercase tracking-[0.14em] opacity-30">{t("highlights.eyebrow")}</h3>
+            <h2 className="text-[28px] md:text-[52px] font-black leading-[0.9] tracking-[-0.03em]">{t("highlights.title")}</h2>
             <p className="mx-auto mt-4 max-w-[560px] text-[14px] md:text-[16px] leading-[1.6] opacity-60">
-              Est. 2024 — GYSM.IO is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.
+              {t("highlights.subtitle")}
             </p>
             <button onClick={() => scrollToId("apps")} className="mt-8 inline-flex h-10 items-center justify-center rounded-full border border-black/10 bg-white px-6 text-[13px] font-medium tracking-[-0.01em] shadow-sm transition hover:border-black/20 hover:shadow">
-              See what's been built →
+              {t("highlights.cta")}
             </button>
           </div>
 
-          {/* 4 overlapping story cards. Founders + agencies now use Mike's
-              own supplied photos; shippers + indie hackers still fall back to
-              the gradient placeholder until those two are sent over. */}
+          {/* 4 overlapping story cards -- founders, shippers, agencies,
+              indie hackers -- each with a real supplied photo. */}
           <div className="relative mt-20">
             <div className="space-y-7 md:space-y-[-84px]">
               {STORY_CARDS.map((card, i) => (
                 <div
-                  key={card.title}
+                  key={card.id}
                   className={`group relative w-full md:w-[76%] ${card.align === "left" ? "md:mr-auto" : "md:ml-auto"}`}
                   style={{ zIndex: 10 + i }}
                 >
-                  <div className={`relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] ${card.image ? "" : `bg-gradient-to-br ${card.gradient}`} grid place-items-center transition duration-500 group-hover:scale-[1.01]`}>
-                    {card.image ? (
-                      <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
-                    ) : (
-                      <span className="px-8 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-black/40">{card.placeholder}</span>
-                    )}
+                  <div className="relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] grid place-items-center transition duration-500 group-hover:scale-[1.01]">
+                    <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
                   </div>
                   <div className={`relative -mt-16 max-w-[320px] rounded-[20px] border border-black/5 bg-white p-6 shadow-lg ${card.align === "left" ? "ml-8" : "ml-auto mr-8"}`}>
                     <div className="text-[20px] font-bold leading-[1.1]">{card.title}</div>
@@ -359,13 +366,13 @@ export default function Page() {
           <div className="absolute inset-0 bg-black/35" />
           <div className="relative z-10 px-6 text-center">
             <h2 className="mx-auto max-w-[680px] text-[32px] md:text-[52px] font-black leading-[0.95] tracking-[-0.04em] text-white">
-              Let's ship some apps<span className="text-[#FF0080]">.</span>
+              {t("quote.title")}
             </h2>
             <button
               onClick={() => startBuilding()}
               className="mt-8 inline-flex h-[46px] items-center justify-center rounded-full bg-[#FF0080] px-7 text-[14px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(255,0,128,0.7)] transition hover:bg-[#FF0080]/90"
             >
-              Start Building →
+              {t("quote.cta")}
             </button>
           </div>
         </div>
@@ -374,8 +381,8 @@ export default function Page() {
       {/* APPS BUILT ON GYSM */}
       <section ref={appsRef as any} id="apps" className="max-w-[1280px] mx-auto px-5 md:px-8 mt-14 md:mt-24">
         <div className="flex items-end justify-between">
-          <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Apps built<br />on GYSM</h2>
-          <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">Explore →</a>
+          <h2 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">{t("apps.heading1")}<br />{t("apps.heading2")}</h2>
+          <a href="/templates" className="text-[13px] font-semibold underline underline-offset-4 opacity-60">{t("apps.explore")}</a>
         </div>
         <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {APPS.map((app) => (
@@ -431,16 +438,16 @@ export default function Page() {
         <div className="relative rounded-[28px] md:rounded-[40px] overflow-hidden bg-[#0A0A0A] p-6 md:p-12">
           <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,rgba(255,0,128,0.18),transparent_60%)]" />
           <div className="relative max-w-[720px] mx-auto text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">New · Community spotlight</div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70">{t("euMvp.badge")}</div>
             <h2 className="mt-5 font-black tracking-[-0.04em] leading-[0.95] text-white" style={{ fontSize: "clamp(32px,5vw,52px)" }}>
-              EU MVP Build
+              {t("euMvp.title")}
             </h2>
             <p className="mt-4 text-[14px] md:text-[16px] text-white/50 leading-[1.6] max-w-[560px] mx-auto">
-              Where founders and creators upload their builds for European exposure — and get discovered. Publish what you shipped with GYSM to BuildGuild and it's live for the community to find, try, and comment on.
+              {t("euMvp.description")}
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a href="/buildguild" className="h-[46px] px-7 rounded-full bg-[#FF0080] text-white text-[14px] font-bold inline-flex items-center justify-center hover:opacity-90 transition">See what's live →</a>
-              <button onClick={() => startBuilding()} className="h-[46px] px-7 rounded-full bg-white text-black text-[14px] font-bold inline-flex items-center justify-center">Build &amp; publish yours</button>
+              <a href="/buildguild" className="h-[46px] px-7 rounded-full bg-[#FF0080] text-white text-[14px] font-bold inline-flex items-center justify-center hover:opacity-90 transition">{t("euMvp.ctaPrimary")}</a>
+              <button onClick={() => startBuilding()} className="h-[46px] px-7 rounded-full bg-white text-black text-[14px] font-bold inline-flex items-center justify-center">{t("euMvp.ctaSecondary")}</button>
             </div>
           </div>
         </div>
@@ -449,8 +456,8 @@ export default function Page() {
       {/* PRICING TEASER */}
       <section className="max-w-[1280px] mx-auto px-5 md:px-8 mt-12 md:mt-20">
         <div className="rounded-[24px] border border-black/5 bg-white p-5 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">Pay only for the builds you ship</div><div className="text-[12px] opacity-50">Credit packs from $9, or monthly plans from $29 — your call</div></div></div>
-          <a href="/pricing" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">See Pricing →</a>
+          <div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-black text-white grid place-items-center font-black">∞</div><div><div className="text-[14px] font-bold">{t("pricing.text")}</div><div className="text-[12px] opacity-50">{t("pricing.sub")}</div></div></div>
+          <a href="/pricing" className="h-10 px-6 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center w-full md:w-auto shrink-0">{t("pricing.cta")}</a>
         </div>
       </section>
 
@@ -462,7 +469,7 @@ export default function Page() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-6">
             <div className="col-span-2 md:col-span-1">
               <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
-              <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">The AI no-code app builder for founders who ship.</p>
+              <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">{t("footer.tagline")}</p>
               <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
             </div>
             <div>
@@ -501,6 +508,7 @@ export default function Page() {
           <div className="mt-10 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>
         </div>
       </footer>
+      <LanguageSwitcher />
     </div>
   )
 }

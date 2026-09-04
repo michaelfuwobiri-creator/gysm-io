@@ -1,0 +1,73 @@
+{
+  "Home": {
+    "meta": {
+      "title": "GYSM.IO – AI graditelj aplikacija bez koda za osnivače i startupove",
+      "description": "GYSM.IO je AI graditelj aplikacija bez koda: opišite aplikaciju koju želite na običnom jeziku i dobijte pravu, funkcionalnu full-stack web aplikaciju — s autentifikacijom, bazom podataka i plaćanjima — bez potrebe za programiranjem."
+    },
+    "nav": {
+      "startBuilding": "Počni graditi",
+      "templates": "Predlošci",
+      "pricing": "Cijene"
+    },
+    "hero": {
+      "titleLine1": "MI SMO",
+      "titleHighlight": "GRADITELJI",
+      "titleLine2": "NE SANJARI",
+      "tagline": "[mogao bi biti sljedeći web mogul]",
+      "subtitle": "AI tvornica bez koda. Od upita do proizvoda. Autentifikacija, baza podataka, plaćanja, pregled uživo — objavi.",
+      "placeholder": "Opiši aplikaciju koju želiš izgraditi…",
+      "cta": "Generiraj moju aplikaciju",
+      "ctaLoading": "Trenutak…",
+      "helper": "Pregled uživo za nekoliko sekundi • krediti se troše po izgradnji",
+      "scroll": "Skroluj"
+    },
+    "highlights": {
+      "eyebrow": "Uzmemo tvoju ideju i",
+      "title": "Udahnemo joj život.",
+      "subtitle": "Osn. 2024. — GYSM.IO je AI graditelj aplikacija bez koda. Od upita do proizvoda: autentifikacija, baza podataka i Stripe plaćanja uključeni, bez pisanja ijedne linije koda.",
+      "cta": "Pogledaj što je izgrađeno →"
+    },
+    "story": {
+      "founders": {
+        "title": "za osnivače.",
+        "sub": "od upita do proizvoda // autentifikacija, baza podataka, plaćanja, pregled uživo"
+      },
+      "shippers": {
+        "title": "za one koji objavljuju.",
+        "sub": "objavi jednim klikom // od ideje do produkcije"
+      },
+      "agencies": {
+        "title": "za agencije.",
+        "sub": "portali za klijente // white-label SaaS tvornica"
+      },
+      "indieHackers": {
+        "title": "za samostalne graditelje.",
+        "sub": "solo graditelj // izgradi to sam"
+      }
+    },
+    "quote": {
+      "title": "Idemo objaviti par aplikacija.",
+      "cta": "Počni graditi →"
+    },
+    "apps": {
+      "heading1": "Aplikacije izgrađene",
+      "heading2": "na GYSM-u",
+      "explore": "Istraži →"
+    },
+    "euMvp": {
+      "badge": "Novo · Zajednica u fokusu",
+      "title": "EU MVP Build",
+      "description": "Mjesto gdje osnivači i kreatori objavljuju svoje aplikacije za europsku vidljivost — i bivaju otkriveni. Objavi ono što si izgradio s GYSM-om na BuildGuildu i odmah je dostupno zajednici da ga pronađe, isproba i komentira.",
+      "ctaPrimary": "Pogledaj što je live →",
+      "ctaSecondary": "Izgradi i objavi svoju"
+    },
+    "pricing": {
+      "text": "Plaćaš samo ono što izgradiš",
+      "sub": "Paketi kredita od 9 $, ili mjesečni planovi od 29 $ — biraš ti",
+      "cta": "Pogledaj cijene →"
+    },
+    "footer": {
+      "tagline": "AI graditelj aplikacija bez koda za osnivače koji objavljuju."
+    }
+  }
+}

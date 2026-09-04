@@ -1,0 +1,73 @@
+{
+  "Home": {
+    "meta": {
+      "title": "GYSM.IO – KI-No-Code-App-Builder für Gründer & Startups",
+      "description": "GYSM.IO ist ein KI-No-Code-App-Builder: Beschreibe die App, die du willst, in normaler Sprache und erhalte eine echte, funktionierende Full-Stack-Web-App — inklusive Login, Datenbank und Zahlungen — ganz ohne Programmieren."
+    },
+    "nav": {
+      "startBuilding": "Jetzt bauen",
+      "templates": "Vorlagen",
+      "pricing": "Preise"
+    },
+    "hero": {
+      "titleLine1": "WIR SIND",
+      "titleHighlight": "MACHER",
+      "titleLine2": "KEINE TRÄUMER",
+      "tagline": "[du könntest der nächste Web-Mogul sein]",
+      "subtitle": "KI-No-Code-Fabrik. Vom Prompt zum Produkt. Login, Datenbank, Zahlungen, Live-Vorschau — veröffentlichen.",
+      "placeholder": "Beschreibe die App, die du bauen willst…",
+      "cta": "Meine App generieren",
+      "ctaLoading": "Einen Moment…",
+      "helper": "Live-Vorschau in Sekunden • Credits pro Build",
+      "scroll": "Scrollen"
+    },
+    "highlights": {
+      "eyebrow": "Wir nehmen deine Idee und",
+      "title": "Erwecken sie zum Leben.",
+      "subtitle": "Gegr. 2024 — GYSM.IO ist ein KI-No-Code-App-Builder. Vom Prompt zum Produkt: inklusive Login, Datenbank und Stripe-Zahlungen, ohne eine einzige Zeile Code zu schreiben.",
+      "cta": "Ansehen, was gebaut wurde →"
+    },
+    "story": {
+      "founders": {
+        "title": "für Gründer.",
+        "sub": "vom Prompt zum Produkt // Login, Datenbank, Zahlungen, Live-Vorschau"
+      },
+      "shippers": {
+        "title": "für alle, die liefern.",
+        "sub": "mit einem Klick live // von der Idee zur Produktion"
+      },
+      "agencies": {
+        "title": "für Agenturen.",
+        "sub": "Kundenportale // White-Label-SaaS-Fabrik"
+      },
+      "indieHackers": {
+        "title": "für Indie Hacker.",
+        "sub": "Solo-Gründer // bau es selbst"
+      }
+    },
+    "quote": {
+      "title": "Lass uns Apps veröffentlichen.",
+      "cta": "Jetzt bauen →"
+    },
+    "apps": {
+      "heading1": "Apps gebaut",
+      "heading2": "mit GYSM",
+      "explore": "Entdecken →"
+    },
+    "euMvp": {
+      "badge": "Neu · Community-Spotlight",
+      "title": "EU MVP Build",
+      "description": "Hier laden Gründer und Kreative ihre Builds für europäische Sichtbarkeit hoch — und werden entdeckt. Veröffentliche, was du mit GYSM gebaut hast, auf BuildGuild, und die Community kann es sofort finden, ausprobieren und kommentieren.",
+      "ctaPrimary": "Live-Projekte ansehen →",
+      "ctaSecondary": "Bauen & veröffentlichen"
+    },
+    "pricing": {
+      "text": "Zahle nur für das, was du baust",
+      "sub": "Credit-Pakete ab 9 $ oder Monatspläne ab 29 $ — du entscheidest",
+      "cta": "Preise ansehen →"
+    },
+    "footer": {
+      "tagline": "Der KI-No-Code-App-Builder für Gründer, die liefern."
+    }
+  }
+}

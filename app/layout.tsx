@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { getLocale } from "next-intl/server";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import PWARegister from "./components/PWARegister";
@@ -61,9 +62,22 @@ const organizationJsonLd = {
   sameAs: [],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Resolves to the negotiated locale on the homepage (en/hr/de/...) and
+  // to "en" everywhere else in the app, which has no locale segment. See
+  // i18n/request.ts + middleware.ts. Wrapped defensively: this file is the
+  // root layout for the entire app (every route renders through it), so a
+  // failure here must never be able to take the whole site down over a
+  // <html lang> attribute -- worst case we just fall back to "en".
+  let locale = "en";
+  try {
+    locale = await getLocale();
+  } catch {
+    // fall back to "en"
+  }
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body>
         <script
           type="application/ld+json"

@@ -1,0 +1,73 @@
+{
+  "Home": {
+    "meta": {
+      "title": "GYSM.IO – AI No-Code App Builder for Founders & Startups",
+      "description": "GYSM.IO is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required."
+    },
+    "nav": {
+      "startBuilding": "Start Building",
+      "templates": "Templates",
+      "pricing": "Pricing"
+    },
+    "hero": {
+      "titleLine1": "WE ARE",
+      "titleHighlight": "BUILDERS",
+      "titleLine2": "NOT DREAMERS",
+      "tagline": "[you could be the next web mogul]",
+      "subtitle": "AI no-code factory. Prompt → product. Auth, database, payments, live preview — ship.",
+      "placeholder": "Describe the app you want to build…",
+      "cta": "Generate my app",
+      "ctaLoading": "One sec…",
+      "helper": "Live preview in seconds • credits used per build",
+      "scroll": "Scroll"
+    },
+    "highlights": {
+      "eyebrow": "We take your idea and",
+      "title": "Give it life.",
+      "subtitle": "Est. 2024 — GYSM.IO is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.",
+      "cta": "See what's been built →"
+    },
+    "story": {
+      "founders": {
+        "title": "for the founders.",
+        "sub": "prompt to product // auth, database, payments, live preview"
+      },
+      "shippers": {
+        "title": "for the shippers.",
+        "sub": "ship in one click // idea to production"
+      },
+      "agencies": {
+        "title": "for the agencies.",
+        "sub": "client portals // white-label SaaS factory"
+      },
+      "indieHackers": {
+        "title": "for the indie hackers.",
+        "sub": "solo builder // ship it yourself"
+      }
+    },
+    "quote": {
+      "title": "Let's ship some apps.",
+      "cta": "Start Building →"
+    },
+    "apps": {
+      "heading1": "Apps built",
+      "heading2": "on GYSM",
+      "explore": "Explore →"
+    },
+    "euMvp": {
+      "badge": "New · Community spotlight",
+      "title": "EU MVP Build",
+      "description": "Where founders and creators upload their builds for European exposure — and get discovered. Publish what you shipped with GYSM to BuildGuild and it's live for the community to find, try, and comment on.",
+      "ctaPrimary": "See what's live →",
+      "ctaSecondary": "Build & publish yours"
+    },
+    "pricing": {
+      "text": "Pay only for the builds you ship",
+      "sub": "Credit packs from $9, or monthly plans from $29 — your call",
+      "cta": "See Pricing →"
+    },
+    "footer": {
+      "tagline": "The AI no-code app builder for founders who ship."
+    }
+  }
+}

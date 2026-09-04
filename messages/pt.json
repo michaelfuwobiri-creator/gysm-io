@@ -1,0 +1,73 @@
+{
+  "Home": {
+    "meta": {
+      "title": "GYSM.IO – Criador de aplicativos sem código com IA para fundadores e startups",
+      "description": "GYSM.IO é um criador de aplicativos sem código com IA: descreva o aplicativo que você quer em linguagem simples e receba um aplicativo web completo e funcional — com autenticação, banco de dados e pagamentos incluídos — sem escrever uma linha de código."
+    },
+    "nav": {
+      "startBuilding": "Começar a criar",
+      "templates": "Modelos",
+      "pricing": "Preços"
+    },
+    "hero": {
+      "titleLine1": "SOMOS",
+      "titleHighlight": "CONSTRUTORES",
+      "titleLine2": "NÃO SONHADORES",
+      "tagline": "[você pode ser o próximo magnata da web]",
+      "subtitle": "Fábrica de IA sem código. Do prompt ao produto. Autenticação, banco de dados, pagamentos, prévia ao vivo — publique.",
+      "placeholder": "Descreva o aplicativo que você quer criar…",
+      "cta": "Gerar meu aplicativo",
+      "ctaLoading": "Um instante…",
+      "helper": "Prévia ao vivo em segundos • créditos usados por criação",
+      "scroll": "Rolar"
+    },
+    "highlights": {
+      "eyebrow": "Pegamos sua ideia e",
+      "title": "Damos vida a ela.",
+      "subtitle": "Fundada em 2024 — GYSM.IO é um criador de aplicativos sem código com IA. Do prompt ao produto: autenticação, banco de dados e pagamentos via Stripe incluídos, sem escrever uma linha de código.",
+      "cta": "Ver o que já foi criado →"
+    },
+    "story": {
+      "founders": {
+        "title": "para os fundadores.",
+        "sub": "do prompt ao produto // autenticação, banco de dados, pagamentos, prévia ao vivo"
+      },
+      "shippers": {
+        "title": "para quem lança.",
+        "sub": "no ar com um clique // da ideia à produção"
+      },
+      "agencies": {
+        "title": "para as agências.",
+        "sub": "portais de clientes // fábrica de SaaS white-label"
+      },
+      "indieHackers": {
+        "title": "para os indie hackers.",
+        "sub": "construtor solo // construa você mesmo"
+      }
+    },
+    "quote": {
+      "title": "Vamos lançar alguns aplicativos.",
+      "cta": "Começar a criar →"
+    },
+    "apps": {
+      "heading1": "Aplicativos criados",
+      "heading2": "com o GYSM",
+      "explore": "Explorar →"
+    },
+    "euMvp": {
+      "badge": "Novo · Destaque da comunidade",
+      "title": "EU MVP Build",
+      "description": "O lugar onde fundadores e criadores publicam seus projetos para ganhar visibilidade na Europa — e serem descobertos. Publique o que você criou com o GYSM no BuildGuild e ele fica disponível na hora para a comunidade encontrar, testar e comentar.",
+      "ctaPrimary": "Ver o que está no ar →",
+      "ctaSecondary": "Criar e publicar o seu"
+    },
+    "pricing": {
+      "text": "Pague apenas pelo que você criar",
+      "sub": "Pacotes de créditos a partir de $9, ou planos mensais a partir de $29 — você decide",
+      "cta": "Ver preços →"
+    },
+    "footer": {
+      "tagline": "O criador de aplicativos sem código com IA para fundadores que lançam."
+    }
+  }
+}
