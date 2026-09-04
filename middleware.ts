@@ -57,8 +57,16 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
       // an unauthenticated visitor hitting /builder just saw a paywall with
       // no way to actually sign in. Send them to Clerk's sign-in page and
       // carry the page they wanted so they land back on it after login.
+      //
+      // Bug fix: carry the query string too, not just the path.
+      // /builder reads ?projectId=/?template=/?prompt= and /builder-blocks
+      // reads ?id= to decide what to load (see their page.tsx files) --
+      // dropping the search here meant a deep link straight to a specific
+      // project or template silently lost that context the moment the
+      // visitor had to sign in first, landing them on a blank builder
+      // instead of the thing they clicked.
       const signInUrl = new URL('/sign-in', req.url)
-      signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname)
+      signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname + req.nextUrl.search)
       return NextResponse.redirect(signInUrl)
     }
   }

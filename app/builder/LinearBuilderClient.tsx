@@ -139,6 +139,10 @@ interface StoreState {
   schedules: ScheduleItem[];
   programs: Record<string, Program>;
   activeChatId: string | null;
+  // Whose data this is. Not rendered anywhere -- exists purely so a
+  // cross-account localStorage bug (see resetIfDifferentUser below) can
+  // be detected: this key isn't scoped per-account, only per-browser.
+  lastUserId: string | null;
 }
 
 /* --------------------------------------------------------------------- */
@@ -170,6 +174,7 @@ function seedState(): StoreState {
     schedules: [],
     programs: {},
     activeChatId: chat.id,
+    lastUserId: null,
   };
 }
 
@@ -209,6 +214,32 @@ function createStore() {
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    // Bug fix: STORAGE_KEY above is scoped to this browser, not to any one
+    // account. On a shared/public computer, whoever signed in next would
+    // silently inherit the previous person's entire chat history and
+    // generated artifacts -- there was no check anywhere that the
+    // localStorage data actually belonged to the person currently signed
+    // in. Called once on mount from LinearBuilderApp (see its userId
+    // effect below) with the current session's user id: wipes everything
+    // back to a fresh seedState() when the stored data belonged to a
+    // different account, leaves it alone (so a real refresh/crash-recovery
+    // still works) when it's the same person coming back, and just tags
+    // the id the first time (a pre-existing localStorage entry from before
+    // this fix shipped has no lastUserId yet, so there's nothing to
+    // compare against -- treated as "this person's own data" rather than
+    // wiped, since it can't be distinguished from a legitimate history).
+    resetIfDifferentUser: (userId: string | null) => {
+      if (state.lastUserId && userId && state.lastUserId !== userId) {
+        state = { ...seedState(), lastUserId: userId };
+        persist();
+        listeners.forEach((l) => l());
+        return;
+      }
+      if (state.lastUserId !== userId) {
+        state = { ...state, lastUserId: userId };
+        persist();
+      }
     },
   };
 }
@@ -2967,6 +2998,10 @@ interface LinearBuilderAppProps {
    *  getCreditBalance() in page.tsx -- see Sidebar's footer. */
   userName?: string;
   userEmail?: string | null;
+  /** Clerk user id -- used only to detect a stale cross-account
+   *  localStorage draft on mount (see the userId effect below and
+   *  resetIfDifferentUser in createStore()), not displayed anywhere. */
+  userId?: string | null;
   credits?: number;
   /** Real Brand Kit row from getBrandKit() in page.tsx (see
    *  lib/brandKit.ts) -- null for a logged-out visitor or a user who
@@ -2991,6 +3026,7 @@ export default function LinearBuilderApp({
   builderPath = "/builder",
   userName = "there",
   userEmail = null,
+  userId = null,
   credits = 0,
   initialBrandKit = null,
   initialMediaSkillId,
@@ -3011,6 +3047,16 @@ export default function LinearBuilderApp({
   const resizing = useRef(false);
   const router = useRouter();
   const hydrated = useRef(false);
+
+  // Bug fix: wipe a stale cross-account localStorage draft (see
+  // resetIfDifferentUser in createStore() above) before anything else
+  // reads from the store -- deliberately the first effect in this
+  // component so a previous signed-in user's chats/artifacts never get a
+  // chance to render, even for a frame, on a shared/public computer.
+  useEffect(() => {
+    store?.resetIfDifferentUser(userId ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   useEffect(() => {
     fetch("/api/media-assets")

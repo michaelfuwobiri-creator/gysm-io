@@ -115,6 +115,7 @@ export default async function BuilderPage({
         builderPath="/builder"
         userName={user?.name || "there"}
         userEmail={user?.email ?? null}
+        userId={user?.id ?? null}
         credits={credits}
         initialBrandKit={brandKit}
         initialMediaSkillId={initialMediaSkillId}

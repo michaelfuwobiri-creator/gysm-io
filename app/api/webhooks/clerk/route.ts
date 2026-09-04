@@ -10,12 +10,25 @@ export async function POST(req: Request) {
   const svix_timestamp = h.get("svix-timestamp")!
   const svix_signature = h.get("svix-signature")!
 
-  const payload = await req.json()
+  // Bug fix: this used to `await req.json()` and re-serialize the parsed
+  // object with `JSON.stringify()` to verify against -- but svix's HMAC
+  // signature is computed over the EXACT raw bytes Clerk sent, not a
+  // semantically-equivalent re-encoding of them. JSON.stringify(JSON.parse(x))
+  // usually happens to reproduce plain-ASCII input byte-for-byte, which is
+  // almost certainly why this wasn't obviously broken -- but it's not
+  // guaranteed (differing key order isn't a risk here since V8 preserves
+  // insertion order, but escaping of Unicode names, U+2028/U+2029, or any
+  // future change to Clerk's own serialization would silently start
+  // failing every webhook's signature check). `req.text()` reads the
+  // literal raw body once; verify against that directly, then JSON.parse
+  // it for evt.data below only after the signature has already checked
+  // out.
+  const rawBody = await req.text()
   const wh = new Webhook(WEBHOOK_SECRET)
 
   let evt: any
   try {
-    evt = wh.verify(JSON.stringify(payload), {
+    evt = wh.verify(rawBody, {
       "svix-id": svix_id,
       "svix-timestamp": svix_timestamp,
       "svix-signature": svix_signature,

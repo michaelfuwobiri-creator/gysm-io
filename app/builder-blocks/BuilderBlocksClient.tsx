@@ -11,11 +11,26 @@ import TopBar from "@/components/builder-blocks/TopBar";
 
 export default function BuilderBlocksClient({
   initialProject,
+  userId,
 }: {
   initialProject: { id: string; name: string; blocks: BuilderBlock[] } | null;
+  userId: string;
 }) {
-  const { blocks, addBlock, reorderBlocks, loadProject } = useBuilderBlocksStore();
+  const { blocks, addBlock, reorderBlocks, loadProject, resetIfDifferentUser } = useBuilderBlocksStore();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  // Bug fix: the draft below persists to this browser's localStorage, not
+  // to this account -- on a shared/public computer, whoever signs in next
+  // would otherwise inherit the previous person's unsaved blocks. Wipes
+  // the draft when it belonged to a different signed-in user; leaves it
+  // alone for the same user coming back (that's the actual point of
+  // persisting it -- see store/builderBlocksStore.ts). Deliberately runs
+  // BEFORE the initialProject effect below, so a stale cross-account
+  // draft never has a chance to render even for a frame.
+  useEffect(() => {
+    resetIfDifferentUser(userId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // A server-loaded project (came in via ?id=, see page.tsx) always wins
   // over whatever's sitting in the localStorage draft -- opening a saved

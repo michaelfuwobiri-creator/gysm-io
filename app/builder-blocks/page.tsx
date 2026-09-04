@@ -26,7 +26,12 @@ export default async function BuilderBlocksPage({
 }) {
   const user = await getUser();
   if (!user) {
-    redirect(`/sign-in?redirect_url=${encodeURIComponent("/builder-blocks")}`);
+    // Bug fix: this used to hardcode the redirect target as bare
+    // "/builder-blocks", dropping ?id= -- a signed-out visitor opening a
+    // shared link to a specific project would sign in and land on a new,
+    // empty canvas instead of the project they clicked through to.
+    const target = searchParams.id ? `/builder-blocks?id=${encodeURIComponent(searchParams.id)}` : "/builder-blocks";
+    redirect(`/sign-in?redirect_url=${encodeURIComponent(target)}`);
   }
 
   let initialProject: { id: string; name: string; blocks: BuilderBlock[] } | null = null;
@@ -46,5 +51,5 @@ export default async function BuilderBlocksPage({
     }
   }
 
-  return <BuilderBlocksClient initialProject={initialProject} />;
+  return <BuilderBlocksClient initialProject={initialProject} userId={user.id} />;
 }

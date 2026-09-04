@@ -10,6 +10,11 @@ type BuilderBlocksState = {
   blocks: BuilderBlock[];
   selectedId: string | null;
   isDirty: boolean;
+  // Whose draft this is. Not shown anywhere -- exists purely so
+  // resetIfDifferentUser (below) can tell "my own draft from an earlier
+  // visit" apart from "someone else's draft left behind in this browser's
+  // localStorage" the first time a page mounts in a session.
+  lastUserId: string | null;
 
   loadProject: (project: { id: string | null; name: string; blocks: BuilderBlock[] }) => void;
   setProjectName: (name: string) => void;
@@ -20,6 +25,15 @@ type BuilderBlocksState = {
   selectBlock: (id: string | null) => void;
   markSaved: (projectId: string) => void;
   reset: () => void;
+  // Bug fix: this store persists to localStorage (see the `persist` call
+  // below), which is scoped per-browser, not per-account. On a shared or
+  // public computer, one person's unsaved draft was silently visible to
+  // whoever signed in next on that same browser. Call this once on mount
+  // with the current signed-in user's id (see BuilderBlocksClient.tsx) --
+  // it wipes the draft when it belonged to someone else, and leaves it
+  // alone (so a real refresh/crash-recovery still works) when it's the
+  // same person coming back.
+  resetIfDifferentUser: (userId: string) => void;
 };
 
 // Zustand + persist -- the queue spec asked for exactly this combination
@@ -37,6 +51,7 @@ export const useBuilderBlocksStore = create<BuilderBlocksState>()(
       blocks: [],
       selectedId: null,
       isDirty: false,
+      lastUserId: null,
 
       loadProject: ({ id, name, blocks }) =>
         set({ projectId: id, projectName: name, blocks, selectedId: null, isDirty: false }),
@@ -82,7 +97,18 @@ export const useBuilderBlocksStore = create<BuilderBlocksState>()(
       markSaved: (projectId) => set({ projectId, isDirty: false }),
 
       reset: () => set({ projectId: null, projectName: "Untitled", blocks: [], selectedId: null, isDirty: false }),
+
+      resetIfDifferentUser: (userId) =>
+        set((s) => {
+          if (s.lastUserId && s.lastUserId !== userId) {
+            return { projectId: null, projectName: "Untitled", blocks: [], selectedId: null, isDirty: false, lastUserId: userId };
+          }
+          return { lastUserId: userId };
+        }),
     }),
-    { name: "gysm_builder_blocks_draft", partialize: (s) => ({ projectId: s.projectId, projectName: s.projectName, blocks: s.blocks }) }
+    {
+      name: "gysm_builder_blocks_draft",
+      partialize: (s) => ({ projectId: s.projectId, projectName: s.projectName, blocks: s.blocks, lastUserId: s.lastUserId }),
+    }
   )
 );
