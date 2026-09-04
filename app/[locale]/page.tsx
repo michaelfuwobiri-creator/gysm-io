@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProductsNavMenu from "../components/ProductsNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
+import { PRICING_PLANS } from "@/lib/stripe";
 
 const NavAuthLink = dynamic(() => import("../components/NavAuthLink"), { ssr: false });
 
@@ -13,6 +14,20 @@ const INDEX_SECTIONS = [
   { id: "hero", label: "Home" },
   { id: "highlights", label: "Highlights" },
 ] as const;
+
+// Derived straight from lib/stripe.ts PRICING_PLANS (not hardcoded) for the
+// AggregateOffer JSON-LD below -- this exact field went stale once already
+// (shipped as a hardcoded "9" that survived a full repricing to $1.99
+// before anyone noticed AI crawlers were still being told the old number).
+// Computing it here means it can't drift out of sync with the real prices
+// again. Only the public, non-hidden GYSM plans count -- VOIIE's tiers are
+// quoted 1:1 to specific leads, not a self-serve price a crawler should cite.
+const PUBLIC_PLAN_PRICES = PRICING_PLANS.filter((p) => !p.hidden).map((p) => p.price);
+const AGGREGATE_OFFER = {
+  lowPrice: Math.min(...PUBLIC_PLAN_PRICES).toFixed(2),
+  highPrice: Math.max(...PUBLIC_PLAN_PRICES).toFixed(2),
+  offerCount: String(PUBLIC_PLAN_PRICES.length),
+};
 
 export default function Page() {
   const t = useTranslations("Home");
@@ -114,9 +129,10 @@ export default function Page() {
             keywords: "no-code app builder, AI app builder, AI prompt to app, build full-stack web apps without code, no-code SaaS builder",
             offers: {
               "@type": "AggregateOffer",
-              lowPrice: "9",
+              lowPrice: AGGREGATE_OFFER.lowPrice,
+              highPrice: AGGREGATE_OFFER.highPrice,
               priceCurrency: "USD",
-              offerCount: "6",
+              offerCount: AGGREGATE_OFFER.offerCount,
             },
           }),
         }}

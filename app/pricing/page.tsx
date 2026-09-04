@@ -3,6 +3,8 @@ import dynamic from "next/dynamic";
 import { PRICING_PLANS } from "@/lib/stripe";
 import CheckoutButton from "./CheckoutButton";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
+
 // ssr:false island for the 3 optional query-string banners (?reason=,
 // ?canceled=, ?upsell=) -- see PricingBanners.tsx for why: reading
 // `searchParams` directly on this page forced the whole route into
@@ -27,8 +29,38 @@ export default function PricingPage() {
   const payAsYouGo = PRICING_PLANS.filter((p) => p.interval === "one_time" && !p.hidden);
   const monthly = PRICING_PLANS.filter((p) => p.interval === "month" && !p.hidden);
 
+  // Per-plan Offer structured data -- built straight from PRICING_PLANS
+  // (never hardcoded numbers) so it can't go stale the way the homepage's
+  // AggregateOffer JSON-LD did (shipped once as a hardcoded "9" that
+  // silently outlived a full repricing to $1.99). This is what lets AI
+  // answer engines and search rich results cite GYSM's actual current
+  // price per plan instead of guessing from the rendered "$X.XX" text or
+  // a stale cache. VOIIE's tiers are excluded (already filtered out via
+  // !p.hidden above) since those are quoted 1:1 to specific leads, not a
+  // self-serve price a crawler should tell a random reader about.
+  const pricingJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "GYSM.IO AI App Builder",
+    description: "AI website/app builder credit packs and subscription plans.",
+    brand: { "@type": "Brand", name: "GYSM.IO" },
+    offers: [...payAsYouGo, ...monthly].map((p) => ({
+      "@type": "Offer",
+      name: p.name,
+      price: p.price.toFixed(2),
+      priceCurrency: "USD",
+      url: `${siteUrl}/pricing`,
+      availability: "https://schema.org/InStock",
+      description: p.description,
+      ...(p.interval === "month"
+        ? { priceSpecification: { "@type": "UnitPriceSpecification", price: p.price.toFixed(2), priceCurrency: "USD", billingDuration: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } } }
+        : {}),
+    })),
+  };
+
   return (
     <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }} />
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
