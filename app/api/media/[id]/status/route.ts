@@ -1,6 +1,6 @@
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { addCredits } from "@/lib/credits";
+import { markFailed } from "@/lib/media/service";
 import { getPrediction } from "@/lib/media/providers/replicate";
 import { getVideoStatus } from "@/lib/media/providers/heygen";
 
@@ -53,11 +53,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       return Response.json({ id: row.id, status: "done", url: result.url });
     }
     if (result.status === "failed") {
-      await Promise.all([
-        sql`update media_generations set status = 'failed', error = ${result.error || "Generation failed."}, updated_at = now() where id = ${row.id}`,
-        addCredits(row.user_id, row.credit_cost),
-      ]);
-      return Response.json({ id: row.id, status: "failed", error: result.error || "Generation failed. Your credits were refunded." });
+      // Was its own inline copy of markFailed's refund+mark-failed logic
+      // (two implementations of the same thing, drifting risk) -- now
+      // reuses the shared one, which also sends the build-failed email
+      // (item #7). `user` here is already scoped to this row's owner by
+      // the `user_id = ${user.id}` WHERE clause above.
+      const message = result.error || "Generation failed.";
+      await markFailed(row.id, user, row.credit_cost, row.kind, message);
+      return Response.json({ id: row.id, status: "failed", error: `${message} Your credits were refunded.` });
     }
     return Response.json({ id: row.id, status: "processing" });
   } catch (error: any) {

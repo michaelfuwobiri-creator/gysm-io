@@ -2,6 +2,7 @@ import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { deductCredit, addCredits } from "@/lib/credits";
 import { MEDIA_CREDIT_COST, MEDIA_KIND_ENV_VAR, type MediaKind } from "@/lib/mediaCreditsConstants";
+import { sendBuildFailedEmail } from "@/lib/email/send";
 
 // Shared plumbing every /api/media/* route uses -- auth, the "is this
 // provider even configured yet" gate, atomic credit deduction (mirrors
@@ -61,9 +62,19 @@ export async function markProcessing(id: string, providerJobId: string): Promise
 // Refunds the deducted credit alongside marking the row failed -- a
 // failed generation shouldn't cost the user anything, same principle as
 // not charging for a build that errors out before it produces an app.
-export async function markFailed(id: string, userId: string, cost: number, error: string): Promise<void> {
+// Also sends the "build failed" email (item #7) -- media generations
+// (video, voice, etc.) are the async, walk-away-and-come-back kind, so
+// an email actually adds value here, unlike the main prompt-driven
+// builder chat, which already shows a failure inline in the same open
+// tab instantly (see BuildFailedEmail.tsx's header comment). Takes the
+// full user object (not just the id) since every call site already has
+// it from requireUserAndCredit() -- one extra DB round-trip per failure
+// to look up an email nobody asked for isn't worth it when the caller
+// already has it in scope.
+export async function markFailed(id: string, user: MediaUser, cost: number, kind: string, error: string): Promise<void> {
   await Promise.all([
     sql`update media_generations set status = 'failed', error = ${error}, updated_at = now() where id = ${id}`,
-    addCredits(userId, cost),
+    addCredits(user.id, cost),
   ]);
+  if (user.email) await sendBuildFailedEmail(user.email, user.name, kind, error);
 }

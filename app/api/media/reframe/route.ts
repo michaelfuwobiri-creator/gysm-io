@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, status: "processing" }, { status: 202 });
   } catch (error: any) {
     console.error("[media/reframe] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "reframe", error.message);
     return Response.json({ error: "Reframe failed to start. Your credits were refunded." }, { status: 502 });
   }
 }

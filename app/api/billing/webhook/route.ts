@@ -5,6 +5,7 @@ import { sql } from "@/lib/db";
 import { addCredits } from "@/lib/credits";
 import { convertLeadToCustomer } from "@/lib/voiie/billing";
 import { markRenewalStatus } from "@/lib/voiie/db";
+import { sendPaymentFailedEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
 
@@ -132,6 +133,37 @@ export async function POST(req: NextRequest) {
             update subscriptions set status = 'active', updated_at = now()
             where stripe_subscription_id = ${subId}
           `;
+        }
+        break;
+      }
+
+      // Failed subscription renewal charge -- Stripe retries automatically
+      // per its own retry schedule and will also fire
+      // customer.subscription.updated (handled below) once the
+      // subscription's status actually changes, so this case only sends
+      // the warning email; it doesn't touch `subscriptions.status` itself
+      // to avoid two handlers racing to write the same field.
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId =
+          ((invoice as any).subscription as string | null) ??
+          ((invoice as any).parent?.subscription_details?.subscription as string | null) ??
+          null;
+        if (!subId) {
+          console.error("[billing/webhook] invoice.payment_failed had no subscription id", { invoiceId: invoice.id });
+          break;
+        }
+
+        const rows = await sql`
+          select s.user_id, s.plan, u.email, u.name
+          from subscriptions s
+          left join users u on u.clerk_id = s.user_id
+          where s.stripe_subscription_id = ${subId}
+        `;
+        const row = rows[0] as { user_id: string; plan: string; email: string | null; name: string | null } | undefined;
+        if (row?.email) {
+          const plan = getPlanById(row.plan);
+          await sendPaymentFailedEmail(row.email, row.name, plan?.name || row.plan);
         }
         break;
       }

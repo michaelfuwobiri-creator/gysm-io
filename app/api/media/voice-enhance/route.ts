@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, audioUrl: outUrl });
   } catch (error: any) {
     console.error("[media/voice-enhance] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "voice-enhance", error.message);
     return Response.json({ error: "Voice enhancement failed. Your credits were refunded." }, { status: 502 });
   }
 }

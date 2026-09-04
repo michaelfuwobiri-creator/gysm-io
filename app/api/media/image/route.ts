@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, url });
   } catch (error: any) {
     console.error("[media/image] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "image", error.message);
     return Response.json({ error: "Image generation failed. Your credits were refunded." }, { status: 502 });
   }
 }

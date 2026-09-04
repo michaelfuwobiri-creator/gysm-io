@@ -7,22 +7,13 @@ import { sendWhatsAppText } from "@/lib/voiie/whatsapp";
 import { sendTwitterDM, lookupUserIdByHandle } from "@/lib/voiie/twitter";
 import { DEFAULT_OUTREACH_TEMPLATE } from "@/lib/voiie/constants";
 import { pickOutreachTemplate } from "@/lib/voiie/spintax";
+import { getResend } from "@/lib/email/resend";
 import type { OutreachChannel, VoiieLead } from "@/types/voiie";
 
 export const DEFAULT_TEMPLATE = DEFAULT_OUTREACH_TEMPLATE;
 
 export function renderTemplate(template: string, lead: Pick<VoiieLead, "handle" | "signal">): string {
   return template.replace(/\{name\}/g, lead.handle).replace(/\{pain\}/g, lead.signal || "a website");
-}
-
-let resendClient: import("resend").Resend | null = null;
-async function getResend() {
-  if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not configured.");
-  if (!resendClient) {
-    const { Resend } = await import("resend");
-    resendClient = new Resend(process.env.RESEND_API_KEY);
-  }
-  return resendClient;
 }
 
 /**

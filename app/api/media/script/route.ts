@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, text });
   } catch (error: any) {
     console.error("[media/script] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "script", error.message);
     return Response.json({ error: "Script generation failed. Your credits were refunded." }, { status: 502 });
   }
 }

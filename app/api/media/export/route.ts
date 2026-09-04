@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, url });
   } catch (error: any) {
     console.error("[media/export] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "export", error.message);
     return Response.json({ error: "Export failed. Your credits were refunded." }, { status: 502 });
   }
 }

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, status: "processing" }, { status: 202 });
   } catch (error: any) {
     console.error("[media/avatar] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "avatar", error.message);
     return Response.json({ error: "Avatar video failed to start. Your credits were refunded." }, { status: 502 });
   }
 }

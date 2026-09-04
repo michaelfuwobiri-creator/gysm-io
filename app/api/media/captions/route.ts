@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, text, vtt });
   } catch (error: any) {
     console.error("[media/captions] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "captions", error.message);
     return Response.json({ error: "Captioning failed. Your credits were refunded." }, { status: 502 });
   }
 }

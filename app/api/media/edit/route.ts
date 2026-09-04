@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, status: "processing" }, { status: 202 });
   } catch (error: any) {
     console.error("[media/edit] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "edit", error.message);
     return Response.json({ error: "Edit failed. Your credits were refunded." }, { status: 502 });
   }
 }

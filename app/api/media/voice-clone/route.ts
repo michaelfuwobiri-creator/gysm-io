@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, audioUrl, voiceId });
   } catch (error: any) {
     console.error("[media/voice-clone] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "voice-clone", error.message);
     return Response.json({ error: "Voice cloning failed. Your credits were refunded." }, { status: 502 });
   }
 }

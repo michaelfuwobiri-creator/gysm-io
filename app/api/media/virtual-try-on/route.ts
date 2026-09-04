@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ id, url });
   } catch (error: any) {
     console.error("[media/virtual-try-on] generation failed:", error.message);
-    await markFailed(id, user.id, cost, error.message);
+    await markFailed(id, user, cost, "virtual-try-on", error.message);
     return Response.json({ error: "Virtual try-on failed. Your credits were refunded." }, { status: 502 });
   }
 }
