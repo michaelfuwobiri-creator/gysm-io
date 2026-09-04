@@ -31,10 +31,21 @@ const NAMES: Record<string, string> = {
 // gysm.io <-> gysm.io/hr <-> gysm.io/de etc.; next-intl's useRouter takes
 // care of updating the NEXT_LOCALE cookie so the choice sticks on the next
 // visit to "/" too.
+//
+// Hidden per Mike's request (2026-09): language already auto-switches by
+// visitor IP/country (see middleware.ts's COUNTRY_TO_LOCALE block), so this
+// manual pill was redundant UI clutter on the homepage. Left in place
+// rather than deleted -- the auto-detect logic in middleware.ts is
+// completely separate from this component and is unaffected either way --
+// so re-enabling is just deleting the early return below.
+const HIDDEN = true;
+
 export default function LanguageSwitcher() {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+
+  if (HIDDEN) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex gap-1 rounded-full border border-[#FF0080] bg-black/80 px-2 py-2 backdrop-blur">
