@@ -5,7 +5,7 @@ import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
-const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)'])
+const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)'])
 
 // Locale-aware homepage. Scoped narrowly on purpose: this repo has ~80
 // routes, and next-intl only needs to run where there's actually a

@@ -13,7 +13,11 @@
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
     "@clerk/nextjs": "^6.39.6",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/genai": "^2.17.1",
+    "@monaco-editor/react": "^4.7.0",
     "@neondatabase/serverless": "^1.1.0",
     "@revenuecat/purchases-capacitor": "^13.4.0",
     "@stripe/stripe-js": "^9.13.0",
@@ -31,7 +35,8 @@
     "resend": "^4.0.1",
     "stripe": "^22.4.0",
     "svix": "^1.99.1",
-    "twitter-api-v2": "^1.19.1"
+    "twitter-api-v2": "^1.19.1",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",

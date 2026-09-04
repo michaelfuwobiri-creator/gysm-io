@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 import CookiePreferencesLink from "../components/CookiePreferencesLink";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import ProductsNavMenu from "../components/ProductsNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
 import { IMAGE_BLUR } from "@/lib/imagePlaceholders";
 
@@ -222,6 +223,7 @@ export default function Page() {
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <div className="flex items-center gap-2"><span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span></div>
           <div className="flex items-center gap-2">
+            <ProductsNavMenu />
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">{t("nav.templates")}</a>
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>

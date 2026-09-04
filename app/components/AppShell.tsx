@@ -29,6 +29,10 @@ const NAV_GROUPS: {
       { key: "templates", label: "Templates", href: "/templates", icon: "layout" },
       { key: "connectors", label: "Connectors", href: "/connectors", icon: "plug" },
       { key: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: "chart" },
+      // Drag-and-drop block builder -- a separate, parallel surface from
+      // the prompt-driven AI builder above (see /builder-blocks route
+      // comment for why this isn't a replacement for /builder).
+      { key: "builder-blocks", label: "Blocks (beta)", href: "/builder-blocks", icon: "blocks" },
     ],
   },
   {
@@ -75,6 +79,16 @@ function NavIcon({ name }: { name: string }) {
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <path d="M3 9h18" />
         <path d="M9 21V9" />
+      </svg>
+    );
+  }
+  if (name === "blocks") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
       </svg>
     );
   }
