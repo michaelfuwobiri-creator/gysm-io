@@ -40,6 +40,11 @@ export default function MarketplaceClient() {
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [interestDomain, setInterestDomain] = useState<string | null>(null);
+  // Honeypot -- see app/api/marketplace/waitlist/route.ts. A field named
+  // "website" reads as legitimate to a scraping bot's form-fill heuristics
+  // but is never shown to (or fillable by) a real person, so anything
+  // that arrives with this non-empty is near-certainly automated.
+  const [website, setWebsite] = useState("");
 
   const filtered = useMemo(() => {
     return DOMAINS.filter((d) => {
@@ -58,7 +63,7 @@ export default function MarketplaceClient() {
       const res = await fetch("/api/marketplace/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, domain: interestDomain }),
+        body: JSON.stringify({ email, domain: interestDomain, website }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -256,6 +261,22 @@ export default function MarketplaceClient() {
             : "Leave your email and we'll reach out the moment domains go live for purchase."}
         </p>
         <form className="mp-form-row" onSubmit={joinWaitlist}>
+          {/* Honeypot field -- invisible and unreachable for a real
+              visitor (off-screen, not tab-focusable, not announced to
+              screen readers), but a form-filling bot typically populates
+              every input it finds including this one. See setWebsite
+              above and the server-side check in
+              app/api/marketplace/waitlist/route.ts. */}
+          <input
+            type="text"
+            name="website"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+          />
           <input
             id="mp-waitlist-email"
             className="mp-input"

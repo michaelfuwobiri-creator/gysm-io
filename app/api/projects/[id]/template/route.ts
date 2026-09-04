@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
+import { logAudit } from "@/lib/auditLog";
 
 // Admin-only: flip a build's is_template flag (see db/migrations/0001_init.sql)
 // and, optionally, set its curated one-line gallery description
@@ -59,6 +60,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // app/templates/page.tsx) -- bust it now so a curation change shows
     // up immediately instead of waiting out the window.
     revalidateTag("templates");
+    await logAudit({
+      actorUserId: user.id,
+      action: "project.template_curation_change",
+      targetType: "project",
+      targetId: params.id,
+      metadata: { featured, blurb: blurb ?? null },
+    });
     return Response.json({ isTemplate: project.is_template, blurb: project.template_blurb });
   } catch (error: any) {
     console.error("[projects/template] failed to update:", error.message);

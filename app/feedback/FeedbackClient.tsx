@@ -39,6 +39,11 @@ function SubmitForm({ signedIn, onCreated }: { signedIn: boolean; onCreated: (id
   const [description, setDescription] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  // Honeypot -- see app/api/feedback/route.ts and the identical pattern in
+  // MarketplaceClient.tsx. Signing in is already a real barrier here, but
+  // this is a new open-write surface (any signed-in user, no admin gate)
+  // and the check costs nothing.
+  const [website, setWebsite] = useState("");
 
   if (!signedIn) {
     return (
@@ -63,7 +68,7 @@ function SubmitForm({ signedIn, onCreated }: { signedIn: boolean; onCreated: (id
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({ title, description, website }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -83,6 +88,16 @@ function SubmitForm({ signedIn, onCreated }: { signedIn: boolean; onCreated: (id
   return (
     <form onSubmit={submit} className="mb-8 rounded-2xl border border-dashed border-black/20 bg-black/[0.02] p-5 flex flex-col gap-3">
       <div className="text-[11px] font-bold uppercase tracking-wider text-black/40">Got an idea?</div>
+      <input
+        type="text"
+        name="website"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }}
+      />
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}

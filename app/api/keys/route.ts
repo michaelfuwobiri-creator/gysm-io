@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { generateApiKey } from "@/lib/apiKeys";
+import { logAudit } from "@/lib/auditLog";
 
 // List (masked -- key_prefix only, never the full key) and create API
 // keys for the signed-in user. Owner-scoped throughout, same pattern as
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
       returning id, name, key_prefix, created_at
     `;
     const row = rows[0] as any;
+    // Logs the key's id/name/prefix only -- never the raw key itself,
+    // which isn't stored anywhere after this response (see comment below).
+    await logAudit({ actorUserId: user.id, action: "api_key.create", targetType: "api_key", targetId: row.id, metadata: { name: row.name, keyPrefix: row.key_prefix } });
     // The only time the raw key is ever returned -- it's not recoverable
     // after this response, only revocable.
     return NextResponse.json({ id: row.id, name: row.name, keyPrefix: row.key_prefix, createdAt: row.created_at, key: rawKey });

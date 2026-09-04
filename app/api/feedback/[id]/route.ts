@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
+import { logAudit } from "@/lib/auditLog";
 
 // Triage endpoint -- admin-only, same guard as /api/roadmap/[id]. Unlike
 // roadmap items (which only an admin can create in the first place), a
@@ -23,6 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     }
     await sql`update feedback_items set status = ${status} where id = ${params.id}`;
+    await logAudit({ actorUserId: user.id, action: "feedback.status_change", targetType: "feedback_item", targetId: params.id, metadata: { status } });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("[feedback] failed to update item:", error.message);
@@ -40,6 +42,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   try {
     await sql`delete from feedback_items where id = ${params.id}`;
+    await logAudit({ actorUserId: user.id, action: "feedback.delete", targetType: "feedback_item", targetId: params.id });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("[feedback] failed to delete item:", error.message);

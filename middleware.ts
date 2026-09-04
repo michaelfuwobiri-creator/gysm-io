@@ -3,9 +3,26 @@ import { NextResponse, NextRequest, NextFetchEvent } from 'next/server'
 import { neon } from '@neondatabase/serverless'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
+import { checkRateLimit } from './lib/rateLimit'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
 const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)'])
+
+// Item #9 of GYSM_IO_HANDOFF.md: "add rate limiting ... 100 req/min per
+// IP". Applied to every /api/* route EXCEPT inbound webhooks and Vercel
+// Cron hits -- those are server-to-server, already authenticated
+// (Stripe/Clerk signatures, svix, WHATSAPP_APP_SECRET, CRON_SECRET
+// Bearer auth) rather than IP-trustworthy in the first place, and several
+// of them (Stripe, WhatsApp, Twitter) can legitimately arrive from a
+// shared IP pool serving many unrelated accounts -- IP-based limiting
+// there risks blocking other tenants' real deliveries, not just abuse.
+const isRateLimitExempt = createRouteMatcher([
+  '/api/webhooks(.*)',
+  '/api/billing/webhook(.*)',
+  '/api/voiie/webhooks(.*)',
+  '/api/voiie/cron(.*)',
+  '/api/cron(.*)',
+])
 
 // Locale-aware homepage. Scoped narrowly on purpose: this repo has ~80
 // routes, and next-intl only needs to run where there's actually a
@@ -80,6 +97,33 @@ function isKnownHost(host: string): boolean {
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const host = req.headers.get('host') || ''
+
+  // Rate limiting runs before everything else below (custom-domain
+  // lookup, Clerk auth, i18n) so an abusive caller gets rejected as
+  // cheaply as possible -- no DB round-trip, no auth check.
+  if (req.nextUrl.pathname.startsWith('/api/') && !isRateLimitExempt(req)) {
+    // req.ip is populated on Vercel's Edge Network; x-forwarded-for is the
+    // fallback for local dev and any proxy in between that sets it.
+    const ip =
+      (req as any).ip ||
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      'unknown'
+    const { success, limit, remaining, reset } = await checkRateLimit(ip)
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please slow down and try again shortly.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': reset ? Math.max(1, Math.ceil((reset - Date.now()) / 1000)).toString() : '60',
+            ...(limit !== undefined ? { 'X-RateLimit-Limit': String(limit) } : {}),
+            ...(remaining !== undefined ? { 'X-RateLimit-Remaining': String(remaining) } : {}),
+          },
+        }
+      )
+    }
+  }
 
   if (sql && host && !isKnownHost(host) && req.nextUrl.pathname === '/') {
     try {

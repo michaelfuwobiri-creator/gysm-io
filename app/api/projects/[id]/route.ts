@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { logAudit } from "@/lib/auditLog";
 
 // Owner-only read of a single build -- used by the builder's History
 // panel to load an earlier version's prompt/html back into view, and by
@@ -98,6 +99,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     if (rows.length === 0) {
       return Response.json({ error: "Build not found, or you need to be an org admin to delete a teammate's build." }, { status: 404 });
     }
+    await logAudit({ actorUserId: user.id, action: "project.delete", targetType: "project", targetId: params.id });
     return Response.json({ ok: true, id: params.id });
   } catch (error: any) {
     console.error("[projects] failed to delete project:", error.message);

@@ -36,6 +36,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // Honeypot (see FeedbackClient.tsx) -- pretend success without
+    // writing, same as app/api/marketplace/waitlist/route.ts.
+    const honeypot = (body?.website ?? "").toString().trim();
+    if (honeypot) {
+      return NextResponse.json({ id: "ok" });
+    }
+
     const title = (body?.title ?? "").toString().trim().slice(0, 200);
     const description = (body?.description ?? "").toString().trim().slice(0, 2000) || null;
 

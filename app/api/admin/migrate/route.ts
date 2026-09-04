@@ -435,6 +435,91 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
       create index if not exists voiie_support_tickets_customer_status_idx on voiie_support_tickets (customer_id, status)
     `,
   },
+  // 0022-0024 were added to db/migrations/*.sql without also being added
+  // here when they landed (items #6, #8, #9 of GYSM_IO_HANDOFF.md) --
+  // caught while wiring up #9's audit_log entry below. This file, not
+  // `db/migrations/*.sql` directly, is what actually reaches the deployed
+  // Neon database (see this file's top comment), so those three tables
+  // never existed in production until now despite the app code that reads
+  // from them already being live.
+  {
+    id: "0022_builder_block_projects",
+    run: () => sql`
+      create table if not exists builder_block_projects (
+        id         uuid primary key default gen_random_uuid(),
+        user_id    text not null,
+        name       text not null default 'Untitled',
+        blocks     jsonb not null default '[]'::jsonb,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0022_builder_block_projects_user_id_updated_at_idx",
+    run: () => sql`
+      create index if not exists builder_block_projects_user_id_updated_at_idx
+        on builder_block_projects (user_id, updated_at desc)
+    `,
+  },
+  {
+    id: "0023_feedback_items",
+    run: () => sql`
+      create table if not exists feedback_items (
+        id          uuid primary key default gen_random_uuid(),
+        user_id     text not null,
+        title       text not null,
+        description text,
+        status      text not null default 'open',
+        created_at  timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0023_feedback_votes",
+    run: () => sql`
+      create table if not exists feedback_votes (
+        item_id     uuid not null references feedback_items(id) on delete cascade,
+        user_id     text not null,
+        created_at  timestamptz not null default now(),
+        primary key (item_id, user_id)
+      )
+    `,
+  },
+  {
+    id: "0023_feedback_items_status_idx",
+    run: () => sql`create index if not exists feedback_items_status_idx on feedback_items (status)`,
+  },
+  {
+    id: "0023_feedback_items_user_id_idx",
+    run: () => sql`create index if not exists feedback_items_user_id_idx on feedback_items (user_id)`,
+  },
+  {
+    id: "0024_audit_log",
+    run: () => sql`
+      create table if not exists audit_log (
+        id            uuid primary key default gen_random_uuid(),
+        actor_user_id text,
+        action        text not null,
+        target_type   text,
+        target_id     text,
+        metadata      jsonb,
+        created_at    timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0024_audit_log_actor_idx",
+    run: () => sql`create index if not exists audit_log_actor_idx on audit_log (actor_user_id)`,
+  },
+  {
+    id: "0024_audit_log_action_idx",
+    run: () => sql`create index if not exists audit_log_action_idx on audit_log (action)`,
+  },
+  {
+    id: "0024_audit_log_created_at_idx",
+    run: () => sql`create index if not exists audit_log_created_at_idx on audit_log (created_at desc)`,
+  },
 ];
 
 export async function POST(_req: NextRequest) {

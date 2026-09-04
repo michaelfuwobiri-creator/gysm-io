@@ -7,6 +7,17 @@ import { sql } from "@/lib/db";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
+
+    // Honeypot (see MarketplaceClient.tsx) -- a real visitor never
+    // populates this field. Return the same success response a genuine
+    // signup gets rather than a 400/403, so a bot has no signal to tell
+    // it was caught and adjust; the request is simply dropped instead of
+    // written.
+    const honeypot = typeof body?.website === "string" ? body.website.trim() : "";
+    if (honeypot) {
+      return Response.json({ ok: true });
+    }
+
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
     const domainInterest = typeof body?.domain === "string" ? body.domain.trim().slice(0, 120) : null;
 

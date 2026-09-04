@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { logAudit } from "@/lib/auditLog";
 
 // Revokes a key (soft delete via revoked_at, not a hard DELETE) -- keeps
 // the row around for the "last used" audit trail and so a reused/leaked
@@ -21,6 +22,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     if (rows.length === 0) {
       return NextResponse.json({ error: "Key not found." }, { status: 404 });
     }
+    await logAudit({ actorUserId: user.id, action: "api_key.revoke", targetType: "api_key", targetId: params.id });
     return NextResponse.json({ ok: true });
   } catch (error: any) {
     console.error("[keys] failed to revoke:", error.message);

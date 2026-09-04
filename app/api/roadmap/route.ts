@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
+import { logAudit } from "@/lib/auditLog";
 
 // Public roadmap board -- generalizes the honest "real request, no fake
 // button" pattern already used for /connectors (connector_requests) into
@@ -52,7 +53,9 @@ export async function POST(req: NextRequest) {
       values (${title}, ${description}, ${status})
       returning id
     `;
-    return NextResponse.json({ id: (rows[0] as any).id });
+    const id = (rows[0] as any).id;
+    await logAudit({ actorUserId: user.id, action: "roadmap.create", targetType: "roadmap_item", targetId: id, metadata: { title, status } });
+    return NextResponse.json({ id });
   } catch (error: any) {
     console.error("[roadmap] failed to create item:", error.message);
     return NextResponse.json({ error: "Failed to create item." }, { status: 500 });
