@@ -10,7 +10,7 @@ export default function SupportPage() {
         <p>
           Need help with GYSM.IO? Email us at{" "}
           <a href="mailto:support@gysm.io" className="underline font-semibold text-black">support@gysm.io</a>{" "}
-          and we&apos;ll get back to you.
+          and we&apos;ll get back to you, or use the chat button in the corner of the screen for a faster reply.
         </p>
 
         <section>

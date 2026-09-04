@@ -1,6 +1,7 @@
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
+import CommandPalette, { CommandPaletteTrigger } from "./CommandPalette";
 
 // Persistent left-sidebar shell for the signed-in app pages (dashboard,
 // templates, connectors, buildguild). Modeled on the left-nav pattern
@@ -40,6 +41,7 @@ const NAV_GROUPS: {
     items: [
       { key: "buildguild", label: "BuildGuild", href: "/buildguild", icon: "users" },
       { key: "roadmap", label: "Roadmap", href: "/roadmap", icon: "map" },
+      { key: "feedback", label: "Feedback", href: "/feedback", icon: "bulb" },
     ],
   },
   {
@@ -147,6 +149,15 @@ function NavIcon({ name }: { name: string }) {
       </svg>
     );
   }
+  if (name === "bulb") {
+    return (
+      <svg {...common}>
+        <path d="M9 18h6" />
+        <path d="M10 22h4" />
+        <path d="M12 2a7 7 0 00-4 12.7c.6.4 1 1.2 1 2.05V17h6v-2.25c0-.85.4-1.65 1-2.05A7 7 0 0012 2z" />
+      </svg>
+    );
+  }
   // users / community
   return (
     <svg {...common}>
@@ -189,6 +200,11 @@ export default async function AppShell({
             </div>
             <span className="text-[12px] font-semibold text-black/70 truncate">{displayName}</span>
           </div>
+
+          {/* Discoverability affordance for CommandPalette.tsx -- the
+              shortcut alone (Cmd/Ctrl+K) is invisible to anyone who
+              doesn't already know it exists. */}
+          <CommandPaletteTrigger />
 
           <nav className="flex flex-col gap-4">
             {NAV_GROUPS.map((group) => (
@@ -244,6 +260,7 @@ export default async function AppShell({
         </div>
       </aside>
       <main className="flex-1 min-w-0 md:ml-60">{children}</main>
+      <CommandPalette />
     </div>
   );
 }

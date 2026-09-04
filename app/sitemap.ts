@@ -16,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/build/booking-app`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${siteUrl}/buildguild`, changeFrequency: "hourly", priority: 0.8 },
     { url: `${siteUrl}/roadmap`, changeFrequency: "daily", priority: 0.5 },
+    { url: `${siteUrl}/feedback`, changeFrequency: "daily", priority: 0.5 },
     { url: `${siteUrl}/changelog`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${siteUrl}/marketplace`, changeFrequency: "weekly", priority: 0.4 },
     // GYSM's own legal/support pages -- previously missing from this

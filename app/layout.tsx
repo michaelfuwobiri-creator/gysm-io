@@ -5,6 +5,7 @@ import "./globals.css";
 import PWARegister from "./components/PWARegister";
 import AnalyticsGate from "./components/AnalyticsGate";
 import CookieConsent from "./components/CookieConsent";
+import ChatWidget from "./components/ChatWidget";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
@@ -101,6 +102,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </ClerkProvider>
         <AnalyticsGate />
         <CookieConsent />
+        <ChatWidget />
       </body>
     </html>
   );
