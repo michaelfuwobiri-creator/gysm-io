@@ -1,11 +1,23 @@
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { Redis } from "@upstash/redis/cloudflare";
 
 // Item #9 of GYSM_IO_HANDOFF.md: "Add rate limiting with Upstash Redis
 // (100 req/min per IP)". Upstash's REST-based Redis client (fetch under
 // the hood, no raw TCP socket) is what makes this usable from
 // middleware.ts, which Next.js runs on the Edge runtime -- a normal
 // node-redis/ioredis client can't open a TCP connection there.
+//
+// Imports from "@upstash/redis/cloudflare", not the bare "@upstash/redis"
+// package -- caught via a real `next build` warning: the package's
+// default export ("@upstash/redis") resolves to its Node.js build, which
+// reads `process.version` for environment detection. `process` doesn't
+// exist in Vercel's Edge Runtime (same V8-isolate sandbox Cloudflare
+// Workers uses, which is exactly why Upstash ships this build for it --
+// their own Node build's error message even says so: "If you are
+// deploying to cloudflare, please import from '@upstash/redis/cloudflare'
+// instead"). The /cloudflare build is fetch-only with zero `process.*`
+// references, and exports the same `Redis` class with the same
+// constructor shape, so this is a drop-in fix.
 //
 // Optional, same degrade-gracefully pattern as every other integration in
 // this app (see .env.local.example): unset UPSTASH_REDIS_REST_URL/TOKEN
