@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
-import CookiePreferencesLink from "../components/CookiePreferencesLink";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProductsNavMenu from "../components/ProductsNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
@@ -255,51 +254,19 @@ export default function Page() {
         </div>
       </section>
 
-      {/* FOOTER -- real sitemap only, no fabricated "trusted by" logos,
-          Instagram grids, or usage stats. Every link below points to a page
-          that actually exists in this app. */}
+      {/* FOOTER -- trimmed per Mike's request: the Product/Account/Company
+          link columns that used to live here moved to /links (a plain site
+          directory), and are deliberately NOT in the header nav -- just a
+          brand block plus a single link to the full directory. */}
       <footer className="mt-16 md:mt-24 border-t border-black/[0.06]">
         <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-12 md:py-16">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-6">
-            <div className="col-span-2 md:col-span-1">
-              <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
-              <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[220px]">{t("footer.tagline")}</p>
-              <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
-            </div>
-            <div>
-              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Product</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-bold">
-                <li><a href="/templates" className="text-black/80 hover:text-black">Templates</a></li>
-                <li><a href="/connectors" className="text-black/80 hover:text-black">Connectors</a></li>
-                <li><a href="/marketplace" className="text-black/80 hover:text-black">Marketplace</a></li>
-                <li><a href="/buildguild" className="text-black/80 hover:text-black">BuildGuild</a></li>
-                <li><a href="/actlayer" className="text-black/80 hover:text-black">ActLayer</a></li>
-                <li><a href="/media-factory-preview.html" className="text-black/80 hover:text-black">Media Factory <span className="text-black/30 font-medium">(preview)</span></a></li>
-                <li><a href="/pricing" className="text-black/80 hover:text-black">Pricing</a></li>
-                <li><a href="/roadmap" className="text-black/80 hover:text-black">Roadmap</a></li>
-                <li><a href="/changelog" className="text-black/80 hover:text-black">Changelog</a></li>
-              </ul>
-            </div>
-            <div>
-              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Account</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-bold">
-                <li><a href="/dashboard" className="text-black/80 hover:text-black">Dashboard</a></li>
-                <li><a href="/sign-in" className="text-black/80 hover:text-black">Log in</a></li>
-                <li><a href="/sign-up" className="text-black/80 hover:text-black">Sign up</a></li>
-              </ul>
-            </div>
-            <div>
-              <div className="text-[11px] font-black tracking-[0.1em] uppercase text-black/30 mb-3">Company</div>
-              <ul className="flex flex-col gap-2 text-[13px] font-bold">
-                <li><a href="mailto:support@gysm.io?subject=Work%20with%20us" className="text-black/80 hover:text-black">Work with us</a></li>
-                <li><a href="/support" className="text-black/80 hover:text-black">Support</a></li>
-                <li><a href="/terms" className="text-black/80 hover:text-black">Terms</a></li>
-                <li><a href="/privacy" className="text-black/80 hover:text-black">Privacy</a></li>
-                <li><CookiePreferencesLink /></li>
-              </ul>
-            </div>
+          <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
+          <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[320px]">{t("footer.tagline")}</p>
+          <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
+          <div className="mt-10 pt-6 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-3 text-[11px] text-black/30">
+            <span>© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</span>
+            <a href="/links" className="font-semibold text-black/50 hover:text-black">All site links →</a>
           </div>
-          <div className="mt-10 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>
         </div>
       </footer>
       <LanguageSwitcher />
