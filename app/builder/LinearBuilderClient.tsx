@@ -3285,7 +3285,7 @@ export default function LinearBuilderApp({
           { id: uid("step"), label: "Find leads on Twitter", status: "pending" },
           { id: uid("step"), label: "Build demo", status: "pending" },
           { id: uid("step"), label: "Send email", status: "pending" },
-          { id: uid("step"), label: "Collect $79", status: "pending" },
+          { id: uid("step"), label: "Collect $79.99", status: "pending" },
         ],
       };
       return { ...s, programs: { ...s.programs, [activeChat.id]: program } };

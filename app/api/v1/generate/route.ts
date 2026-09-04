@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiKey } from "@/lib/apiKeys";
-import { getCreditBalance, deductCredit, CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST } from "@/lib/credits";
+import { getCreditBalance, deductCredit, CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE } from "@/lib/credits";
 import { generateWebsite, ModelTier, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { sql } from "@/lib/db";
 
@@ -33,9 +33,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
-    // Optional: {"tier": "best"} or {"tier": "claude"} both use a
-    // stronger model for 2x credits. Anything else (including omitted)
-    // is the default "fast" tier.
+    // Optional: {"tier": "best"} or {"tier": "claude"} use a stronger
+    // model, each at its own real-cost-based credit price (see
+    // CREDIT_COST_PER_BUILD_BEST / CREDIT_COST_PER_BUILD_CLAUDE in
+    // lib/credits-constants.ts -- no longer a flat 2x for both). Anything
+    // else (including omitted) is the default "fast" tier.
     tier = body?.tier === "best" ? "best" : body?.tier === "claude" ? "claude" : "fast";
   } catch {
     return NextResponse.json({ error: "Invalid request body. Expected JSON: {\"prompt\": \"...\"}." }, { status: 400 });
@@ -44,7 +46,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "\"prompt\" is required." }, { status: 400 });
   }
 
-  const buildCost = tier === "fast" ? CREDIT_COST_PER_BUILD : CREDIT_COST_PER_BUILD_BEST;
+  const buildCost =
+    tier === "fast" ? CREDIT_COST_PER_BUILD : tier === "claude" ? CREDIT_COST_PER_BUILD_CLAUDE : CREDIT_COST_PER_BUILD_BEST;
 
   const balance = await getCreditBalance(auth.userId);
   if (balance < buildCost) {

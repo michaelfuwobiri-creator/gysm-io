@@ -45,7 +45,17 @@ export async function sendWhatsAppText(to: string, body: string): Promise<void> 
  * Sends the pre-approved "voiie_demo_ready" template message.
  * Template body (configure in Meta Business Manager):
  *   "Your free demo for {{1}} is ready! Check it out: {{2}}
- *    Reply APPROVE + a plan ($79 / $199 / $499) any time to go live."
+ *    Reply APPROVE + a plan ($79.99 / $199.99 / $499.99) any time to go live."
+ *
+ * IMPORTANT: this docstring is just a record of what the template says --
+ * the actual wording lives in Meta Business Manager's WhatsApp template
+ * library, not in this codebase, and this function only fills in {{1}}
+ * and {{2}} (businessName, demoUrl) at send time. Updating this comment
+ * does NOT change the live message. Since VOIIE's prices were repriced
+ * to $79.99/$199.99/$499.99 (Sep 2026, was a flat $79/$199/$499), the
+ * actual approved template in Meta Business Manager needs to be edited
+ * (and likely re-approved by Meta, which can take time) to match -- that
+ * has to happen by hand in Meta's dashboard, not from here.
  */
 export async function sendDemoReadyTemplate(to: string, businessName: string, demoUrl: string): Promise<void> {
   const token = requireEnv("WHATSAPP_TOKEN");

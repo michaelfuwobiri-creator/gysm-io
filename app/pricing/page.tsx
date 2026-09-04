@@ -60,7 +60,11 @@ export default function PricingPage() {
             >
               <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
               <div className="flex gap-1 items-baseline mt-2">
-                <span className="text-4xl font-black">${plan.price}</span>
+                {/* toFixed(2) -- prices are real cost + a flat $1 now (see
+                    lib/stripe.ts), so they're no longer always whole
+                    dollars (e.g. $43.60), unlike the old flat round
+                    numbers. */}
+                <span className="text-4xl font-black">${plan.price.toFixed(2)}</span>
               </div>
               <p className="mt-3 text-sm opacity-80">{plan.description}</p>
               <p className="mt-1 text-xs opacity-50">{plan.tagline}</p>
@@ -83,7 +87,11 @@ export default function PricingPage() {
             >
               <div className="text-xs opacity-50 uppercase tracking-widest">{plan.name}</div>
               <div className="flex gap-1 items-baseline mt-2">
-                <span className="text-4xl font-black">${plan.price}</span>
+                {/* toFixed(2) -- prices are real cost + a flat $1 now (see
+                    lib/stripe.ts), so they're no longer always whole
+                    dollars (e.g. $43.60), unlike the old flat round
+                    numbers. */}
+                <span className="text-4xl font-black">${plan.price.toFixed(2)}</span>
                 <span className="text-sm opacity-60">/mo</span>
               </div>
               <p className="mt-3 text-sm opacity-80">{plan.description}</p>

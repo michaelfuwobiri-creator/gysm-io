@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, getCreditBalance, deductCredit } from "@/lib/credits";
+import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, getCreditBalance, deductCredit } from "@/lib/credits";
 import { generateWebsite, editWebsite, BuildStage, ModelTier, extractSchemaSql, stripSchemaComment } from "@/lib/ai/orchestrator";
 import { buildSuggestions } from "@/lib/suggestions";
 import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
@@ -55,11 +55,15 @@ export async function POST(req: NextRequest) {
     prompt = (body?.prompt ?? "").toString().trim();
     previousHtml = typeof body?.previousHtml === "string" && body.previousHtml.trim() ? body.previousHtml : null;
     projectId = typeof body?.projectId === "string" && body.projectId ? body.projectId : undefined;
-    // Optional model tier -- "best" (Sol) or "claude" (Claude Sonnet 5)
-    // both cost more credits than the default "fast" (Terra); see
-    // CREDIT_COST_PER_BUILD_BEST. Anything other than exactly "best" or
-    // "claude" falls back to "fast" rather than erroring, since this is a
-    // nice-to-have toggle, not a required field.
+    // Optional model tier -- "best" (Sol) costs more credits than the
+    // default "fast" (Terra); "claude" (Claude Sonnet 5) has its own,
+    // separately-priced credit cost now too (see CREDIT_COST_PER_BUILD_BEST
+    // / CREDIT_COST_PER_BUILD_CLAUDE in lib/credits-constants.ts -- Claude
+    // Sonnet 5's real per-token cost turned out close to Terra's, not
+    // Sol's, once repriced off real model costs, so it no longer makes
+    // sense to charge it the same as "best"). Anything other than exactly
+    // "best" or "claude" falls back to "fast" rather than erroring, since
+    // this is a nice-to-have toggle, not a required field.
     tier = body?.tier === "best" ? "best" : body?.tier === "claude" ? "claude" : "fast";
     // Optional snapshot from a connected Airtable/Google Sheets data
     // source (see DataImportPanel + /api/connectors/data/*) -- folded
@@ -91,7 +95,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Describe what you want to build." }, { status: 400 });
   }
 
-  const buildCost = tier === "fast" ? CREDIT_COST_PER_BUILD : CREDIT_COST_PER_BUILD_BEST;
+  const buildCost =
+    tier === "fast" ? CREDIT_COST_PER_BUILD : tier === "claude" ? CREDIT_COST_PER_BUILD_CLAUDE : CREDIT_COST_PER_BUILD_BEST;
 
   const balance = await getCreditBalance(user.id);
   if (balance < buildCost) {

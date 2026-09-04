@@ -170,7 +170,7 @@ export default function UseCaseLanding({
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">{faqNote}</p>
               <button onClick={() => startBuilding(examplePrompt)} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
-              <div className="mt-3 text-[11px] text-white/30">Credit packs from $9 • cancel monthly plans anytime</div>
+              <div className="mt-3 text-[11px] text-white/30">Credit packs from $1.99 • cancel monthly plans anytime</div>
             </div>
           </div>
           <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>

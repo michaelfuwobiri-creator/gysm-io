@@ -5,7 +5,44 @@ import Stripe from "stripe";
 // DATABASE_URL isn't set. Since only NEXT_PUBLIC_* vars are ever inlined
 // into client bundles, that throw would fire in every visitor's browser.
 // credits-constants.ts has the same plan/build numbers with no db import.
-import { CREDITS_PER_PLAN, BUILDS_PER_PLAN } from "@/lib/credits-constants";
+import { CREDITS_PER_PLAN, BUILDS_PER_PLAN, BUILD_COST_USD, FLAT_PROFIT_USD } from "@/lib/credits-constants";
+
+// Standard US Stripe card rate (2.9% + $0.30/transaction) -- stable,
+// published pricing, not something that needed the same web research as
+// the AI model rates above. Folded into every price below so the flat $1
+// profit survives Stripe's own cut, not just the AI cost: charging
+// (builds*BUILD_COST_USD.fast + FLAT_PROFIT_USD) and then having Stripe
+// take a bite out of THAT would leave less than $1 net, silently. Applied
+// once per Stripe transaction (a whole pack/plan purchase, or one month's
+// subscription invoice) -- Stripe charges the fee on the transaction
+// total, not per line item, which is also why FLAT_PROFIT_USD itself is
+// added once per plan rather than once per build.
+const STRIPE_PERCENT_FEE = 0.029;
+const STRIPE_FIXED_FEE_USD = 0.3;
+
+/** Grosses up a target net amount (what GYSM should actually keep after
+ *  Stripe's cut) into the sticker price that nets exactly that amount.
+ *  Standard fee-inclusive-pricing algebra: if P is charged and Stripe
+ *  takes `pct*P + fixed`, then P - (pct*P + fixed) = net  =>
+ *  P = (net + fixed) / (1 - pct). Rounded up to the cent so GYSM never
+ *  nets a fraction less than intended. */
+function priceCoveringStripeFee(netTargetUsd: number): number {
+  const gross = (netTargetUsd + STRIPE_FIXED_FEE_USD) / (1 - STRIPE_PERCENT_FEE);
+  return Math.ceil(gross * 100) / 100;
+}
+
+/** Per Mike: every price tag should read as a "99" price (psychological
+ *  pricing -- $4.99 not $4.23). Rounds UP to the nearest whole-dollar-99,
+ *  never down, so the result still covers priceCoveringStripeFee's exact
+ *  break-even-plus-profit target -- it can only pad the margin a little
+ *  further, never erode it. $4.99 stays $4.99 (already there); $4.23,
+ *  $5.00, and $5.98 all become $5.99. Computed in integer cents to avoid
+ *  float-precision edge cases at the boundary. */
+function roundUpToX99(usd: number): number {
+  const cents = Math.round(usd * 100);
+  const dollars = Math.max(0, Math.ceil((cents - 99) / 100));
+  return dollars + 0.99;
+}
 
 let _stripe: Stripe | null = null;
 
@@ -66,22 +103,52 @@ export type PricingPlan = {
 
 /**
  * Single source of truth for pricing, consumed by app/pricing/page.tsx and
- * app/api/billing/checkout/route.ts. Change prices here and both the
- * pricing page and checkout stay in sync.
+ * app/api/billing/checkout/route.ts. Change prices here and the pricing
+ * page updates -- but see the IMPORTANT note below, `price` here is
+ * DISPLAY ONLY.
  *
- * Priced at roughly 6-26x the actual AI cost per build (~$0.07 -- GPT-4o
- * structure pass + Gemini design pass), floored so every tier clears at
- * least a 500% margin even at its cheapest per-build price (Studio, the
- * highest-volume subscription, is the floor at 6x). PAYG is priced highest
- * per-build on purpose -- it's the no-commitment option -- and each
- * subscription tier gets cheaper per-build as volume goes up, to pull
- * usage toward recurring revenue.
+ * Repriced Sep 2026 at real AI cost + a flat $1 profit, Stripe's own
+ * processing fee included (see BUILD_COST_USD in lib/credits-constants.ts
+ * for the AI cost model and its sourcing, and priceCoveringStripeFee above
+ * for the fee math). Replaces the old volume-discount model (6-26x markup,
+ * cheaper per-build the more you bought, based on a single stale
+ * "~$0.07/build, GPT-4o + Gemini" estimate that didn't match the models
+ * actually in use).
+ *
+ * IMPORTANT, corrected same day: the $1 is added ONCE PER PLAN, not once
+ * per build in the plan. Every plan below is
+ * `priceCoveringStripeFee(builds * BUILD_COST_USD.fast + FLAT_PROFIT_USD)`
+ * -- exactly $1 of flat margin whether it's a 5-build pack or a 600-build
+ * plan. An earlier version of this multiplied FLAT_PROFIT_USD by builds
+ * (so Studio alone carried $600 of "flat $1" profit) -- Mike caught that
+ * this wasn't what "put $1 as my profit" meant and corrected it to a
+ * true flat $1 per price tag. Net effect vs. the old flat prices: PAYG
+ * packs got much cheaper, and so did the subscriptions -- this pricing
+ * model runs GYSM's builder plans at close to break-even (a few cents to
+ * ~$1 total margin per pack/month), not a per-build profit center. That's
+ * a deliberate, Mike-confirmed choice, not an oversight.
+ *
+ * Every price is then rounded UP to the nearest "99" ending (see
+ * roundUpToX99 above) -- per Mike, so every price tag reads $X.99 instead
+ * of an odd cost-derived amount like $4.23. This only ever pads the
+ * margin a few cents further, never erodes the break-even-plus-profit
+ * target above it.
+ *
+ * IMPORTANT: `price` below is what the /pricing page DISPLAYS. What
+ * Stripe actually CHARGES at checkout is whatever amount the Price object
+ * at `priceIdEnvVar` (in the Stripe Dashboard) was created with --
+ * app/api/billing/checkout/route.ts passes that Price ID straight to
+ * Stripe and never reads `price` at all. Updating the numbers here does
+ * NOT change what customers get billed. Each priceIdEnvVar's Stripe Price
+ * object needs to be recreated (Stripe Prices are immutable once created)
+ * at the new amount, and the env var repointed at the new Price ID, or
+ * this page will advertise one number and charge another.
  */
 export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "credits_starter",
     name: "Starter Pack",
-    price: 9,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.credits_starter * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.credits_starter,
@@ -93,7 +160,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "credits_popular",
     name: "Popular Pack",
-    price: 29,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.credits_popular * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.credits_popular,
@@ -106,19 +173,19 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "credits_bulk",
     name: "Bulk Pack",
-    price: 59,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.credits_bulk * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.credits_bulk,
     builds: BUILDS_PER_PLAN.credits_bulk,
-    description: "Best per-build rate without a subscription. 50 builds.",
-    tagline: "Stock up and save",
+    description: "50 builds, no subscription.",
+    tagline: "Stock up",
     priceIdEnvVar: "STRIPE_CREDITS_BULK_PRICE_ID",
   },
   {
     id: "plan_builder",
     name: "Builder",
-    price: 29,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.plan_builder * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "month",
     credits: CREDITS_PER_PLAN.plan_builder,
@@ -130,7 +197,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "plan_pro",
     name: "Pro",
-    price: 79,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.plan_pro * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "month",
     credits: CREDITS_PER_PLAN.plan_pro,
@@ -143,7 +210,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "plan_studio",
     name: "Studio",
-    price: 249,
+    price: roundUpToX99(priceCoveringStripeFee(BUILDS_PER_PLAN.plan_studio * BUILD_COST_USD.fast + FLAT_PROFIT_USD)),
     currency: "usd",
     interval: "month",
     credits: CREDITS_PER_PLAN.plan_studio,
@@ -160,10 +227,29 @@ export const PRICING_PLANS: PricingPlan[] = [
   // real GYSM.IO account that owns the build (see convertLeadToCustomer
   // in lib/voiie/billing.ts and the checkout.session.completed handler
   // in app/api/billing/webhook/route.ts).
+  //
+  // NOT repriced to builds*BUILD_COST_USD.fast + FLAT_PROFIT_USD like the
+  // plans above (that would round to $1.99/$2.99/$3.99 -- literally just
+  // the welcome credit grant's raw AI cost + $1). Deliberately left at the
+  // original $79/$199/$499 (now $79.99/$199.99/$499.99 after the .99
+  // rounding pass below, same as every other plan): this price isn't
+  // paying for N raw AI builds, it's
+  // paying for a live, deployed, custom-domained website plus ongoing
+  // support/repairs and the sales/outreach work that landed the lead in
+  // the first place -- none of which has a $ cost anywhere in this
+  // codebase to add $1 on top of. Pricing these at the bare AI-cost
+  // number would guarantee a loss the moment a domain gets registered or
+  // a support ticket gets answered -- and under the flat-$1-per-tag model
+  // above it'd be an even steeper cut than under the old per-build one
+  // (roughly 50x/96x/142x, not ~24x). Flagged to Mike rather than
+  // silently slashing these -- if VOIIE's real all-in cost per site
+  // (domain + support time + outreach cost) is ever tracked somewhere,
+  // that's the number this should become cost-plus-$1 of, not the AI
+  // cost alone.
   {
     id: "voiie_starter",
     name: "VOIIE Starter Site",
-    price: 79,
+    price: roundUpToX99(79),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.voiie_starter,
@@ -176,7 +262,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "voiie_pro",
     name: "VOIIE Pro Site",
-    price: 199,
+    price: roundUpToX99(199),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.voiie_pro,
@@ -189,7 +275,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   {
     id: "voiie_agency",
     name: "VOIIE Agency Site",
-    price: 499,
+    price: roundUpToX99(499),
     currency: "usd",
     interval: "one_time",
     credits: CREDITS_PER_PLAN.voiie_agency,

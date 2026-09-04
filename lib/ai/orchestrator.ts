@@ -107,9 +107,13 @@ export type StageCallback = (stage: BuildStage) => void;
 // "claude" replaces the structure/edit model entirely with Anthropic's
 // Claude Sonnet 5, via a completely separate code path (generateStructureWithClaude
 // / editWithClaude below) since it's a different SDK and message format,
-// not just a different model string. Priced the same as "best" (see
-// CREDIT_COST_PER_BUILD_BEST) -- this is a real, working model choice,
-// not a label slapped on the existing GPT pipeline.
+// not just a different model string. Priced on its own real cost now (see
+// CREDIT_COST_PER_BUILD_CLAUDE in lib/credits-constants.ts) rather than
+// lumped in with "best" -- Claude Sonnet 5's per-token rate turned out
+// close to Terra's, not Sol's, so charging it the same as Sol would have
+// been overcharging for a model that isn't actually that much pricier to
+// run. Still a real, working model choice, not a label slapped on the
+// existing GPT pipeline.
 export type ModelTier = "fast" | "best" | "claude";
 
 const CLAUDE_MODEL = "claude-sonnet-5";

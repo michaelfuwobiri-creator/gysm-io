@@ -71,7 +71,9 @@ export type OutreachChannel = "twitter" | "whatsapp" | "email";
 
 /** Mirrors the "voiie_*" entries in lib/stripe.ts PRICING_PLANS -- kept in
  *  sync by hand since that file can't import this one (it's imported by
- *  client components, this one isn't meant to be). */
+ *  client components, this one isn't meant to be). Synced Sep 2026 to the
+ *  new .99-rounded Stripe amounts ($79.99/$199.99/$499.99, was a flat
+ *  $79/$199/$499) -- if PRICING_PLANS changes again, update here too. */
 export type VoiiePlanId = "voiie_starter" | "voiie_pro" | "voiie_agency";
 
 export const PLAN_DETAILS: Record<
@@ -79,20 +81,20 @@ export const PLAN_DETAILS: Record<
   { label: string; price: number; title: string; items: string[] }
 > = {
   voiie_starter: {
-    label: "$79",
-    price: 79,
+    label: "$79.99",
+    price: 79.99,
     title: "Starter Site",
     items: ["Live hosting on gysm.io", "SSL certificate", "Your own GYSM.IO account", "3 free edit credits"],
   },
   voiie_pro: {
-    label: "$199",
-    price: 199,
+    label: "$199.99",
+    price: 199.99,
     title: "Pro Site",
     items: ["Everything in Starter", "Custom domain connect", "Priority repairs/upgrades", "10 free edit credits"],
   },
   voiie_agency: {
-    label: "$499",
-    price: 499,
+    label: "$499.99",
+    price: 499.99,
     title: "Agency Site",
     items: ["Everything in Pro", "Full build-out & hands-on support", "Ongoing renewal management", "30 free edit credits"],
   },
