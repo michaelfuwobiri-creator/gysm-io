@@ -2,10 +2,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import CookiePreferencesLink from "../components/CookiePreferencesLink";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import { trackEvent } from "@/lib/analytics/track";
+import { IMAGE_BLUR } from "@/lib/imagePlaceholders";
 
 const NavAuthLink = dynamic(() => import("../components/NavAuthLink"), { ssr: false });
 
@@ -86,9 +88,9 @@ function AppLogo({ name, className }: { name: string; className?: string }) {
 // translates per locale -- this array only keeps the locale-independent
 // visual metadata (layout, gradient fallback, photo).
 const STORY_CARDS_META = [
-  { id: "founders", align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", image: "/media/story-founders.jpg" },
-  { id: "shippers", align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", image: "/media/story-shippers.jpg" },
-  { id: "agencies", align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", image: "/media/story-agencies.jpg" },
+  { id: "founders", align: "left" as const, gradient: "from-amber-200 via-orange-300 to-rose-300", image: "/media/story-founders.webp" },
+  { id: "shippers", align: "right" as const, gradient: "from-sky-400 via-blue-500 to-indigo-600", image: "/media/story-shippers.webp" },
+  { id: "agencies", align: "left" as const, gradient: "from-slate-300 via-slate-400 to-slate-600", image: "/media/story-agencies.webp" },
   { id: "indieHackers", align: "right" as const, gradient: "from-fuchsia-500 via-violet-600 to-indigo-700", image: "/media/story-indie-hackers.webp" },
 ] as const;
 
@@ -344,7 +346,15 @@ export default function Page() {
                   style={{ zIndex: 10 + i }}
                 >
                   <div className="relative h-[280px] md:h-[400px] w-full overflow-hidden rounded-[20px] grid place-items-center transition duration-500 group-hover:scale-[1.01]">
-                    <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                    <Image
+                      src={card.image}
+                      alt={card.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 76vw"
+                      className="object-cover transition duration-700 group-hover:scale-[1.04]"
+                      placeholder="blur"
+                      blurDataURL={IMAGE_BLUR[card.image]}
+                    />
                   </div>
                   <div className={`relative -mt-16 max-w-[320px] rounded-[20px] border border-black/5 bg-white p-6 shadow-lg ${card.align === "left" ? "ml-8" : "ml-auto mr-8"}`}>
                     <div className="text-[20px] font-bold leading-[1.1]">{card.title}</div>

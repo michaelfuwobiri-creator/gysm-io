@@ -1,4 +1,4 @@
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_noStore as noStore, unstable_cache } from "next/cache";
 import { sql } from "@/lib/db";
 import TemplatesGallery from "./TemplatesGallery";
 import AppShell from "../components/AppShell";
@@ -22,6 +22,18 @@ import AppShell from "../components/AppShell";
 // existing at build time) and kept serving that shell. noStore() is the
 // documented fix for exactly this case -- a non-fetch data source (the
 // Neon client) that still needs to force per-request dynamic rendering.
+// Route/segment rendering mode stays exactly as it was fixed -- do not
+// remove dynamic/noStore below to "do ISR" here, it will bring the old
+// bug back.
+//
+// ISR instead happens one layer down: the query result itself (not the
+// page) is cached via unstable_cache with a 60s revalidate and the
+// "templates" tag, so a fully dynamic route still avoids hitting Neon on
+// every request. app/api/projects/[id]/template/route.ts calls
+// revalidateTag("templates") right after a successful curation edit, so
+// a newly featured/edited template shows up immediately instead of
+// waiting out the 60s window -- best of both: cheap by default, instant
+// when it matters.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -34,16 +46,24 @@ export type TemplateCard = {
   created_at: string;
 };
 
-export default async function TemplatesPage() {
-  noStore();
-  let list: TemplateCard[] = [];
-  try {
-    list = (await sql`
+const getTemplates = unstable_cache(
+  async (): Promise<TemplateCard[]> => {
+    return (await sql`
       select id, name, prompt, template_blurb as blurb, html, created_at from projects
       where is_template = true
       order by created_at desc
       limit 24
     `) as TemplateCard[];
+  },
+  ["templates-gallery"],
+  { revalidate: 60, tags: ["templates"] }
+);
+
+export default async function TemplatesPage() {
+  noStore();
+  let list: TemplateCard[] = [];
+  try {
+    list = await getTemplates();
   } catch (error: any) {
     console.error("[templates] failed to load:", error.message);
   }

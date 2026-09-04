@@ -18,7 +18,7 @@ export default function Page() {
       examplePrompt="A zodiac-based dating app where users match based on astrological compatibility, with profiles, swiping, and a chat feature"
       promptPlaceholder="A zodiac-based dating app where users match based on astrological compatibility…"
       screenshot={{
-        src: "/screenshots/builder-live.jpg",
+        src: "/screenshots/builder-live.webp",
         alt: "GYSM builder generating a dating app in real time",
         caption: "The builder generating a live, working preview — not a mockup.",
       }}
@@ -28,7 +28,7 @@ export default function Page() {
         { title: "Payments for premium tiers", body: "Add paid matching boosts or premium tiers with Stripe checkout and subscriptions wired in automatically — no separate billing integration." },
       ]}
       proofScreenshot={{
-        src: "/screenshots/buildguild.jpg",
+        src: "/screenshots/buildguild.webp",
         alt: "BuildGuild public gallery of apps built on GYSM",
         caption: "BuildGuild — GYSM's public showcase of shipped apps.",
       }}

@@ -18,7 +18,7 @@ export default function Page() {
       examplePrompt="A booking app for a hair salon with service selection, calendar availability, and deposit payments at checkout"
       promptPlaceholder="A booking app for a hair salon with calendar availability and deposit payments…"
       screenshot={{
-        src: "/screenshots/builder-live.jpg",
+        src: "/screenshots/builder-live.webp",
         alt: "GYSM builder generating a booking app in real time",
         caption: "The builder generating a live, working preview — not a mockup.",
       }}
@@ -28,7 +28,7 @@ export default function Page() {
         { title: "Client accounts, done for you", body: "Sign-up, login, and booking history are wired in from the first prompt, so clients can manage their own appointments." },
       ]}
       proofScreenshot={{
-        src: "/screenshots/social-proof.jpg",
+        src: "/screenshots/social-proof.webp",
         alt: "Founders and freelancers who have shipped products with GYSM",
         caption: "Founders, freelancers, and indie hackers shipping with GYSM.",
       }}

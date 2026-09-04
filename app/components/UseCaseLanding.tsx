@@ -1,5 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { IMAGE_BLUR, IMAGE_DIMENSIONS } from "@/lib/imagePlaceholders";
 
 export type UseCasePoint = { title: string; body: string };
 
@@ -98,7 +100,15 @@ export default function UseCaseLanding({
       {/* PRODUCT SCREENSHOT */}
       <section className="max-w-[1100px] mx-auto px-5 md:px-8 mt-10 md:mt-14">
         <div className="rounded-[20px] md:rounded-[28px] overflow-hidden border border-black/10 shadow-xl bg-white">
-          <img src={screenshot.src} alt={screenshot.alt} className="w-full h-auto block" />
+          <Image
+            src={screenshot.src}
+            alt={screenshot.alt}
+            width={IMAGE_DIMENSIONS[screenshot.src]?.width ?? 1920}
+            height={IMAGE_DIMENSIONS[screenshot.src]?.height ?? 1080}
+            sizes="(max-width: 1100px) 100vw, 1100px"
+            className="w-full h-auto block"
+            {...(IMAGE_BLUR[screenshot.src] ? { placeholder: "blur" as const, blurDataURL: IMAGE_BLUR[screenshot.src] } : {})}
+          />
         </div>
         <div className="mt-3 text-center text-[12px] text-black/40 font-medium">{screenshot.caption}</div>
       </section>
@@ -134,7 +144,15 @@ export default function UseCaseLanding({
               </div>
             </div>
             <div className="rounded-[20px] overflow-hidden border border-white/10 bg-black">
-              <img src={proofScreenshot.src} alt={proofScreenshot.alt} className="w-full h-auto block" />
+              <Image
+                src={proofScreenshot.src}
+                alt={proofScreenshot.alt}
+                width={IMAGE_DIMENSIONS[proofScreenshot.src]?.width ?? 1920}
+                height={IMAGE_DIMENSIONS[proofScreenshot.src]?.height ?? 1080}
+                sizes="(max-width: 1280px) 100vw, 640px"
+                className="w-full h-auto block"
+                {...(IMAGE_BLUR[proofScreenshot.src] ? { placeholder: "blur" as const, blurDataURL: IMAGE_BLUR[proofScreenshot.src] } : {})}
+              />
             </div>
           </div>
         </div>

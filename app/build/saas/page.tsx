@@ -18,7 +18,7 @@ export default function Page() {
       examplePrompt="A project management SaaS for freelancers with client dashboards, task boards, and monthly subscription billing"
       promptPlaceholder="A project management SaaS for freelancers with client dashboards…"
       screenshot={{
-        src: "/screenshots/homepage.jpg",
+        src: "/screenshots/homepage.webp",
         alt: "GYSM.IO homepage — describe an app, get a real product",
         caption: "Describe it once. Get a real, working product — not a mockup.",
       }}
@@ -28,7 +28,7 @@ export default function Page() {
         { title: "Export the code or keep iterating", body: "Copy the code out and self-host, or keep refining in the builder — GYSM doesn't lock your SaaS into a black box." },
       ]}
       proofScreenshot={{
-        src: "/screenshots/buildguild.jpg",
+        src: "/screenshots/buildguild.webp",
         alt: "BuildGuild public gallery of SaaS apps built on GYSM",
         caption: "BuildGuild — GYSM's public showcase of shipped apps.",
       }}

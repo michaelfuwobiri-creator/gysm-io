@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
@@ -54,6 +55,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!project) {
       return Response.json({ error: "Build not found." }, { status: 404 });
     }
+    // /templates caches this list for 60s via unstable_cache (see
+    // app/templates/page.tsx) -- bust it now so a curation change shows
+    // up immediately instead of waiting out the window.
+    revalidateTag("templates");
     return Response.json({ isTemplate: project.is_template, blurb: project.template_blurb });
   } catch (error: any) {
     console.error("[projects/template] failed to update:", error.message);
