@@ -26,7 +26,13 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Credits and payments</h2>
-          <p>Building with GYSM uses credits, purchased individually or through a subscription plan. All payments are processed securely by Stripe. Prices and plans are shown at checkout and may change going forward; purchases are generally non-refundable except where required by law.</p>
+          <p>
+            Building with GYSM uses credits, purchased individually or through a subscription plan. All
+            payments are processed securely by Stripe. Prices and plans are shown at checkout and may
+            change going forward; purchases are generally non-refundable except where required by law.
+            See our <a href="/refund" className="underline">Refund Policy</a> for how failed
+            generations, credit packs, and subscription cancellations are actually handled.
+          </p>
         </section>
 
         <section>

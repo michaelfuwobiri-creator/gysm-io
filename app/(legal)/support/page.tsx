@@ -54,7 +54,8 @@ export default function SupportPage() {
           <p>
             <a href="/pricing" className="underline">Pricing</a> ·{" "}
             <a href="/privacy" className="underline">Privacy Policy</a> ·{" "}
-            <a href="/terms" className="underline">Terms of Service</a>
+            <a href="/terms" className="underline">Terms of Service</a> ·{" "}
+            <a href="/refund" className="underline">Refund Policy</a>
           </p>
         </section>
       </div>

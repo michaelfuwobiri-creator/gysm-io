@@ -18,6 +18,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/roadmap`, changeFrequency: "daily", priority: 0.5 },
     { url: `${siteUrl}/changelog`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${siteUrl}/marketplace`, changeFrequency: "weekly", priority: 0.4 },
+    // GYSM's own legal/support pages -- previously missing from this
+    // sitemap entirely (only the separate "apps/orbit" sub-app's copies
+    // below were listed).
+    { url: `${siteUrl}/privacy`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${siteUrl}/terms`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${siteUrl}/refund`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${siteUrl}/support`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${siteUrl}/apps/orbit/privacy`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${siteUrl}/apps/orbit/terms`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${siteUrl}/apps/orbit/support`, changeFrequency: "monthly", priority: 0.3 },

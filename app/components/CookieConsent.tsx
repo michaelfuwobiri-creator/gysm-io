@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 
 // Cookie/analytics consent banner. GDPR/ePrivacy require an opt-in, granular
-// choice before anything non-essential runs (see @vercel/analytics, gated
-// by AnalyticsGate.tsx reading the same localStorage key). "Necessary"
+// choice before anything non-essential runs (see @vercel/analytics,
+// posthog-js, and the GA4 gtag.js scripts, all gated by AnalyticsGate.tsx
+// reading the same localStorage key -- PostHog and GA4 were added after
+// this banner was first written; see lib/analytics/track.ts). "Necessary"
 // storage below is the functional localStorage GYSM already uses --
 // gysm_pending_prompt (app/page.tsx, app/components/UseCaseLanding.tsx) and
 // the App Store submission checklist (AppStoreGuide.tsx) -- both strictly
@@ -75,9 +77,12 @@ export default function CookieConsent() {
         <p className="text-[13px] leading-relaxed text-black/70">
           We use a small amount of storage to run GYSM.IO -- some of it (like
           remembering a prompt you typed before signing in) is strictly
-          necessary and always on. The rest is optional, cookieless product
-          analytics (Vercel Analytics) that helps us see what's working. You
-          can change this anytime from the link in the footer.
+          necessary and always on. The rest is optional product analytics
+          (Vercel Analytics, PostHog, and Google Analytics, where configured)
+          that helps us see what's working -- Vercel Analytics is cookieless,
+          while PostHog and Google Analytics do set analytics cookies, which
+          is why this choice is opt-in. You can change this anytime from the
+          link in the footer.
         </p>
 
         {expanded && (
@@ -87,7 +92,7 @@ export default function CookieConsent() {
               <input type="checkbox" checked disabled className="accent-black" />
             </label>
             <label className="flex items-center justify-between gap-3 text-[13px]">
-              <span>Analytics (Vercel Analytics, cookieless)</span>
+              <span>Analytics (Vercel Analytics, PostHog, Google Analytics)</span>
               <input
                 type="checkbox"
                 checked={analyticsChoice}

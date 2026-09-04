@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Privacy Policy</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated September 1, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated September 4, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -45,14 +45,17 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Cookies and analytics</h2>
           <p>
-            GYSM.IO uses Vercel Analytics, a cookieless, aggregated analytics service — it doesn't set
-            tracking cookies or build a cross-site profile of you. We also use a small amount of
-            browser local storage that's strictly necessary for the product to work (for example,
-            remembering a prompt you typed before signing in, or your progress through the App Store
-            submission checklist) — this isn't used for tracking and doesn't require consent under
-            ePrivacy rules. On your first visit we still ask for an explicit choice before Vercel
-            Analytics runs at all; you can change that choice anytime via "Cookie preferences" in the
-            site footer.
+            GYSM.IO uses Vercel Analytics, PostHog, and Google Analytics 4 for product analytics —
+            aggregated usage data (which pages get visited, which features get used) that helps us see
+            what's working. Vercel Analytics is cookieless and doesn't build a cross-site profile of
+            you; PostHog and Google Analytics do set analytics cookies (and, if you don't turn analytics
+            on, they simply never load — both are optional and off by default). We also use a small
+            amount of browser local storage that's strictly necessary for the product to work (for
+            example, remembering a prompt you typed before signing in, or your progress through the App
+            Store submission checklist) — this isn't used for tracking and doesn't require consent under
+            ePrivacy rules. On your first visit we ask for an explicit, opt-in choice before any of
+            Vercel Analytics, PostHog, or Google Analytics runs; you can change that choice anytime via
+            "Cookie preferences" in the site footer.
           </p>
         </section>
 
@@ -72,7 +75,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Who we share it with</h2>
-          <p>We share data only with the service providers that power GYSM.IO, each acting under their own privacy and security commitments: Clerk (authentication), our database and hosting providers (storing and serving your builds), Stripe (payment processing), OpenAI, Google, and Anthropic (processing prompts to generate your app), and Vercel Analytics (cookieless product analytics). We don&apos;t share your data with third parties for their own marketing purposes.</p>
+          <p>We share data only with the service providers that power GYSM.IO, each acting under their own privacy and security commitments: Clerk (authentication), our database and hosting providers (storing and serving your builds), Stripe (payment processing), OpenAI, Google, and Anthropic (processing prompts to generate your app), and Vercel Analytics, PostHog, and Google Analytics (product analytics, only if you&apos;ve opted in). We don&apos;t share your data with third parties for their own marketing purposes.</p>
         </section>
 
         <section>
