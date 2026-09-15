@@ -1189,6 +1189,11 @@ async function runRealGeneration(opts: {
   onStage: (label: string) => void;
   onAuthRequired: () => void;
   onNoCredits: () => void;
+  /** Lets the caller cancel an in-flight generation (Stop/Pause button --
+   *  see runGeneration's AbortController wiring). Aborting rejects the
+   *  in-flight fetch/stream read with a DOMException named "AbortError",
+   *  which the caller distinguishes from a real failure. */
+  signal?: AbortSignal;
 }): Promise<GenerateDoneEvent> {
   const res = await fetch("/api/generate", {
     method: "POST",
@@ -1200,6 +1205,7 @@ async function runRealGeneration(opts: {
       image: opts.image,
       tier: opts.tier,
     }),
+    signal: opts.signal,
   });
 
   if (res.status === 401) {
@@ -2539,6 +2545,9 @@ function ChatCenter({
   chat,
   media,
   onSend,
+  isGenerating,
+  onStopGeneration,
+  restore,
   onOpenArtifact,
   onOpenSearch,
   onOpenMobileSidebar,
@@ -2562,6 +2571,19 @@ function ChatCenter({
   chat: Chat | null;
   media: MediaItem[];
   onSend: (text: string, mediaIds: string[], mediaSkillId?: string, batchCount?: number, maskDataUrl?: string) => void;
+  /** True while the active chat has an /api/generate build in flight --
+   *  swaps the composer's Send button for a Stop button (see below). Does
+   *  NOT cover Media Factory generations (images/video/etc.), which run
+   *  concurrently and aren't cancellable the same way. */
+  isGenerating: boolean;
+  /** Aborts the active chat's in-flight generation (wired to
+   *  runGeneration's AbortController in LinearBuilderApp). */
+  onStopGeneration: () => void;
+  /** Set once, right after a Stop, to hand the aborted prompt back into
+   *  the composer so the user can edit and resend it instead of retyping
+   *  it. `nonce` changes on every stop so the restore effect below fires
+   *  even if the same chat is stopped twice with the same text. */
+  restore?: { text: string; nonce: number };
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -2665,9 +2687,25 @@ function ChatCenter({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chat?.messages.length, chat?.messages[chat.messages.length - 1]?.content]);
 
+  // Stop/Pause button: when the parent records a stop for this chat
+  // (restore.nonce changes), put the aborted prompt back in the box so
+  // the user can fix it and hit Send again instead of retyping it.
+  useEffect(() => {
+    if (restore) {
+      setInput(restore.text);
+      textareaRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restore?.nonce]);
+
   function submit() {
     const text = input.trim();
     if (!chat) return;
+    // While a build is in flight for this chat, Enter/click is a no-op --
+    // the composer shows Stop instead of Send (see the button below), but
+    // the Enter-key shortcut calls submit() directly, so it needs the same
+    // guard to avoid firing a second concurrent /api/generate call.
+    if (isGenerating) return;
 
     if (pickedMedia) {
       if (pickedMedia.needsAttachment && chatMedia.length === 0) {
@@ -2959,17 +2997,27 @@ function ChatCenter({
                   </option>
                 ))}
               </select>
-              <button
-                onClick={submit}
-                disabled={!mediaReady}
-                className={`h-8 w-8 flex items-center justify-center rounded-full text-white transition-all ${
-                  mediaReady
-                    ? "bg-[#FF0080] shadow-[0_0_16px_rgba(255,0,128,0.45)] hover:brightness-110"
-                    : "bg-white/10 cursor-not-allowed"
-                }`}
-              >
-                &#8593;
-              </button>
+              {isGenerating ? (
+                <button
+                  onClick={onStopGeneration}
+                  title="Stop -- pause the build and get your prompt back to edit"
+                  className="h-8 w-8 flex items-center justify-center rounded-full text-white bg-white/15 hover:bg-white/25 transition-all"
+                >
+                  <span className="block h-2.5 w-2.5 rounded-[2px] bg-white" />
+                </button>
+              ) : (
+                <button
+                  onClick={submit}
+                  disabled={!mediaReady}
+                  className={`h-8 w-8 flex items-center justify-center rounded-full text-white transition-all ${
+                    mediaReady
+                      ? "bg-[#FF0080] shadow-[0_0_16px_rgba(255,0,128,0.45)] hover:brightness-110"
+                      : "bg-white/10 cursor-not-allowed"
+                  }`}
+                >
+                  &#8593;
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -3047,6 +3095,20 @@ export default function LinearBuilderApp({
   const resizing = useRef(false);
   const router = useRouter();
   const hydrated = useRef(false);
+
+  /** Stop/Pause button (see runGeneration + ChatCenter's composer):
+   *  one AbortController per chat with an in-flight /api/generate call,
+   *  so stopping one chat's build never touches another's. generatingChatIds
+   *  drives the composer's Send-vs-Stop button; restoreOnStop hands the
+   *  in-flight prompt back to the composer so the user can edit and
+   *  resubmit it after a stop, instead of retyping it from scratch. */
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const [generatingChatIds, setGeneratingChatIds] = useState<Set<string>>(new Set());
+  const [restoreOnStop, setRestoreOnStop] = useState<Record<string, { text: string; nonce: number }>>({});
+
+  function stopGeneration(chatId: string) {
+    abortControllersRef.current.get(chatId)?.abort();
+  }
 
   // Bug fix: wipe a stale cross-account localStorage draft (see
   // resetIfDifferentUser in createStore() above) before anything else
@@ -3350,6 +3412,10 @@ export default function LinearBuilderApp({
       }));
     };
 
+    const controller = new AbortController();
+    abortControllersRef.current.set(chatId, controller);
+    setGeneratingChatIds((s) => new Set(s).add(chatId));
+
     try {
       const result = await runRealGeneration({
         prompt,
@@ -3360,6 +3426,7 @@ export default function LinearBuilderApp({
         onStage: setStreamingText,
         onAuthRequired: () => router.push(`/sign-in?redirect_url=${encodeURIComponent(builderPath)}`),
         onNoCredits: () => router.push("/pricing?reason=no_credits"),
+        signal: controller.signal,
       });
 
       if (!existingArtifact?.projectId && result.projectId) {
@@ -3393,7 +3460,23 @@ export default function LinearBuilderApp({
       setRightOpen(true);
     } catch (err: any) {
       if (err?.message === "__redirecting__") return;
+      if (err?.name === "AbortError") {
+        // User hit Stop -- not a real failure. Hand the prompt back to the
+        // composer (see ChatCenter's restore effect) so they can fix
+        // whatever made them stop it and resend, instead of retyping.
+        finalizeText("Stopped -- your prompt is back in the box below. Edit it and hit Send to try again.");
+        setRestoreOnStop((r) => ({ ...r, [chatId]: { text: prompt, nonce: Date.now() } }));
+        return;
+      }
       finalizeText(err?.message || "Something went wrong. Try again.");
+    } finally {
+      abortControllersRef.current.delete(chatId);
+      setGeneratingChatIds((s) => {
+        if (!s.has(chatId)) return s;
+        const next = new Set(s);
+        next.delete(chatId);
+        return next;
+      });
     }
   }
 
@@ -3682,6 +3765,9 @@ export default function LinearBuilderApp({
         chat={activeChat}
         media={state.media}
         onSend={sendMessage}
+        isGenerating={activeChat ? generatingChatIds.has(activeChat.id) : false}
+        onStopGeneration={() => activeChat && stopGeneration(activeChat.id)}
+        restore={activeChat ? restoreOnStop[activeChat.id] : undefined}
         onOpenArtifact={openArtifactPanel}
         onOpenSearch={() => setSearchOpen(true)}
         onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
