@@ -238,7 +238,7 @@ export function CenterPanel({
   const buildDemo = async () => {
     if (!lead) return;
     setBuilding(true);
-    pushToast("Building free demo with the GYSM.IO builder...", "fuchsia");
+    pushToast("Building free demo with the GYSM builder...", "fuchsia");
     try {
       const result = await apiPost<{ publicUrl: string }>(`/api/voiie/demo/${lead.lead.id}`);
       pushToast(`Demo live: ${result.publicUrl}`, "fuchsia");

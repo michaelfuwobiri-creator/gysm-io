@@ -58,7 +58,7 @@ export function LeftPanel({
           </div>
           <div className="flex flex-col leading-tight">
             <span style={{ fontWeight: 800, fontSize: 14 }}>
-              VOIIE <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>&middot; GYSM.IO</span>
+              VOIIE <span style={{ color: "var(--text-faint)", fontWeight: 600 }}>&middot; GYSM</span>
             </span>
             <div className="flex items-center gap-1.5" style={{ marginTop: 2 }}>
               <span className="animate-pulse-dot" style={{ width: 6, height: 6, borderRadius: 9999, background: "var(--fuchsia)" }} />

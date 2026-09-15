@@ -61,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       [
         `# ${displayName}`,
         "",
-        "Exported from GYSM.IO for deploying to your own Vercel account.",
+        "Exported from GYSM for deploying to your own Vercel account.",
         "",
         "## Deploy",
         "",

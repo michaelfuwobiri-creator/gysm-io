@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
 
         send({ type: "stage", stage: "saving" });
 
-        // Strip GYSM.IO's own build-time schema comment (if the model
+        // Strip GYSM's own build-time schema comment (if the model
         // emitted one) before this ever reaches the user -- it's
         // provisioning metadata, not something that belongs in "View
         // source" or the code tab.

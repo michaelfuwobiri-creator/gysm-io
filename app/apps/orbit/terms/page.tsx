@@ -8,7 +8,7 @@ export default function OrbitTermsPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          These terms cover your use of Orbit, a product preview built and operated by GYSM.IO. By viewing
+          These terms cover your use of Orbit, a product preview built and operated by GYSM. By viewing
           or interacting with Orbit, you agree to the terms below.
         </p>
 
@@ -32,8 +32,8 @@ export default function OrbitTermsPage() {
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Intellectual property</h2>
           <p>
-            Orbit&apos;s design, copy, and code are the property of GYSM.IO. Orbit was generated using the
-            GYSM.IO AI app builder; nothing here transfers ownership of the GYSM.IO platform itself.
+            Orbit&apos;s design, copy, and code are the property of GYSM. Orbit was generated using the
+            GYSM AI app builder; nothing here transfers ownership of the GYSM platform itself.
           </p>
         </section>
 
@@ -41,7 +41,7 @@ export default function OrbitTermsPage() {
           <h2 className="text-[18px] font-bold text-black mb-2">Limitation of liability</h2>
           <p>
             Orbit is provided &quot;as is,&quot; without warranties of any kind, to the fullest extent
-            permitted by law. GYSM.IO is not liable for any damages arising from your use of, or inability to
+            permitted by law. GYSM is not liable for any damages arising from your use of, or inability to
             use, Orbit.
           </p>
         </section>

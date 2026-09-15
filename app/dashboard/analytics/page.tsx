@@ -6,7 +6,7 @@ import { getMediaUsageSummary } from "@/lib/mediaAnalytics";
 import AnalyticsClient from "./AnalyticsClient";
 import MediaUsageSection from "./MediaUsageSection";
 
-export const metadata = { title: "Analytics | GYSM.IO" };
+export const metadata = { title: "Analytics | GYSM" };
 export const dynamic = "force-dynamic";
 
 // Real per-build analytics -- views over time and top referrers, built

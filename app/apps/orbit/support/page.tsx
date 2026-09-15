@@ -8,7 +8,7 @@ export default function OrbitSupportPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          Orbit is a zodiac-compatibility dating concept currently in product preview, built with GYSM.IO.
+          Orbit is a zodiac-compatibility dating concept currently in product preview, built with GYSM.
           If you have questions, feedback, a bug to report, or want early access when real accounts launch,
           reach out directly:
         </p>
@@ -33,7 +33,7 @@ export default function OrbitSupportPage() {
             </div>
             <div>
               <p className="font-semibold text-black">How was Orbit built?</p>
-              <p>Orbit was generated with <a href="/" className="underline">GYSM.IO</a>, an AI app builder — describe an app, get a real one.</p>
+              <p>Orbit was generated with <a href="/" className="underline">GYSM</a>, an AI app builder — describe an app, get a real one.</p>
             </div>
           </div>
         </section>

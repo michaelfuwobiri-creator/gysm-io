@@ -188,7 +188,7 @@ export default function MarketplaceClient() {
 
       <header className="mp-header">
         <span className="mp-serif" style={{ fontSize: 20 }}>GYSM Marketplace</span>
-        <a href="/" style={{ fontSize: 13, color: "rgba(22,19,15,0.6)", textDecoration: "none" }}>← Back to GYSM.IO</a>
+        <a href="/" style={{ fontSize: 13, color: "rgba(22,19,15,0.6)", textDecoration: "none" }}>← Back to GYSM</a>
       </header>
 
       <section className="mp-hero">
@@ -296,7 +296,7 @@ export default function MarketplaceClient() {
         <p className="mp-note">No purchases happen today. This just adds you to the launch list.</p>
       </section>
 
-      <footer className="mp-footer">GYSM Marketplace is a preview from the team behind GYSM.IO. Not yet open for purchases.</footer>
+      <footer className="mp-footer">GYSM Marketplace is a preview from the team behind GYSM. Not yet open for purchases.</footer>
     </div>
   );
 }

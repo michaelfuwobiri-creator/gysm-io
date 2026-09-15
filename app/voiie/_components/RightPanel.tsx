@@ -102,7 +102,7 @@ function DemoHtmlTab({ lead, pushToast }: { lead: LeadDetail; pushToast: (t: str
         </a>
       </div>
       <div className="flex items-center justify-center gap-1.5" style={{ fontSize: 10.5, color: "var(--text-ghost)" }}>
-        Built with the GYSM.IO builder &middot; free, live at /publish &middot; {lead.project?.views ?? 0} views
+        Built with the GYSM builder &middot; free, live at /publish &middot; {lead.project?.views ?? 0} views
       </div>
     </div>
   );
@@ -168,7 +168,7 @@ function PaymentTab({ lead, onChanged, onLeadsChanged, pushToast }: { lead: Lead
             </button>
             {sentPlan === id && (
               <div className="font-mono" style={{ background: "#08080a", border: "1px solid var(--border)", borderRadius: 10, padding: 9, fontSize: 10.5, color: "var(--text-faint)", lineHeight: 1.6 }}>
-                A real Stripe checkout link for {p.label} was sent. Once they pay, GYSM.IO creates their account and hands them the build automatically.
+                A real Stripe checkout link for {p.label} was sent. Once they pay, GYSM creates their account and hands them the build automatically.
               </div>
             )}
           </div>
@@ -218,7 +218,7 @@ function ProductionTab({ lead }: { lead: LeadDetail }) {
       <div style={{ background: "#08080a", border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>
         <div className="field-label">Account</div>
         <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
-          They now have a real GYSM.IO account with their own credits -- they can sign in with{" "}
+          They now have a real GYSM account with their own credits -- they can sign in with{" "}
           <span className="font-mono">{lead.lead.contact_email}</span> to manage the build, or you can keep managing renewals/upgrades from here.
         </div>
       </div>

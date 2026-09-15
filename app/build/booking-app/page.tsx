@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import UseCaseLanding from "@/app/components/UseCaseLanding";
 
 export const metadata: Metadata = {
-  title: "Build a Booking App with AI — GYSM.IO",
+  title: "Build a Booking App with AI — GYSM",
   description:
     "Describe your booking or scheduling app and GYSM generates a real, working product — calendars, auth, and payments included. Ship a booking system without writing boilerplate.",
   alternates: { canonical: "https://www.gysm.io/build/booking-app" },

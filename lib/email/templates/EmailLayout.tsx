@@ -21,14 +21,14 @@ export default function EmailLayout({
         <Container style={{ maxWidth: 480, margin: "0 auto", backgroundColor: "#ffffff", borderRadius: 20, overflow: "hidden" }}>
           <Section style={{ backgroundColor: "#0A0A0A", padding: "24px 32px" }}>
             <Text style={{ margin: 0, fontSize: 16, fontWeight: 900, color: "#ffffff", letterSpacing: "-0.02em" }}>
-              GYSM<span style={{ color: "#FF0080" }}>.IO</span>
+              GYSM
             </Text>
           </Section>
           <Section style={{ padding: "32px" }}>{children}</Section>
           <Hr style={{ borderColor: "#eee", margin: 0 }} />
           <Section style={{ padding: "20px 32px" }}>
             <Text style={{ fontSize: 12, color: "#999", margin: 0, lineHeight: 1.6 }}>
-              GYSM.IO -- Build Apps Like Legos.{" "}
+              GYSM -- Build Apps Like Legos.{" "}
               <Link href="https://www.gysm.io/support" style={{ color: "#999", textDecoration: "underline" }}>
                 Support
               </Link>{" "}

@@ -7,8 +7,8 @@ import CookiePreferencesLink from "../components/CookiePreferencesLink";
 // reference page, not a primary nav destination) -- the homepage footer
 // links here instead (see app/[locale]/page.tsx's footer).
 export const metadata = {
-  title: "Site Links | GYSM.IO",
-  description: "Every page on GYSM.IO in one place.",
+  title: "Site Links | GYSM",
+  description: "Every page on GYSM in one place.",
 };
 
 const SECTIONS = [
@@ -52,14 +52,14 @@ export default function LinksPage() {
 
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
-          <a href="/" className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></a>
+          <a href="/" className="font-black tracking-tighter text-[16px]">GYSM</a>
           <a href="/" className="text-[13px] font-medium opacity-60 hover:opacity-100">Back to home</a>
         </div>
       </nav>
 
       <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-14 md:py-20">
         <h1 className="text-[28px] md:text-[40px] font-black tracking-[-0.03em] leading-[0.9]">Site links</h1>
-        <p className="mt-3 text-[14px] opacity-60 max-w-[480px]">Every page on GYSM.IO, in one place.</p>
+        <p className="mt-3 text-[14px] opacity-60 max-w-[480px]">Every page on GYSM, in one place.</p>
 
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-10">
           {SECTIONS.map((section) => (
@@ -75,7 +75,7 @@ export default function LinksPage() {
           ))}
         </div>
 
-        <div className="mt-14 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM<span className="text-[#FF0080]">.IO</span> — built for founders who ship</div>
+        <div className="mt-14 pt-6 border-t border-black/[0.06] text-[11px] text-black/30">© 2026 GYSM — built for founders who ship</div>
       </div>
     </div>
   );

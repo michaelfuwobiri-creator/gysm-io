@@ -4,7 +4,7 @@ import BuildFailedEmail from "./templates/BuildFailedEmail";
 import PaymentFailedEmail from "./templates/PaymentFailedEmail";
 import WeeklySummaryEmail from "./templates/WeeklySummaryEmail";
 
-const FROM = "GYSM.IO <hello@gysm.io>";
+const FROM = "GYSM <hello@gysm.io>";
 
 // Every function here swallows and logs its own errors rather than
 // throwing -- these are all called from the middle of something else
@@ -18,7 +18,7 @@ export async function sendWelcomeEmail(to: string, name: string | null): Promise
   if (!process.env.RESEND_API_KEY) return;
   try {
     const resend = await getResend();
-    await resend.emails.send({ from: FROM, to, subject: "Welcome to GYSM.IO", react: <WelcomeEmail name={name} /> });
+    await resend.emails.send({ from: FROM, to, subject: "Welcome to GYSM", react: <WelcomeEmail name={name} /> });
   } catch (error: any) {
     console.error("[email] failed to send welcome email:", error.message);
   }
@@ -46,7 +46,7 @@ export async function sendPaymentFailedEmail(to: string, name: string | null, pl
     await resend.emails.send({
       from: FROM,
       to,
-      subject: "Action needed: your GYSM.IO payment failed",
+      subject: "Action needed: your GYSM payment failed",
       react: <PaymentFailedEmail name={name} planName={planName} />,
     });
   } catch (error: any) {
@@ -66,7 +66,7 @@ export async function sendWeeklySummaryEmail(
     await resend.emails.send({
       from: FROM,
       to,
-      subject: "Your week on GYSM.IO",
+      subject: "Your week on GYSM",
       react: <WeeklySummaryEmail name={name} buildsThisWeek={buildsThisWeek} creditsRemaining={creditsRemaining} />,
     });
   } catch (error: any) {

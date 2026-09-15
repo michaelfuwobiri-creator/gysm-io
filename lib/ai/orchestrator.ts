@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // real headroom under the 240s ceiling for DB writes and stream overhead.
 const PER_CALL_TIMEOUT_MS = 100_000;
 
-const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM.IO builder. Generate ONE complete, production-quality HTML document for the user's request.
+const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM builder. Generate ONE complete, production-quality HTML document for the user's request.
 
 HARD RULES:
 - Output ONLY the HTML document. No markdown code fences, no commentary before or after it.
@@ -29,7 +29,7 @@ HARD RULES:
 - Always render something complete and believable, even for a vague prompt -- never return an empty page, a "TODO", or placeholder-only content.
 - If a reference image is provided alongside the prompt, use it as visual/content inspiration -- subject matter, mood, layout, or style it implies -- for what you build. You don't need to literally recreate the image pixel-for-pixel; capture what it's telling you about the app the user wants.
 
-VISUAL BAR -- build this to look like a funded startup's marketing/product page shipped it, not a wireframe. Default to this house style (the same system GYSM.IO's own homepage uses) unless the request clearly calls for something else:
+VISUAL BAR -- build this to look like a funded startup's marketing/product page shipped it, not a wireframe. Default to this house style (the same system GYSM's own homepage uses) unless the request clearly calls for something else:
 - Oversized, extremely bold headlines (font-black), tight tracking (tracking-tight or tighter), tight leading (leading-none or leading-[0.9]) for hero/section titles.
 - One confident accent identity used consistently and sparingly -- pick a single hue (or a two-color gradient like violet-to-fuchsia) that fits the subject, and apply it to the key headline word via bg-gradient-to-r ... bg-clip-text text-transparent, plus small icon chips and highlights. Don't scatter five unrelated colors.
 - Every button and small label is a fully rounded pill (rounded-full): solid black or accent-colored primary buttons, white/light secondary buttons, and tiny bold uppercase-or-badge pills for tags like "Popular" or "New".
@@ -55,7 +55,7 @@ HARD RULES:
 - If you are not confident a change is safe, leave that part unchanged rather than risk breaking it.
 - Output ONLY the complete revised HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
 
-DESIGN TARGET -- push the document toward this house style (the same system GYSM.IO's own marketing site uses) unless the existing design has a clear, different intentional theme worth preserving:
+DESIGN TARGET -- push the document toward this house style (the same system GYSM's own marketing site uses) unless the existing design has a clear, different intentional theme worth preserving:
 - Typography: load/keep Inter, push headline weights to font-black with tight tracking and tight leading so hero and section titles feel confident and oversized; body copy stays comfortably readable at a lighter weight.
 - Accent: consolidate onto one confident accent identity (a single hue or a violet-to-fuchsia-style two-color gradient works well) applied to the key headline word or phrase via bg-clip-text, to primary CTAs, and to small icon chips -- remove competing, unrelated accent colors.
 - Buttons and badges: make every button and small tag a fully rounded pill (rounded-full), bold label text, generous horizontal padding.
@@ -64,7 +64,7 @@ DESIGN TARGET -- push the document toward this house style (the same system GYSM
 - Rhythm: even out section spacing and center content in a consistent max-width container; tighten anything cramped, loosen anything crowded.
 - If the page sells or lists something and doesn't already end with one, add a closing high-contrast CTA moment (a dark rounded band with a subtle radial gradient glow works well) -- but only if you can do this without touching any element the script depends on.`;
 
-const EDIT_SYSTEM_PROMPT = `You are the GYSM.IO builder, now editing an app you already built. You'll get the app's complete current HTML and one specific change to make. Apply exactly that change and return the complete updated document -- don't rewrite parts that weren't asked for.
+const EDIT_SYSTEM_PROMPT = `You are the GYSM builder, now editing an app you already built. You'll get the app's complete current HTML and one specific change to make. Apply exactly that change and return the complete updated document -- don't rewrite parts that weren't asked for.
 
 HARD RULES:
 - Output ONLY the complete HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
@@ -476,7 +476,7 @@ export function extractSchemaSql(html: string): string | null {
 }
 
 /** Removes the schema comment from the HTML actually shown/saved -- it's
- *  build-time metadata for GYSM.IO's own provisioning step, not something
+ *  build-time metadata for GYSM's own provisioning step, not something
  *  a user needs to see in "View source" or the code tab. */
 export function stripSchemaComment(html: string): string {
   return html.replace(SCHEMA_COMMENT_RE, "").trim();

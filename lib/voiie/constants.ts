@@ -14,4 +14,4 @@ export const DEFAULT_HUNT_QUERY = "(need website OR looking for developer OR nee
 export const DEFAULT_PLACES_QUERY = "";
 
 export const DEFAULT_OUTREACH_TEMPLATE =
-  "Hey {name}, saw you need {pain}. I'm VOIIE from GYSM.IO — I deliver a website in 10 min. Free demo, no cost. Want a quick 2-min consult?";
+  "Hey {name}, saw you need {pain}. I'm VOIIE from GYSM — I deliver a website in 10 min. Free demo, no cost. Want a quick 2-min consult?";

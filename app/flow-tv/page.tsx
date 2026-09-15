@@ -28,7 +28,7 @@ export default async function FlowTvPage() {
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <span className="font-black tracking-tighter text-[16px]">
-              GYSM<span className="text-[#FF0080]">.IO</span>
+              GYSM
             </span>
           </a>
           <div className="flex items-center gap-2">

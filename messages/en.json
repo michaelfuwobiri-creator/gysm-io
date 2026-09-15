@@ -1,8 +1,8 @@
 {
   "Home": {
     "meta": {
-      "title": "GYSM.IO – AI No-Code App Builder for Founders & Startups",
-      "description": "GYSM.IO is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required."
+      "title": "GYSM – AI No-Code App Builder for Founders & Startups",
+      "description": "GYSM is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required."
     },
     "nav": {
       "startBuilding": "Start Building",
@@ -24,7 +24,7 @@
     "highlights": {
       "eyebrow": "We take your idea and",
       "title": "Give it life.",
-      "subtitle": "Est. 2024 — GYSM.IO is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.",
+      "subtitle": "Est. 2024 — GYSM is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.",
       "cta": "See what's been built →"
     },
     "story": {

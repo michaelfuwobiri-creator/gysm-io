@@ -1,8 +1,8 @@
 {
   "Home": {
     "meta": {
-      "title": "GYSM.IO – Créateur d'applications sans code par IA pour fondateurs et startups",
-      "description": "GYSM.IO est un créateur d'applications sans code propulsé par l'IA : décrivez l'application que vous voulez en langage courant et obtenez une véritable application web complète — authentification, base de données et paiements inclus — sans écrire une ligne de code."
+      "title": "GYSM – Créateur d'applications sans code par IA pour fondateurs et startups",
+      "description": "GYSM est un créateur d'applications sans code propulsé par l'IA : décrivez l'application que vous voulez en langage courant et obtenez une véritable application web complète — authentification, base de données et paiements inclus — sans écrire une ligne de code."
     },
     "nav": {
       "startBuilding": "Commencer à créer",
@@ -24,7 +24,7 @@
     "highlights": {
       "eyebrow": "On prend votre idée et on lui",
       "title": "Donne vie.",
-      "subtitle": "Fondé en 2024 — GYSM.IO est un créateur d'applications sans code par IA. Du prompt au produit : authentification, base de données et paiements Stripe inclus, sans écrire une seule ligne de code.",
+      "subtitle": "Fondé en 2024 — GYSM est un créateur d'applications sans code par IA. Du prompt au produit : authentification, base de données et paiements Stripe inclus, sans écrire une seule ligne de code.",
       "cta": "Voir ce qui a été créé →"
     },
     "story": {

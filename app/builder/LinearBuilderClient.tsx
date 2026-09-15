@@ -1629,7 +1629,7 @@ function Sidebar({
             <div className="h-7 w-7 rounded-full bg-[#FF0080] flex items-center justify-center text-white text-[13px] font-bold">
               G
             </div>
-            <span className="text-white font-bold text-[14px]">GYSM.IO</span>
+            <span className="text-white font-bold text-[14px]">GYSM</span>
             <span className="ml-auto rounded-full bg-[#FF0080]/15 border border-[#FF0080]/30 px-2 py-0.5 text-[10px] font-semibold text-[#FF0080]">
               PRO
             </span>

@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM.IO — Privacy Policy" };
+export const metadata = { title: "GYSM — Privacy Policy" };
 
 export default function PrivacyPage() {
   return (
@@ -8,7 +8,7 @@ export default function PrivacyPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          GYSM.IO ("GYSM," "we," "us") is an AI app builder: you describe the app you want in plain
+          GYSM ("GYSM," "we," "us") is an AI app builder: you describe the app you want in plain
           English and GYSM generates a real, working product with authentication, a database, and
           Stripe payments already wired in. This policy explains what data we collect when you use
           gysm.io, why we collect it, how AI is involved, and how you can control it.
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
             request under its own commercial API terms, which — unlike their free consumer products —
             contractually exclude using API inputs/outputs to train their models. We don't control
             those providers' infrastructure and encourage you to review their own privacy terms if you
-            want the full picture. GYSM.IO is the "provider" of the resulting AI system for the
+            want the full picture. GYSM is the "provider" of the resulting AI system for the
             purposes of applicable AI regulation (such as the EU AI Act), since we determine how these
             models are integrated into and used within the product.
           </p>
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Cookies and analytics</h2>
           <p>
-            GYSM.IO uses Vercel Analytics, PostHog, and Google Analytics 4 for product analytics —
+            GYSM uses Vercel Analytics, PostHog, and Google Analytics 4 for product analytics —
             aggregated usage data (which pages get visited, which features get used) that helps us see
             what's working. Vercel Analytics is cookieless and doesn't build a cross-site profile of
             you; PostHog and Google Analytics do set analytics cookies (and, if you don't turn analytics
@@ -70,19 +70,19 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">How we use your information</h2>
-          <p>We use the data above to operate the builder, generate and store your apps, process payments, keep the service secure, respond to support requests, and improve GYSM.IO over time. We do not sell your personal data to advertisers or data brokers.</p>
+          <p>We use the data above to operate the builder, generate and store your apps, process payments, keep the service secure, respond to support requests, and improve GYSM over time. We do not sell your personal data to advertisers or data brokers.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Who we share it with</h2>
-          <p>We share data only with the service providers that power GYSM.IO, each acting under their own privacy and security commitments: Clerk (authentication), our database and hosting providers (storing and serving your builds), Stripe (payment processing), OpenAI, Google, and Anthropic (processing prompts to generate your app), and Vercel Analytics, PostHog, and Google Analytics (product analytics, only if you&apos;ve opted in). We don&apos;t share your data with third parties for their own marketing purposes.</p>
+          <p>We share data only with the service providers that power GYSM, each acting under their own privacy and security commitments: Clerk (authentication), our database and hosting providers (storing and serving your builds), Stripe (payment processing), OpenAI, Google, and Anthropic (processing prompts to generate your app), and Vercel Analytics, PostHog, and Google Analytics (product analytics, only if you&apos;ve opted in). We don&apos;t share your data with third parties for their own marketing purposes.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">International data transfers</h2>
           <p>
-            GYSM.IO and the providers listed above operate infrastructure in the United States and
-            elsewhere. If you're accessing GYSM.IO from the EEA, UK, or Switzerland, your data may be
+            GYSM and the providers listed above operate infrastructure in the United States and
+            elsewhere. If you're accessing GYSM from the EEA, UK, or Switzerland, your data may be
             transferred to and processed in countries outside those regions; our providers rely on
             recognized transfer mechanisms (such as the EU-U.S. Data Privacy Framework or Standard
             Contractual Clauses) to do so.
@@ -111,12 +111,12 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Children</h2>
-          <p>GYSM.IO is not directed at children under 13, and we do not knowingly collect personal information from them.</p>
+          <p>GYSM is not directed at children under 13, and we do not knowingly collect personal information from them.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Changes to this policy</h2>
-          <p>If this policy changes, we&apos;ll update the date at the top of this page. Continued use of GYSM.IO after a change means you accept the revised policy.</p>
+          <p>If this policy changes, we&apos;ll update the date at the top of this page. Continued use of GYSM after a change means you accept the revised policy.</p>
         </section>
 
         <section>

@@ -6,8 +6,8 @@ import RoadmapClient from "./RoadmapClient";
 import RoadmapAdminForm from "./RoadmapAdminForm";
 
 export const metadata: Metadata = {
-  title: "Roadmap | GYSM.IO",
-  description: "What's planned, in progress, and shipped on GYSM.IO -- vote on what you want built next.",
+  title: "Roadmap | GYSM",
+  description: "What's planned, in progress, and shipped on GYSM -- vote on what you want built next.",
 };
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export default async function RoadmapPage() {
       <div className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="text-[#FF0080]">.IO</span>
+            GYSM
           </a>
           <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
             Back to dashboard

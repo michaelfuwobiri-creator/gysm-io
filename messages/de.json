@@ -1,8 +1,8 @@
 {
   "Home": {
     "meta": {
-      "title": "GYSM.IO – KI-No-Code-App-Builder für Gründer & Startups",
-      "description": "GYSM.IO ist ein KI-No-Code-App-Builder: Beschreibe die App, die du willst, in normaler Sprache und erhalte eine echte, funktionierende Full-Stack-Web-App — inklusive Login, Datenbank und Zahlungen — ganz ohne Programmieren."
+      "title": "GYSM – KI-No-Code-App-Builder für Gründer & Startups",
+      "description": "GYSM ist ein KI-No-Code-App-Builder: Beschreibe die App, die du willst, in normaler Sprache und erhalte eine echte, funktionierende Full-Stack-Web-App — inklusive Login, Datenbank und Zahlungen — ganz ohne Programmieren."
     },
     "nav": {
       "startBuilding": "Jetzt bauen",
@@ -24,7 +24,7 @@
     "highlights": {
       "eyebrow": "Wir nehmen deine Idee und",
       "title": "Erwecken sie zum Leben.",
-      "subtitle": "Gegr. 2024 — GYSM.IO ist ein KI-No-Code-App-Builder. Vom Prompt zum Produkt: inklusive Login, Datenbank und Stripe-Zahlungen, ohne eine einzige Zeile Code zu schreiben.",
+      "subtitle": "Gegr. 2024 — GYSM ist ein KI-No-Code-App-Builder. Vom Prompt zum Produkt: inklusive Login, Datenbank und Stripe-Zahlungen, ohne eine einzige Zeile Code zu schreiben.",
       "cta": "Ansehen, was gebaut wurde →"
     },
     "story": {

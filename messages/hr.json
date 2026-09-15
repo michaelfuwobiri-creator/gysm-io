@@ -1,8 +1,8 @@
 {
   "Home": {
     "meta": {
-      "title": "GYSM.IO – AI graditelj aplikacija bez koda za osnivače i startupove",
-      "description": "GYSM.IO je AI graditelj aplikacija bez koda: opišite aplikaciju koju želite na običnom jeziku i dobijte pravu, funkcionalnu full-stack web aplikaciju — s autentifikacijom, bazom podataka i plaćanjima — bez potrebe za programiranjem."
+      "title": "GYSM – AI graditelj aplikacija bez koda za osnivače i startupove",
+      "description": "GYSM je AI graditelj aplikacija bez koda: opišite aplikaciju koju želite na običnom jeziku i dobijte pravu, funkcionalnu full-stack web aplikaciju — s autentifikacijom, bazom podataka i plaćanjima — bez potrebe za programiranjem."
     },
     "nav": {
       "startBuilding": "Počni graditi",
@@ -24,7 +24,7 @@
     "highlights": {
       "eyebrow": "Uzmemo tvoju ideju i",
       "title": "Udahnemo joj život.",
-      "subtitle": "Osn. 2024. — GYSM.IO je AI graditelj aplikacija bez koda. Od upita do proizvoda: autentifikacija, baza podataka i Stripe plaćanja uključeni, bez pisanja ijedne linije koda.",
+      "subtitle": "Osn. 2024. — GYSM je AI graditelj aplikacija bez koda. Od upita do proizvoda: autentifikacija, baza podataka i Stripe plaćanja uključeni, bez pisanja ijedne linije koda.",
       "cta": "Pogledaj što je izgrađeno →"
     },
     "story": {

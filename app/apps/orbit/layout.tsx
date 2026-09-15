@@ -2,7 +2,7 @@
 // These exist primarily to satisfy App Store Connect / Play Console's
 // required-URL fields for the Orbit app store listing, and are written to
 // honestly reflect what Orbit currently is: a live product preview built
-// on GYSM.IO with no real accounts or backend yet, not a fictional legal
+// on GYSM with no real accounts or backend yet, not a fictional legal
 // document pretending otherwise.
 export default function OrbitLegalLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,7 +24,7 @@ export default function OrbitLegalLayout({ children }: { children: React.ReactNo
             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#FF0080] to-[#FF0080] grid place-items-center text-white text-[13px]">✦</div>
             <span className="font-black tracking-tight text-[15px]">orbit.</span>
           </a>
-          <a href="/" className="text-[12px] font-medium opacity-50 hover:opacity-100">Built with GYSM.IO</a>
+          <a href="/" className="text-[12px] font-medium opacity-50 hover:opacity-100">Built with GYSM</a>
         </div>
       </nav>
       <div className="max-w-[720px] mx-auto px-5 py-12">{children}</div>

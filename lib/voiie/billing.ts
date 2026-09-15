@@ -4,7 +4,7 @@
 // gysm.io's own plans -- see createVoiieCheckoutSession below), and on
 // checkout.session.completed (app/api/billing/webhook/route.ts routes
 // here when metadata.source === "voiie"), convert the lead into a real
-// GYSM.IO account that owns the demo build going forward.
+// GYSM account that owns the demo build going forward.
 
 import { clerkClient } from "@clerk/nextjs/server";
 import { getStripe, getPlanById, getPriceId, DEFAULT_LIVE_PRICE_IDS } from "@/lib/stripe";

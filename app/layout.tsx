@@ -11,15 +11,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "GYSM.IO \u2013 AI No-Code App Builder for Founders & Startups",
+  title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
   description:
-    "GYSM.IO is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required.",
-  applicationName: "GYSM.IO",
+    "GYSM is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required.",
+  applicationName: "GYSM",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "GYSM.IO",
+    title: "GYSM",
   },
   icons: {
     icon: [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }],
@@ -29,16 +29,16 @@ export const metadata: Metadata = {
   // app/robots.ts, app/sitemap.ts, and public/llms.txt -- see those for
   // the SEO / AI-discoverability side of things.
   openGraph: {
-    title: "GYSM.IO \u2013 AI No-Code App Builder for Founders & Startups",
-    description: "Describe the app you want. GYSM.IO's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
+    title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
+    description: "Describe the app you want. GYSM's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
     url: siteUrl,
-    siteName: "GYSM.IO",
+    siteName: "GYSM",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "GYSM.IO \u2013 AI No-Code App Builder for Founders & Startups",
-    description: "Describe the app you want. GYSM.IO's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
+    title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
+    description: "Describe the app you want. GYSM's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
   },
 };
 
@@ -49,17 +49,17 @@ export const viewport: Viewport = {
 };
 
 // Site-wide Organization structured data -- gives AI answer engines and
-// search result rich-snippets a clean, unambiguous entity to attach GYSM.IO
+// search result rich-snippets a clean, unambiguous entity to attach GYSM
 // to. Page-specific SoftwareApplication JSON-LD lives on the homepage and
 // on each published app's /publish/[id] page instead of here.
 const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "GYSM.IO",
+  name: "GYSM",
   url: siteUrl,
   logo: `${siteUrl}/icons/icon-512.png`,
   description:
-    "GYSM.IO is an AI app builder: describe an app in plain English and get a real, working website with auth, payments, and a live preview.",
+    "GYSM is an AI app builder: describe an app in plain English and get a real, working website with auth, payments, and a live preview.",
   sameAs: [],
 };
 

@@ -24,7 +24,7 @@ import LinearBuilderClient from "./LinearBuilderClient";
 //
 // ?prompt=<text> is a plain deep-link: prefills the prompt box only, never
 // auto-submits (no surprise credit spend) and never touches initialHtml/
-// initialProjectId. Used by the "Build on GYSM.IO" links from the Chrome
+// initialProjectId. Used by the "Build on GYSM" links from the Chrome
 // extension (and anywhere else that wants to hand off a starting prompt).
 export default async function BuilderPage({
   searchParams,

@@ -8,7 +8,7 @@ export default function OrbitPrivacyPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          Orbit is a product preview for a zodiac-compatibility dating concept, built and operated by GYSM.IO.
+          Orbit is a product preview for a zodiac-compatibility dating concept, built and operated by GYSM.
           This policy explains what Orbit collects today, in its current preview stage, and what will change
           once Orbit launches with real accounts.
         </p>

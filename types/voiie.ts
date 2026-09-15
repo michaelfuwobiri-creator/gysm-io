@@ -84,7 +84,7 @@ export const PLAN_DETAILS: Record<
     label: "$79.99",
     price: 79.99,
     title: "Starter Site",
-    items: ["Live hosting on gysm.io", "SSL certificate", "Your own GYSM.IO account", "3 free edit credits"],
+    items: ["Live hosting on gysm.io", "SSL certificate", "Your own GYSM account", "3 free edit credits"],
   },
   voiie_pro: {
     label: "$199.99",

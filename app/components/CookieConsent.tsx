@@ -75,7 +75,7 @@ export default function CookieConsent() {
     >
       <div className="mx-auto max-w-[640px] rounded-2xl border border-black/10 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.15)] p-5">
         <p className="text-[13px] leading-relaxed text-black/70">
-          We use a small amount of storage to run GYSM.IO -- some of it (like
+          We use a small amount of storage to run GYSM -- some of it (like
           remembering a prompt you typed before signing in) is strictly
           necessary and always on. The rest is optional product analytics
           (Vercel Analytics, PostHog, and Google Analytics, where configured)

@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM.IO — Terms of Service" };
+export const metadata = { title: "GYSM — Terms of Service" };
 
 export default function TermsPage() {
   return (
@@ -8,7 +8,7 @@ export default function TermsPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          These terms govern your use of GYSM.IO ("GYSM," "we," "us"), an AI app
+          These terms govern your use of GYSM ("GYSM," "we," "us"), an AI app
           builder that turns a plain-English description into a real, working app with authentication,
           a database, and Stripe payments included. By creating an account or using gysm.io, you agree
           to these terms.
@@ -42,7 +42,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Ownership of what you build</h2>
-          <p>You own the app, code, and content you generate with GYSM and can export or deploy it as you like. GYSM retains all rights to the underlying platform, builder tooling, and GYSM.IO branding itself.</p>
+          <p>You own the app, code, and content you generate with GYSM and can export or deploy it as you like. GYSM retains all rights to the underlying platform, builder tooling, and GYSM branding itself.</p>
         </section>
 
         <section>
@@ -62,29 +62,29 @@ export default function TermsPage() {
             third-party AI model (OpenAI, Google Gemini, or Anthropic Claude, depending on the tier
             you choose) to generate a response. Every app, page, and piece of code GYSM produces is
             AI-generated content, not human-written or human-reviewed by GYSM before it reaches you.
-            Builds you publish to BuildGuild carry a visible "Built with GYSM.IO" notice for the same
+            Builds you publish to BuildGuild carry a visible "Built with GYSM" notice for the same
             reason — so visitors know the app was AI-generated.
           </p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Disclaimers</h2>
-          <p>GYSM.IO is provided "as is." AI-generated code can contain bugs or mistakes — review anything GYSM builds before relying on it in production. We don&apos;t guarantee the service will be uninterrupted or error-free.</p>
+          <p>GYSM is provided "as is." AI-generated code can contain bugs or mistakes — review anything GYSM builds before relying on it in production. We don&apos;t guarantee the service will be uninterrupted or error-free.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Limitation of liability</h2>
-          <p>To the extent permitted by law, GYSM.IO isn&apos;t liable for indirect, incidental, or consequential damages arising from your use of the service, including issues in apps you build with it.</p>
+          <p>To the extent permitted by law, GYSM isn&apos;t liable for indirect, incidental, or consequential damages arising from your use of the service, including issues in apps you build with it.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Termination</h2>
-          <p>You can stop using GYSM.IO and close your account at any time. We may suspend or terminate accounts that violate these terms.</p>
+          <p>You can stop using GYSM and close your account at any time. We may suspend or terminate accounts that violate these terms.</p>
         </section>
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Changes</h2>
-          <p>We may update these terms as GYSM.IO evolves. We&apos;ll update the date at the top of this page when we do, and continued use after a change means you accept the revised terms.</p>
+          <p>We may update these terms as GYSM evolves. We&apos;ll update the date at the top of this page when we do, and continued use after a change means you accept the revised terms.</p>
         </section>
 
         <section>

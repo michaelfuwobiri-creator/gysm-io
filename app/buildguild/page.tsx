@@ -222,7 +222,7 @@ export default async function BuildGuildPage({
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#08080a]/80 border-b border-white/[0.06] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
-            <span className="font-black tracking-tighter text-[16px]">GYSM<span className="text-[#FF0080]">.IO</span></span>
+            <span className="font-black tracking-tighter text-[16px]">GYSM</span>
           </a>
           <div className="flex items-center gap-2">
             <a href="/dashboard" className="text-[13px] font-medium text-white/60 hover:text-white hidden md:block mr-2">Dashboard</a>

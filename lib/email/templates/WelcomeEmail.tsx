@@ -3,7 +3,7 @@ import EmailLayout, { buttonStyle, headingStyle, textStyle } from "./EmailLayout
 
 export default function WelcomeEmail({ name }: { name: string | null }) {
   return (
-    <EmailLayout preview="Welcome to GYSM.IO -- describe an app, get a real one.">
+    <EmailLayout preview="Welcome to GYSM -- describe an app, get a real one.">
       <Text style={headingStyle}>Welcome{name ? `, ${name}` : ""}.</Text>
       <Text style={textStyle}>
         You&apos;re in. GYSM turns a plain-English description into a real, working app -- authentication,

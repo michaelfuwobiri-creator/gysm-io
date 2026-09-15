@@ -5,8 +5,8 @@ import { isAdminEmail } from "@/lib/isAdmin";
 import FeedbackClient from "./FeedbackClient";
 
 export const metadata: Metadata = {
-  title: "Feedback | GYSM.IO",
-  description: "Tell us what to build next on GYSM.IO -- post an idea, upvote what you want most.",
+  title: "Feedback | GYSM",
+  description: "Tell us what to build next on GYSM -- post an idea, upvote what you want most.",
 };
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export default async function FeedbackPage() {
       <div className="max-w-2xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="text-[#FF0080]">.IO</span>
+            GYSM
           </a>
           <a href="/dashboard" className="text-[11px] opacity-50 hover:opacity-100">
             Back to dashboard

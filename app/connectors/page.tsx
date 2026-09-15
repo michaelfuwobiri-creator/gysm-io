@@ -7,7 +7,7 @@ import AppShell from "../components/AppShell";
 
 // Signed-in only, same as /dashboard. Supabase (Connect Database, wired
 // up in the builder toolbar -- see lib/supabaseBackend.ts and
-// db/migrations/0003_connected_backends.sql) is GYSM.IO's one real
+// db/migrations/0003_connected_backends.sql) is GYSM's one real
 // connector today; everything else here is an honest "not built yet,
 // tell us you want it" list (db/migrations/0009_connector_requests.sql)
 // rather than a fake "Connect" button with nothing behind it.

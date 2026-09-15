@@ -17,8 +17,8 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 const PricingBanners = dynamic(() => import("./PricingBanners"), { ssr: false });
 
 export const metadata: Metadata = {
-  title: "Pricing | GYSM.IO",
-  description: "Simple, transparent pricing for the GYSM.IO AI website builder — pay as you go or subscribe monthly.",
+  title: "Pricing | GYSM",
+  description: "Simple, transparent pricing for the GYSM AI website builder — pay as you go or subscribe monthly.",
 };
 
 // Server Component reading straight from lib/stripe.ts PRICING_PLANS.
@@ -41,9 +41,9 @@ export default function PricingPage() {
   const pricingJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: "GYSM.IO AI App Builder",
+    name: "GYSM AI App Builder",
     description: "AI website/app builder credit packs and subscription plans.",
-    brand: { "@type": "Brand", name: "GYSM.IO" },
+    brand: { "@type": "Brand", name: "GYSM" },
     offers: [...payAsYouGo, ...monthly].map((p) => ({
       "@type": "Offer",
       name: p.name,
@@ -64,7 +64,7 @@ export default function PricingPage() {
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex justify-between items-center py-4 border-b border-black/10 mb-10">
           <a href="/" className="text-2xl font-black">
-            GYSM<span className="text-[#FF0080]">.IO</span>
+            GYSM
           </a>
           <a href="/builder" className="text-[11px] opacity-50 hover:opacity-100">
             Back to builder

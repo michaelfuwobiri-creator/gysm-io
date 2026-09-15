@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 // Per-app installable-PWA manifest for a published build, so "Orbit" (or
 // any future published app) can be added to a user's home screen as its
 // own app -- distinct icon and name -- rather than only as a bookmark
-// inside GYSM.IO. Falls back to GYSM.IO's own icon set for any published
+// inside GYSM. Falls back to GYSM's own icon set for any published
 // app that doesn't have a custom-designed icon (currently only Orbit
 // does, at /icons/orbit/*).
 const CUSTOM_ICON_PROJECTS: Record<string, string> = {
@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const manifest = {
     name: title,
     short_name: title.length > 20 ? title.slice(0, 20) : title,
-    description: `${title} — built with GYSM.IO`,
+    description: `${title} — built with GYSM`,
     start_url: `/publish/${params.id}?source=pwa`,
     scope: `/publish/${params.id}`,
     display: "standalone",

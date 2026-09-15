@@ -6,7 +6,7 @@ import { getPlanById } from "@/lib/stripe";
 import AppShell from "@/app/components/AppShell";
 import BillingClient from "./BillingClient";
 
-export const metadata = { title: "Billing | GYSM.IO" };
+export const metadata = { title: "Billing | GYSM" };
 export const dynamic = "force-dynamic";
 
 export default async function BillingPage() {

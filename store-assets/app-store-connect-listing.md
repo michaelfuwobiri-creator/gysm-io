@@ -1,7 +1,7 @@
-# App Store Connect listing copy — GYSM.IO
+# App Store Connect listing copy — GYSM
 
 ## App Name (30 char max)
-GYSM.IO — AI App Builder
+GYSM — AI App Builder
 (24 chars)
 
 ## Subtitle (30 char max)
@@ -46,7 +46,7 @@ monthly credit allowance; one-time credit packs never expire.
 ai app builder,no-code,saas builder,website builder,ai coding,app generator,indie hacker,mvp
 
 ## What's New (first submission — required but generic is fine)
-First release of GYSM.IO for iOS. Describe an app, get real working code
+First release of GYSM for iOS. Describe an app, get real working code
 with auth, a database, and payments included.
 
 ## Support URL

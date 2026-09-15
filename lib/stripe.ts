@@ -224,7 +224,7 @@ export const PRICING_PLANS: PricingPlan[] = [
   // /pricing (hidden: true) -- lib/voiie/billing.ts's checkout route is
   // the only place that reads these, quoted to one specific lead at a
   // time by whoever's running VOIIE. Paying converts the lead into a
-  // real GYSM.IO account that owns the build (see convertLeadToCustomer
+  // real GYSM account that owns the build (see convertLeadToCustomer
   // in lib/voiie/billing.ts and the checkout.session.completed handler
   // in app/api/billing/webhook/route.ts).
   //

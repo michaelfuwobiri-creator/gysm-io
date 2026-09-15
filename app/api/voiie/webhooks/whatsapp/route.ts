@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   if (!incoming) return Response.json({ ok: true }); // status update / non-text event -- nothing to do
 
   try {
-    // WHATSAPP_OWNER_USER_ID: whichever GYSM.IO account this WhatsApp
+    // WHATSAPP_OWNER_USER_ID: whichever GYSM account this WhatsApp
     // Business number is registered to receive leads for. This app is
     // single-operator today (see db/migrations/0016_voiie.sql's comment
     // on owner_user_id) -- a multi-operator setup would instead route by

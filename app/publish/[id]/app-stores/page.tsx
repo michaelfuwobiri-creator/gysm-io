@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const project = await getProject(params.id);
   const name = project?.title || project?.prompt?.slice(0, 60) || "your build";
   return {
-    title: `Publish ${name} to the App Store & Play Store — GYSM.IO`,
+    title: `Publish ${name} to the App Store & Play Store — GYSM`,
     robots: { index: false },
   };
 }

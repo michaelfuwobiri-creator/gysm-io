@@ -3,7 +3,7 @@ import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
 // A small, fixed allowlist -- this only records interest in connectors
-// GYSM.IO doesn't actually support yet (see app/connectors/page.tsx), so
+// GYSM doesn't actually support yet (see app/connectors/page.tsx), so
 // it deliberately can't be used to insert arbitrary rows for anything a
 // client sends.
 const REQUESTABLE_CONNECTORS = new Set([

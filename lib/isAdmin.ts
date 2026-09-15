@@ -1,4 +1,4 @@
-// Single source of truth for "is this the GYSM.IO admin" -- gates the
+// Single source of truth for "is this the GYSM admin" -- gates the
 // template-curation toggle (see app/api/projects/[id]/template) so only
 // Mike can flag a build as a public template. Defaults to Mike's email;
 // can be extended via ADMIN_EMAILS (comma-separated) without a redeploy

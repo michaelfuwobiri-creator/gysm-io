@@ -29,7 +29,7 @@ export default function ShareButton({ url, title, variant = "dark", dropUp = fal
   }, []);
 
   const encodedUrl = encodeURIComponent(url);
-  const encodedTitle = encodeURIComponent(`${title} — built with GYSM.IO`);
+  const encodedTitle = encodeURIComponent(`${title} — built with GYSM`);
 
   const links = [
     { label: "X / Twitter", href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}` },

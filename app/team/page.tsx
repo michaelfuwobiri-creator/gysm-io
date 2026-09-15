@@ -3,7 +3,7 @@ import { OrganizationProfile, CreateOrganization } from "@clerk/nextjs";
 import { getUser } from "@/lib/auth";
 import AppShell from "@/app/components/AppShell";
 
-export const metadata = { title: "Team | GYSM.IO" };
+export const metadata = { title: "Team | GYSM" };
 
 // Full team management -- invite by email, assign roles, remove members,
 // see pending invitations. Clerk's <OrganizationProfile /> is a complete,

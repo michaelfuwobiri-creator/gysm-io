@@ -127,7 +127,7 @@ export default async function DashboardPage() {
           <div className="text-black/50 p-10 border border-dashed border-black/10 rounded-2xl text-center bg-white">
             {user.orgId
               ? "No team builds yet. Generate one from the prompt box above while this org is active, or ask a teammate to."
-              : "No builds yet -- describe what you want above and GYSM.IO will build it."}
+              : "No builds yet -- describe what you want above and GYSM will build it."}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">

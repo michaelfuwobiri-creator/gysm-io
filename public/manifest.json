@@ -1,6 +1,6 @@
 {
-  "name": "GYSM.IO - AI Website & App Builder",
-  "short_name": "GYSM.IO",
+  "name": "GYSM - AI Website & App Builder",
+  "short_name": "GYSM",
   "description": "Describe an app, get a real one. AI-powered app builder with working auth, payments, and a live preview.",
   "start_url": "/?source=pwa",
   "scope": "/",

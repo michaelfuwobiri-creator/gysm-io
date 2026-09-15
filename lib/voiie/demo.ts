@@ -122,7 +122,7 @@ function buildTemplateFallback(answers: LeadAnswers, fallbackName: string): stri
       <a style="display:inline-block;background:linear-gradient(135deg,${accent},#8b5cf6);color:#fff;font-weight:700;font-size:14px;padding:13px 28px;border-radius:9999px;">Get Started</a>
     </section>
     <footer style="padding:30px 40px;border-top:1px solid rgba(255,255,255,.08);text-align:center;color:rgba(255,255,255,.35);font-size:12px;">
-      Built free in minutes by VOIIE &mdash; a GYSM.IO agent.
+      Built free in minutes by VOIIE &mdash; a GYSM agent.
     </footer>
   </body></html>`;
 }

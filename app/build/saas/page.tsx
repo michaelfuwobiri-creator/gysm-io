@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import UseCaseLanding from "@/app/components/UseCaseLanding";
 
 export const metadata: Metadata = {
-  title: "Build a SaaS App with AI — GYSM.IO",
+  title: "Build a SaaS App with AI — GYSM",
   description:
     "Describe your SaaS idea and GYSM generates a real, working product — auth, a database, and Stripe subscriptions included. Ship an MVP without writing boilerplate.",
   alternates: { canonical: "https://www.gysm.io/build/saas" },
@@ -19,7 +19,7 @@ export default function Page() {
       promptPlaceholder="A project management SaaS for freelancers with client dashboards…"
       screenshot={{
         src: "/screenshots/homepage.webp",
-        alt: "GYSM.IO homepage — describe an app, get a real product",
+        alt: "GYSM homepage — describe an app, get a real product",
         caption: "Describe it once. Get a real, working product — not a mockup.",
       }}
       points={[

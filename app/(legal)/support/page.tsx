@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM.IO — Support" };
+export const metadata = { title: "GYSM — Support" };
 
 export default function SupportPage() {
   return (
@@ -8,7 +8,7 @@ export default function SupportPage() {
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
-          Need help with GYSM.IO? Email us at{" "}
+          Need help with GYSM? Email us at{" "}
           <a href="mailto:support@gysm.io" className="underline font-semibold text-black">support@gysm.io</a>{" "}
           and we&apos;ll get back to you, or use the chat button in the corner of the screen for a faster reply.
         </p>
@@ -26,7 +26,7 @@ export default function SupportPage() {
 
         <section id="delete-account">
           <h2 className="text-[18px] font-bold text-black mb-2">Delete your account and data</h2>
-          <p className="mb-2">You can delete your GYSM.IO account yourself, anytime, directly in the app:</p>
+          <p className="mb-2">You can delete your GYSM account yourself, anytime, directly in the app:</p>
           <ol className="list-decimal pl-5 space-y-1">
             <li>Sign in at gysm.io and open the builder or dashboard</li>
             <li>Click your profile icon in the top right</li>

@@ -2,7 +2,7 @@
 // Art. 50(2) -- providers of generative AI must make output "detectable
 // as artificially generated" in a machine-readable format, distinct from
 // the human-readable label already shown in the footer of
-// app/publish/[id]/page.tsx ("AI-generated with GYSM.IO").
+// app/publish/[id]/page.tsx ("AI-generated with GYSM").
 //
 // v1 here is a standards-lightweight but real implementation: two <meta>
 // tags injected into the generated document's <head> at render time
@@ -14,7 +14,7 @@
 // crawler/tool checking for `<meta name="ai-generated">` finds it without
 // having to guess.
 export function injectAiGeneratedMeta(html: string): string {
-  const tags = '<meta name="ai-generated" content="true"><meta name="generator" content="GYSM.IO AI App Builder">';
+  const tags = '<meta name="ai-generated" content="true"><meta name="generator" content="GYSM AI App Builder">';
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (match) => `${match}${tags}`);
   }

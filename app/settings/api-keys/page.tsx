@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 import AppShell from "@/app/components/AppShell";
 import ApiKeysClient from "./ApiKeysClient";
 
-export const metadata = { title: "API Keys | GYSM.IO" };
+export const metadata = { title: "API Keys | GYSM" };
 export const dynamic = "force-dynamic";
 
 export default async function ApiKeysPage() {

@@ -91,8 +91,8 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
 // arriving on a user's own verified domain (not gysm.io / *.vercel.app /
 // localhost) gets rewritten straight to that build's /publish/[id] page,
 // entirely bypassing Clerk -- these visitors are the public viewing
-// someone's published app, not signing into GYSM.IO itself. Falls straight
-// through to the existing Clerk middleware for every known GYSM.IO host,
+// someone's published app, not signing into GYSM itself. Falls straight
+// through to the existing Clerk middleware for every known GYSM host,
 // so none of the platform auth behavior above changes for normal traffic.
 const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
 

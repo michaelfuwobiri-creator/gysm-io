@@ -38,7 +38,7 @@ export async function generateMetadata({
       title: t("title"),
       description: t("description"),
       url: siteUrl,
-      siteName: "GYSM.IO",
+      siteName: "GYSM",
       type: "website",
     },
     twitter: {

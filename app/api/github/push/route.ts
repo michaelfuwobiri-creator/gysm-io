@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   const readme = [
     `# ${displayName}`,
     "",
-    "Synced from GYSM.IO.",
+    "Synced from GYSM.",
     "",
     "## Deploy",
     "",
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       { path: "vercel.json", content: JSON.stringify({ cleanUrls: true }, null, 2) + "\n" },
       { path: "README.md", content: readme },
     ],
-    `Sync from GYSM.IO -- ${new Date().toISOString()}`
+    `Sync from GYSM -- ${new Date().toISOString()}`
   );
 
   if (!result.ok) {

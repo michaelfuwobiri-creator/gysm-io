@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM.IO — Refund Policy" };
+export const metadata = { title: "GYSM — Refund Policy" };
 
 export default function RefundPage() {
   return (
@@ -9,7 +9,7 @@ export default function RefundPage() {
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
           This page explains how refunds work for credit packs and subscription plans purchased on
-          GYSM.IO, and expands on the payment terms in our{" "}
+          GYSM, and expands on the payment terms in our{" "}
           <a href="/terms" className="underline">Terms of Service</a>.
         </p>
 
@@ -20,7 +20,7 @@ export default function RefundPage() {
             action errors out or fails to start — the credits it would have cost are refunded to your
             balance automatically, immediately, with no request needed. This already happens today for
             every credit-consuming action in the builder; you&apos;ll see the failure message and your
-            balance unaffected. This is the main way "refunds" work day-to-day on GYSM.IO.
+            balance unaffected. This is the main way "refunds" work day-to-day on GYSM.
           </p>
         </section>
 

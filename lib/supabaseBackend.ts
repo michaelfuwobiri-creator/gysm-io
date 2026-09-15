@@ -3,7 +3,7 @@ import crypto from "crypto";
 // "Connect database" -- lets a user link their own Supabase project (via
 // OAuth) to a build, so the generated app gets a real Postgres database
 // and real auth instead of the mocked/in-memory state every build gets by
-// default. GYSM.IO never hosts or pays for this data; the user's own
+// default. GYSM never hosts or pays for this data; the user's own
 // Supabase org owns the project. See db/migrations/0003_connected_backends.sql
 // and app/api/backend/* for how this is wired end to end.
 //
