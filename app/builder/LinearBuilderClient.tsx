@@ -1137,6 +1137,8 @@ const STAGE_LABELS: Record<string, string> = {
   structure_done: "Structure, content, and interactivity written.",
   design: "Applying a visual design pass...",
   design_done: "Design polish complete.",
+  verifying: "Checking the build for issues...",
+  fixing: "Found something broken -- fixing it automatically...",
   saving: "Saving your build...",
 };
 

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
+import { runPreflightCheck, type PreflightIssue } from "@/lib/preflightCheck";
 
 // Every generation makes up to two sequential model calls (a structure/edit
 // pass, then a shared Gemini design-polish pass -- see applyDesignPass,
@@ -92,8 +93,34 @@ REAL BACKEND -- this build has a connected Supabase project (the user's own, lin
 
 export type BackendContext = { url: string; anonKey: string };
 
-export type BuildStage = "structure" | "structure_done" | "design" | "design_done";
+export type BuildStage = "structure" | "structure_done" | "design" | "design_done" | "verifying" | "fixing";
 export type StageCallback = (stage: BuildStage) => void;
+
+/** Preflight issue types (lib/preflightCheck.ts) that mean the build is
+ *  actually broken, not just lower-quality -- worth spending one more
+ *  paid model call to fix automatically. Cosmetic-only issues (placeholder
+ *  text, missing alt text) still show up on the trust badge but don't
+ *  trigger an automatic re-generation: an extra AI call is only worth its
+ *  real cost when the alternative is a build that doesn't work, not one
+ *  that's merely not perfect. */
+const BLOCKING_ISSUE_TYPES: ReadonlySet<PreflightIssue["type"]> = new Set<PreflightIssue["type"]>([
+  "truncated",
+  "unbalanced_tags",
+  "broken_anchor",
+]);
+
+/** At most one extra model call per generation/edit for self-correction --
+ *  bounds the added cost to a fixed, known amount instead of letting a
+ *  stubborn bad output retry indefinitely. */
+const MAX_FIX_ATTEMPTS = 1;
+
+const FIX_SYSTEM_PROMPT = `You are the GYSM builder, doing a targeted repair pass on an app you already built. An automated check found specific structural problems in the HTML below. Fix ONLY those problems -- don't rewrite, restyle, or "improve" anything else.
+
+HARD RULES:
+- Output ONLY the complete corrected HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
+- Fix exactly the problems listed. Leave everything else -- content, styling, working functionality -- untouched.
+- If a problem describes truncated output, complete the document properly (finish any unfinished element, script, or section) rather than just closing tags early.
+- If the document contains an HTML comment block starting with <!-- GYSM_SCHEMA, keep it byte-for-byte, unchanged, in the same position.`;
 
 // Model choice -- "fast" is the default Terra tier (cheap, competitive on
 // straightforward one-shot generation). "best" switches the structure
@@ -172,7 +199,9 @@ export async function generateWebsite(
   onStage?.("design");
   const html = await applyDesignPass(structure.html);
   onStage?.("design_done");
-  return { ok: true, html };
+
+  const verified = await verifyAndFix(html, onStage, tier);
+  return { ok: true, html: verified };
 }
 
 /**
@@ -198,7 +227,8 @@ export async function editWebsite(
     onStage?.("design");
     const polishedClaudeEdit = await applyDesignPass(claudeEdit.html);
     onStage?.("design_done");
-    return { ok: true, html: polishedClaudeEdit };
+    const verifiedClaudeEdit = await verifyAndFix(polishedClaudeEdit, onStage, tier);
+    return { ok: true, html: verifiedClaudeEdit };
   }
 
   if (!process.env.OPENAI_API_KEY) {
@@ -250,7 +280,8 @@ export async function editWebsite(
   onStage?.("design");
   const polished = await applyDesignPass(html);
   onStage?.("design_done");
-  return { ok: true, html: polished };
+  const verified = await verifyAndFix(polished, onStage, tier);
+  return { ok: true, html: verified };
 }
 
 async function generateStructure(
@@ -441,6 +472,92 @@ async function applyDesignPass(html: string): Promise<string> {
     console.error("[orchestrator] Gemini design pass failed, keeping OpenAI output:", err?.message || err);
     return html;
   }
+}
+
+function describeBlockingIssues(issues: PreflightIssue[]): string {
+  return issues.map((i) => `- ${i.message}${i.detail ? ` (${i.detail})` : ""}`).join("\n");
+}
+
+/** Targeted repair pass: takes HTML plus a short list of concrete
+ *  structural problems runPreflightCheck found (truncated output,
+ *  unbalanced tags, broken internal links) and asks the same model that
+ *  built it to fix just those, nothing else. Only called by verifyAndFix
+ *  below, so a genuinely broken build gets one real chance at
+ *  self-correction before it ever reaches a user, instead of only being
+ *  flagged on the trust badge after the fact. */
+async function fixHtmlIssues(html: string, issues: PreflightIssue[], tier: ModelTier): Promise<GenerateResult> {
+  const userText = `HTML TO FIX:\n${html}\n\nPROBLEMS FOUND:\n${describeBlockingIssues(issues)}`;
+
+  if (tier === "claude") {
+    if (!process.env.ANTHROPIC_API_KEY) return { ok: false, error: "Claude tier unavailable for the fix pass.", status: 500 };
+    try {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
+      const message = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 16000,
+        system: FIX_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userText }],
+      });
+      const raw = message.content.map((b: any) => (b.type === "text" ? b.text : "")).join("");
+      const fixed = cleanHtml(raw);
+      if (!isCompleteHtmlDocument(fixed)) return { ok: false, error: "Fix pass returned incomplete HTML.", status: 502 };
+      return { ok: true, html: fixed };
+    } catch (err: any) {
+      console.error("[orchestrator] Claude fix pass failed:", err?.message || err);
+      return { ok: false, error: "Fix pass failed.", status: 502 };
+    }
+  }
+
+  if (!process.env.OPENAI_API_KEY) return { ok: false, error: "Generation unavailable for the fix pass.", status: 500 };
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: PER_CALL_TIMEOUT_MS, maxRetries: 1 });
+    const completion = await openai.chat.completions.create({
+      model: structureModelFor(tier),
+      messages: [
+        { role: "system", content: FIX_SYSTEM_PROMPT },
+        { role: "user", content: userText },
+      ],
+      max_completion_tokens: 16000,
+    });
+    const raw = completion.choices[0]?.message?.content || "";
+    const fixed = cleanHtml(raw);
+    if (!isCompleteHtmlDocument(fixed)) return { ok: false, error: "Fix pass returned incomplete HTML.", status: 502 };
+    return { ok: true, html: fixed };
+  } catch (err: any) {
+    console.error("[orchestrator] OpenAI fix pass failed:", err?.message || err);
+    return { ok: false, error: "Fix pass failed.", status: 502 };
+  }
+}
+
+/** Runs the same structural check that lands on the trust badge
+ *  (lib/preflightCheck.ts) right after generation/edit and, only when it
+ *  finds something that means the app is actually broken -- not just
+ *  imperfect -- spends one extra, capped model call (MAX_FIX_ATTEMPTS)
+ *  trying to fix it before the build ever reaches the user. Only swaps in
+ *  the fix if it actually reduced the number of real problems, so this
+ *  can make a build better or leave it unchanged, never worse. Cosmetic
+ *  issues (placeholder text, missing alt text) are intentionally left for
+ *  the trust badge -- see BLOCKING_ISSUE_TYPES. */
+async function verifyAndFix(html: string, onStage: StageCallback | undefined, tier: ModelTier): Promise<string> {
+  let current = html;
+  for (let attempt = 0; attempt < MAX_FIX_ATTEMPTS; attempt++) {
+    onStage?.("verifying");
+    const preflight = runPreflightCheck(current);
+    const blocking = preflight.issues.filter((i) => BLOCKING_ISSUE_TYPES.has(i.type));
+    if (blocking.length === 0) break;
+
+    onStage?.("fixing");
+    const fixResult = await fixHtmlIssues(current, blocking, tier);
+    if (!fixResult.ok) break;
+
+    const afterBlocking = runPreflightCheck(fixResult.html).issues.filter((i) => BLOCKING_ISSUE_TYPES.has(i.type));
+    if (afterBlocking.length < blocking.length) {
+      current = fixResult.html;
+    } else {
+      break;
+    }
+  }
+  return current;
 }
 
 /** Strips markdown fences and any stray prose before/after the document. */
