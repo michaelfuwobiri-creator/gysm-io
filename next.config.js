@@ -1,3 +1,7 @@
+// Redeploy trigger: force a fresh Vercel build to pick up newly-added
+// environment variables (e.g. FAL_API_KEY) that a prior build predates.
+// Vercel does not retroactively apply env var changes to an already-built
+// deployment -- only the next build reads current values. No logic change.
 const createNextIntlPlugin = require('next-intl/plugin');
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.js');
