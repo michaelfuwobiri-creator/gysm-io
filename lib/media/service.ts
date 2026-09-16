@@ -20,8 +20,16 @@ export async function requireUserAndCredit(
   if (!user) {
     return { ok: false, status: 401, error: "Sign in to use Media Factory." };
   }
+  // "image" is the one kind with two possible providers: Fal (full
+  // feature set, including image-to-image) or, as a fallback, OpenAI's
+  // Images API (plain text-to-image only) via the same OPENAI_API_KEY
+  // that already powers the core builder -- see
+  // lib/media/providers/openaiImage.ts. Configured if either is
+  // present; app/api/media/image/route.ts decides which one to
+  // actually call. Every other kind still needs its one specific key.
   const envVar = MEDIA_KIND_ENV_VAR[kind];
-  if (!process.env[envVar]) {
+  const configured = kind === "image" ? !!process.env.FAL_API_KEY || !!process.env.OPENAI_API_KEY : !!process.env[envVar];
+  if (!configured) {
     return {
       ok: false,
       status: 501,
