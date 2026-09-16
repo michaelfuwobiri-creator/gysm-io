@@ -52,6 +52,22 @@ interface ChatMessage {
    *  generation (see /api/media/* + MediaSkillDef below) rather than
    *  an /api/generate app-build reply. */
   media?: MediaMsgState;
+  /** Copy/Edit/Redo hover actions on a user bubble (see MessageBubble):
+   *  the raw prompt exactly as typed, before sendMessage's own display
+   *  formatting (the "(batch of N)" suffix, or the "[Skill]" fallback
+   *  bracket when a Media Factory send has no free-text prompt). Copy
+   *  copies this instead of the decorated `content`; Edit restores it to
+   *  the composer; Redo resends it verbatim. Only ever set on role:
+   *  "user" messages. */
+  rawText?: string;
+  /** Which Media Factory skill (a MEDIA_SKILLS id) this user message
+   *  triggered, if any -- lets Redo re-run that same skill instead of
+   *  falling through to a plain /api/generate build, and lets Edit
+   *  re-select it in the composer. Undefined for a normal build prompt. */
+  mediaSkillId?: string;
+  /** Batch Generation count (image skill only) this message was sent
+   *  with, if more than 1 -- Redo reproduces it exactly. */
+  batchCount?: number;
 }
 
 interface MediaMsgState {
@@ -1389,17 +1405,46 @@ function renderAssistantContent(content: string, onOpenArtifact: () => void) {
 /* Presentational: message bubble                                        */
 /* --------------------------------------------------------------------- */
 
-function TypingDots() {
+/** The builder chat's "something is generating" loading indicator: a
+ *  pink ring spinning via plain CSS (Tailwind's animate-spin), no new
+ *  dependency. Used for the assistant's thinking state before any
+ *  content has streamed in, and for a Media Factory generation's
+ *  in-progress card (see MediaResultCard below). */
+function Spinner({ size = 16 }: { size?: number }) {
   return (
-    <div className="flex items-center gap-1 py-1">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 rounded-full bg-[#FF0080] animate-pulse"
-          style={{ animationDelay: `${i * 150}ms` }}
-        />
-      ))}
-    </div>
+    <span
+      className="inline-block shrink-0 rounded-full border-2 border-[#FF0080]/25 border-t-[#FF0080] animate-spin"
+      style={{ width: size, height: size }}
+      aria-label="Loading"
+    />
+  );
+}
+
+/** Tiny stroke icons for the user-bubble hover actions -- kept as inline
+ *  SVG rather than pulling in an icon package, matching this file's
+ *  existing zero-new-dependency approach (see header comment). */
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+function EditIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+function RedoIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
   );
 }
 
@@ -1407,11 +1452,20 @@ function MessageBubble({
   message,
   onOpenArtifact,
   media,
+  onEdit,
+  onRedo,
 }: {
   message: ChatMessage;
   onOpenArtifact: () => void;
   media: MediaItem[];
+  /** Hover actions on a user bubble -- see LinearBuilderApp's
+   *  editMessage/redoMessage. Omitted (buttons hidden) when the caller
+   *  doesn't wire them up. */
+  onEdit?: (messageId: string) => void;
+  onRedo?: (messageId: string) => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
   if (message.role === "system") {
     return (
       <div className="flex justify-center py-1">
@@ -1423,9 +1477,13 @@ function MessageBubble({
   }
 
   if (message.role === "user") {
+    // Copy/Edit resend the raw prompt as typed, not the decorated
+    // display string (which may have a "(batch of N)" suffix or a
+    // "[Skill]" fallback bracket baked in -- see sendMessage).
+    const promptText = message.rawText ?? message.content;
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[80%]">
+      <div className="flex justify-end group/msg">
+        <div className="max-w-[80%] flex flex-col items-end">
           {message.mediaIds && message.mediaIds.length > 0 && (
             <div className="mb-1.5 flex justify-end gap-1.5">
               {message.mediaIds.map((id) => {
@@ -1444,6 +1502,44 @@ function MessageBubble({
           <div className="rounded-[20px_20px_4px_20px] bg-white text-[#08080a] px-4 py-2.5 text-[14px] leading-relaxed">
             {message.content}
           </div>
+          <div className="mt-1 flex items-center gap-3 pr-1 opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button
+              onClick={() => {
+                navigator.clipboard
+                  ?.writeText(promptText)
+                  .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  })
+                  .catch(() => {});
+              }}
+              title="Copy"
+              className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
+            >
+              <CopyIcon />
+              {copied ? "Copied" : "Copy"}
+            </button>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(message.id)}
+                title="Edit and resend"
+                className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
+              >
+                <EditIcon />
+                Edit
+              </button>
+            )}
+            {onRedo && (
+              <button
+                onClick={() => onRedo(message.id)}
+                title="Redo -- resend this exact prompt"
+                className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white"
+              >
+                <RedoIcon />
+                Redo
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1459,7 +1555,7 @@ function MessageBubble({
           message.content ? (
             <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
           ) : (
-            <TypingDots />
+            <Spinner />
           )
         ) : message.media ? (
           <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
@@ -1508,7 +1604,7 @@ function MediaResultCard({ media }: { media: MediaMsgState }) {
       </div>
       {media.status === "processing" && (
         <div className="flex items-center gap-2 text-[12px] text-white/60">
-          <TypingDots />
+          <Spinner size={14} />
           <span>Generating...</span>
         </div>
       )}
@@ -2550,6 +2646,8 @@ function ChatCenter({
   isGenerating,
   onStopGeneration,
   restore,
+  onEditMessage,
+  onRedoMessage,
   onOpenArtifact,
   onOpenSearch,
   onOpenMobileSidebar,
@@ -2581,11 +2679,22 @@ function ChatCenter({
   /** Aborts the active chat's in-flight generation (wired to
    *  runGeneration's AbortController in LinearBuilderApp). */
   onStopGeneration: () => void;
-  /** Set once, right after a Stop, to hand the aborted prompt back into
-   *  the composer so the user can edit and resend it instead of retyping
-   *  it. `nonce` changes on every stop so the restore effect below fires
-   *  even if the same chat is stopped twice with the same text. */
-  restore?: { text: string; nonce: number };
+  /** Set once, right after a Stop -- OR after an Edit action on a user
+   *  message (see LinearBuilderApp's editMessage) -- to hand a prompt
+   *  back into the composer so the user can fix it and hit Send instead
+   *  of retyping it. `nonce` changes every time so the restore effect
+   *  below fires even if the same text is restored twice in a row.
+   *  `mediaSkillId` re-selects the same Media Factory skill in the
+   *  composer when the restored message was a media send. */
+  restore?: { text: string; nonce: number; mediaSkillId?: string };
+  /** Edit hover action on a user message bubble (see MessageBubble) --
+   *  drops that message and everything after it, then restores its
+   *  prompt (and skill, if any) to the composer via `restore` above. */
+  onEditMessage: (messageId: string) => void;
+  /** Redo hover action on a user message bubble -- drops that message
+   *  and everything after it, then immediately resends the exact same
+   *  prompt (a regenerate, not an edit). */
+  onRedoMessage: (messageId: string) => void;
   onOpenArtifact: () => void;
   onOpenSearch: () => void;
   onOpenMobileSidebar: () => void;
@@ -2689,12 +2798,18 @@ function ChatCenter({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [chat?.messages.length, chat?.messages[chat.messages.length - 1]?.content]);
 
-  // Stop/Pause button: when the parent records a stop for this chat
-  // (restore.nonce changes), put the aborted prompt back in the box so
-  // the user can fix it and hit Send again instead of retyping it.
+  // Stop/Pause button, or an Edit hover action on a past user message:
+  // when the parent records one for this chat (restore.nonce changes),
+  // put that prompt back in the box -- and re-select the same Media
+  // Factory skill, if it was a media send -- so the user can fix it and
+  // hit Send instead of retyping it.
   useEffect(() => {
     if (restore) {
       setInput(restore.text);
+      if (restore.mediaSkillId) {
+        const skill = MEDIA_SKILLS.find((s) => s.id === restore.mediaSkillId);
+        if (skill) setPickedMedia(skill);
+      }
       textareaRef.current?.focus();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2831,7 +2946,14 @@ function ChatCenter({
             </div>
           ) : (
             chat.messages.map((m) => (
-              <MessageBubble key={m.id} message={m} media={media} onOpenArtifact={onOpenArtifact} />
+              <MessageBubble
+                key={m.id}
+                message={m}
+                media={media}
+                onOpenArtifact={onOpenArtifact}
+                onEdit={onEditMessage}
+                onRedo={onRedoMessage}
+              />
             ))
           )}
         </div>
@@ -3106,7 +3228,7 @@ export default function LinearBuilderApp({
    *  resubmit it after a stop, instead of retyping it from scratch. */
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const [generatingChatIds, setGeneratingChatIds] = useState<Set<string>>(new Set());
-  const [restoreOnStop, setRestoreOnStop] = useState<Record<string, { text: string; nonce: number }>>({});
+  const [restoreOnStop, setRestoreOnStop] = useState<Record<string, { text: string; nonce: number; mediaSkillId?: string }>>({});
 
   function stopGeneration(chatId: string) {
     abortControllersRef.current.get(chatId)?.abort();
@@ -3682,6 +3804,12 @@ export default function LinearBuilderApp({
       content: (text || (mediaSkill ? `[${mediaSkill.label}]` : "")) + (count > 1 ? ` (batch of ${count})` : ""),
       createdAt: Date.now(),
       mediaIds: mediaIds.length ? mediaIds : undefined,
+      // Copy/Edit/Redo (see MessageBubble + editMessage/redoMessage
+      // below) act on the raw prompt and skill choice, not the decorated
+      // `content` string above.
+      rawText: text,
+      mediaSkillId: mediaSkill?.id,
+      batchCount: count > 1 ? count : undefined,
     };
     const isFirstMessage = activeChat.messages.length === 0;
     setState((s) => ({
@@ -3744,6 +3872,59 @@ export default function LinearBuilderApp({
     }
   }
 
+  /** Drops `messageId` and everything after it from its chat -- shared by
+   *  editMessage (load prompt back into composer) and redoMessage
+   *  (resend immediately). Returns the removed message (so the caller
+   *  can read its rawText/mediaIds/mediaSkillId) or null if not found. */
+  function truncateFromMessage(chatId: string, messageId: string): ChatMessage | null {
+    const chat = state.chats.find((c) => c.id === chatId);
+    if (!chat) return null;
+    const idx = chat.messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return null;
+    const target = chat.messages[idx];
+    setState((s) => ({
+      ...s,
+      chats: s.chats.map((c) => (c.id === chatId ? { ...c, messages: c.messages.slice(0, idx) } : c)),
+    }));
+    return target;
+  }
+
+  /** Edit hover action on a user message bubble (see MessageBubble):
+   *  drop that message and everything that followed it, then hand its
+   *  original prompt -- and, if it was a Media Factory send, the same
+   *  skill -- back to the composer via the same restore mechanism the
+   *  Stop button uses, so the user can change it and hit Send instead
+   *  of retyping from scratch. */
+  function editMessage(messageId: string) {
+    if (!activeChat) return;
+    const chatId = activeChat.id;
+    const msg = truncateFromMessage(chatId, messageId);
+    if (!msg) return;
+    setRestoreOnStop((r) => ({
+      ...r,
+      [chatId]: { text: msg.rawText ?? msg.content, nonce: Date.now(), mediaSkillId: msg.mediaSkillId },
+    }));
+  }
+
+  /** Redo hover action on a user message bubble: drop that message and
+   *  everything after it, then immediately resend the exact same prompt
+   *  (same text, attachments, skill, and batch count) through the normal
+   *  sendMessage path -- a regenerate, not an edit. One real limitation:
+   *  the Remove Object skill's hand-drawn mask is never persisted on the
+   *  message, so redoing that specific skill can't reproduce the mask --
+   *  the server's own required-field check fails it cleanly (credits
+   *  refunded, same as any other generation failure) rather than this
+   *  silently guessing at one. */
+  function redoMessage(messageId: string) {
+    if (!activeChat) return;
+    const chatId = activeChat.id;
+    const msg = truncateFromMessage(chatId, messageId);
+    if (!msg) return;
+    const text = msg.rawText ?? msg.content;
+    const mediaIds = msg.mediaIds ?? [];
+    sendMessage(text, mediaIds, msg.mediaSkillId, msg.batchCount ?? 1, undefined);
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#08080a] text-white antialiased">
       <Sidebar
@@ -3770,6 +3951,8 @@ export default function LinearBuilderApp({
         isGenerating={activeChat ? generatingChatIds.has(activeChat.id) : false}
         onStopGeneration={() => activeChat && stopGeneration(activeChat.id)}
         restore={activeChat ? restoreOnStop[activeChat.id] : undefined}
+        onEditMessage={editMessage}
+        onRedoMessage={redoMessage}
         onOpenArtifact={openArtifactPanel}
         onOpenSearch={() => setSearchOpen(true)}
         onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
