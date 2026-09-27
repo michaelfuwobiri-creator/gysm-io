@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { getLocale } from "next-intl/server";
+import Script from "next/script";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import PWARegister from "./components/PWARegister";
@@ -80,6 +81,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale}>
       <body>
+        {/* Google AdSense site-verification + ad-serving script (account
+            pub-3253884638050783). `beforeInteractive` makes Next.js inject
+            this into the actual server-rendered <head> regardless of where
+            the component sits in the tree, which is what AdSense's
+            "AdSense code snippet" site-verification check crawls for --
+            see public/ads.txt for the matching authorized-sellers entry
+            required for ads to actually serve once the site is approved. */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3253884638050783"
+          crossOrigin="anonymous"
+          strategy="beforeInteractive"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
