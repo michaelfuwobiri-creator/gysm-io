@@ -67,7 +67,11 @@
       "cta": "मूल्य देखें →"
     },
     "footer": {
-      "tagline": "शिप करने वाले संस्थापकों के लिए AI नो-कोड ऐप बिल्डर।"
+      "tagline": "शिप करने वाले संस्थापकों के लिए AI नो-कोड ऐप बिल्डर।",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "सदस्यता लें",
+      "newsletterSuccess": "आप शामिल हो गए। अपना इनबॉक्स देखें।",
+      "newsletterError": "कुछ गलत हो गया — फिर से कोशिश करें।"
     }
   }
 }

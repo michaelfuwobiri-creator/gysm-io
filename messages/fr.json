@@ -67,7 +67,11 @@
       "cta": "Voir les tarifs →"
     },
     "footer": {
-      "tagline": "Le créateur d'applications sans code par IA pour les fondateurs qui livrent."
+      "tagline": "Le créateur d'applications sans code par IA pour les fondateurs qui livrent.",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "S'abonner",
+      "newsletterSuccess": "C'est fait. Vérifiez votre boîte mail.",
+      "newsletterError": "Une erreur s'est produite — réessayez."
     }
   }
 }

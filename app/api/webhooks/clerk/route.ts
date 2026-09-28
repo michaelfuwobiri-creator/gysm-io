@@ -2,6 +2,7 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { sql } from '@/lib/db'
 import { sendWelcomeEmail } from '@/lib/email/send'
+import { subscribeToAudience } from '@/lib/email/newsletter'
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET!
@@ -45,6 +46,10 @@ export async function POST(req: Request) {
     // errors (see lib/email/send.tsx), so a Resend hiccup can't turn into
     // a failed webhook that Clerk then retries forever.
     if (email) await sendWelcomeEmail(email, first_name || null)
+    // Same non-throwing contract (see lib/email/newsletter.ts) -- auto-enrolls
+    // every new account into the "Users" Resend Audience so product-update
+    // sends don't require manually importing signups later.
+    if (email) await subscribeToAudience(email, process.env.RESEND_AUDIENCE_USERS)
   }
   if (evt.type === 'user.updated') {
     await sql`UPDATE users SET email=${email}, name=${name}, image_url=${image_url}, updated_at=NOW() WHERE clerk_id=${id}`

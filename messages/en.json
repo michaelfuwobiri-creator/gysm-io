@@ -67,7 +67,11 @@
       "cta": "See Pricing →"
     },
     "footer": {
-      "tagline": "The AI no-code app builder for founders who ship."
+      "tagline": "The AI no-code app builder for founders who ship.",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "Subscribe",
+      "newsletterSuccess": "You're in. Check your inbox.",
+      "newsletterError": "Something went wrong — try again."
     }
   }
 }

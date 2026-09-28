@@ -67,7 +67,11 @@
       "cta": "Ver preços →"
     },
     "footer": {
-      "tagline": "O criador de aplicativos sem código com IA para fundadores que lançam."
+      "tagline": "O criador de aplicativos sem código com IA para fundadores que lançam.",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "Inscrever-se",
+      "newsletterSuccess": "Pronto. Confira sua caixa de entrada.",
+      "newsletterError": "Algo deu errado — tente novamente."
     }
   }
 }

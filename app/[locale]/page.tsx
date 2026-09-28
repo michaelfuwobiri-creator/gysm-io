@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import NewsletterSignup from "../components/NewsletterSignup";
 import ProductsNavMenu from "../components/ProductsNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
 import { PRICING_PLANS } from "@/lib/stripe";
@@ -279,6 +280,7 @@ export default function Page() {
           <span className="font-black tracking-tighter text-[16px]">GYSM</span>
           <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[320px]">{t("footer.tagline")}</p>
           <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
+          <NewsletterSignup source="homepage_footer" />
           <div className="mt-10 pt-6 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-3 text-[11px] text-black/30">
             <span>© 2026 GYSM — built for founders who ship</span>
             <a href="/links" className="font-semibold text-black/50 hover:text-black">All site links →</a>

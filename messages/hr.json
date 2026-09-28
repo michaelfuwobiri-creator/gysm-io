@@ -67,7 +67,11 @@
       "cta": "Pogledaj cijene →"
     },
     "footer": {
-      "tagline": "AI graditelj aplikacija bez koda za osnivače koji objavljuju."
+      "tagline": "AI graditelj aplikacija bez koda za osnivače koji objavljuju.",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "Pretplati se",
+      "newsletterSuccess": "Uspješno ste se prijavili. Provjerite svoj inbox.",
+      "newsletterError": "Nešto je pošlo po zlu — pokušajte ponovno."
     }
   }
 }

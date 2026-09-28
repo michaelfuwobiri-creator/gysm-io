@@ -67,7 +67,11 @@
       "cta": "料金を見る →"
     },
     "footer": {
-      "tagline": "リリースする創業者のためのAIノーコードアプリビルダー。"
+      "tagline": "リリースする創業者のためのAIノーコードアプリビルダー。",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "登録する",
+      "newsletterSuccess": "登録完了。受信箱を確認してください。",
+      "newsletterError": "問題が発生しました。もう一度お試しください。"
     }
   }
 }

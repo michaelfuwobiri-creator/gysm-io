@@ -67,7 +67,11 @@
       "cta": "Preise ansehen →"
     },
     "footer": {
-      "tagline": "Der KI-No-Code-App-Builder für Gründer, die liefern."
+      "tagline": "Der KI-No-Code-App-Builder für Gründer, die liefern.",
+      "newsletterPlaceholder": "you@email.com",
+      "newsletterCta": "Abonnieren",
+      "newsletterSuccess": "Du bist dabei. Schau in dein Postfach.",
+      "newsletterError": "Etwas ist schiefgelaufen — versuch es erneut."
     }
   }
 }
