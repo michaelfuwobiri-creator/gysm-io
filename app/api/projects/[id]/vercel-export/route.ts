@@ -1,3 +1,4 @@
+import { getProjectFiles } from "@/lib/projectFiles";
 import { NextRequest } from "next/server";
 import JSZip from "jszip";
 import { getUser } from "@/lib/auth";
@@ -49,14 +50,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     // Must be literally named index.html -- that's what Vercel's static
     // deploy (and every static host) looks for as the folder's entry
     // point.
-    zip.file("index.html", project.html);
+    // Every file in the build (just index.html for a classic single-file build).
+    const files = await getProjectFiles(params.id);
+    for (const f of files) zip.file(f.path, f.content);
     // Empty-but-valid config. Nothing in a single static HTML file needs
     // routing/build overrides, but shipping the file makes it explicit
     // this is meant for Vercel and gives the user a place to add their
     // own settings later (custom headers, redirects, etc.) without
     // guessing the schema.
-    zip.file("vercel.json", JSON.stringify({ cleanUrls: true }, null, 2) + "\n");
-    zip.file(
+    if (!files.some((f) => f.path === "vercel.json")) zip.file("vercel.json", JSON.stringify({ cleanUrls: true }, null, 2) + "\n");
+    if (!files.some((f) => f.path === "README.md")) zip.file(
       "README.md",
       [
         `# ${displayName}`,

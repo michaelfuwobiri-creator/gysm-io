@@ -2,7 +2,11 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
-import { fetchFileText } from "@/lib/githubPush";
+import { fetchFileText, listRepoFiles } from "@/lib/githubPush";
+import { getProjectFiles, hasExtraFiles, replaceProjectFiles } from "@/lib/projectFiles";
+import { selectPullPaths, sameFileSet, validateFileSet, ENTRY_PATH, type ProjectFile } from "@/lib/projectFilesCore";
+import { runProjectPreflight } from "@/lib/projectPreflight";
+import { appFrameUrl } from "@/lib/userContent";
 import { validatePulledHtml } from "@/lib/githubPull";
 import { runPreflightCheck } from "@/lib/preflightCheck";
 import { relinkProjectId } from "@/lib/backendStore";
@@ -67,11 +71,36 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: failure.error }, { status: 422 });
   }
 
-  if (html === String(project.html ?? "").trim()) {
+  // A project that already has several files pulls all of them: every
+  // allowed file in the repo, not just index.html. A single-file project
+  // keeps pulling index.html only, so unrelated files in the repo are never
+  // imported by accident.
+  let pulledFiles: ProjectFile[] | null = null;
+  if (await hasExtraFiles(projectId)) {
+    const current = await getProjectFiles(projectId);
+    const listed = await listRepoFiles(token, conn.owner, conn.repo, conn.branch);
+    if (!listed.ok) {
+      return Response.json({ error: (listed as Extract<typeof listed, { ok: false }>).error }, { status: 502 });
+    }
+    const paths = selectPullPaths(listed.paths, current.map((f) => f.path));
+    const files: ProjectFile[] = [{ path: ENTRY_PATH, content: html }];
+    for (const path of paths) {
+      if (path === ENTRY_PATH) continue;
+      const got = await fetchFileText(token, conn.owner, conn.repo, conn.branch, path);
+      if (!got.ok) {
+        return Response.json({ error: (got as Extract<typeof got, { ok: false }>).error }, { status: 502 });
+      }
+      files.push({ path, content: got.content });
+    }
+    const checked = validateFileSet(files);
+    if (checked.ok === false) return Response.json({ error: checked.error }, { status: 422 });
+    if (sameFileSet(current, checked.files)) return Response.json({ ok: true, changed: false });
+    pulledFiles = checked.files;
+  } else if (html === String(project.html ?? "").trim()) {
     return Response.json({ ok: true, changed: false });
   }
 
-  const preflight = runPreflightCheck(html);
+  const preflight = pulledFiles ? runProjectPreflight(pulledFiles) : runPreflightCheck(html);
   const prompt = `Pulled from GitHub (${conn.owner}/${conn.repo}@${conn.branch})`;
 
   let newProjectId: string | null = null;
@@ -87,6 +116,15 @@ export async function POST(req: NextRequest) {
   }
   if (!newProjectId) return Response.json({ error: "Could not save the pulled version. Please try again." }, { status: 500 });
 
+  if (pulledFiles) {
+    try {
+      await replaceProjectFiles(newProjectId, pulledFiles);
+    } catch (error: any) {
+      console.error("[github pull] failed to save files:", error.message);
+      return Response.json({ error: "Could not save the pulled files. Please try again." }, { status: 500 });
+    }
+  }
+
   // Carry the database and GitHub links onto the new row, as edits do.
   try {
     await relinkProjectId(projectId, newProjectId);
@@ -99,5 +137,5 @@ export async function POST(req: NextRequest) {
     console.error("[github pull] failed to relink github connection:", error.message);
   }
 
-  return Response.json({ ok: true, changed: true, projectId: newProjectId, html, issues: preflight.issues });
+  return Response.json({ ok: true, changed: true, projectId: newProjectId, html, files: pulledFiles, previewUrl: pulledFiles && pulledFiles.length > 1 ? appFrameUrl(newProjectId) ?? `/a/${newProjectId}/` : null, issues: preflight.issues });
 }

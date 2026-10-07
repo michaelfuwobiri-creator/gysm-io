@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
 import { pushFiles } from "@/lib/githubPush";
+import { getProjectFiles } from "@/lib/projectFiles";
 
 // Pushes the project's current build to the connected GitHub repo -- the
 // same index.html / vercel.json / README.md shape Voiie's one-time zip
@@ -61,16 +62,21 @@ export async function POST(req: NextRequest) {
     `Originally built at: ${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/builder`,
   ].join("\n");
 
+  // Every file in the build; GYSM's own vercel.json and README.md are added
+  // only when the project does not have files of those names itself.
+  const projectFiles = await getProjectFiles(projectId);
+  const toPush = projectFiles.map((f) => ({ path: f.path, content: f.content }));
+  if (!toPush.some((f) => f.path === "vercel.json")) {
+    toPush.push({ path: "vercel.json", content: JSON.stringify({ cleanUrls: true }, null, 2) + "\n" });
+  }
+  if (!toPush.some((f) => f.path === "README.md")) toPush.push({ path: "README.md", content: readme });
+
   const result = await pushFiles(
     token,
     conn.owner,
     conn.repo,
     conn.branch,
-    [
-      { path: "index.html", content: project.html },
-      { path: "vercel.json", content: JSON.stringify({ cleanUrls: true }, null, 2) + "\n" },
-      { path: "README.md", content: readme },
-    ],
+    toPush,
     `Sync from GYSM -- ${new Date().toISOString()}`
   );
 

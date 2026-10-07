@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { runPreflightCheck } from "@/lib/preflightCheck";
+import { getProjectFiles } from "@/lib/projectFiles";
+import { runProjectPreflight } from "@/lib/projectPreflight";
 
 // On-demand re-run of the automated pre-publish check (lib/preflightCheck.ts)
 // -- used for builds saved before this feature existed (check_status is
@@ -24,7 +25,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       return Response.json({ error: "Build not found." }, { status: 404 });
     }
 
-    const preflight = runPreflightCheck(project.html);
+    const preflight = runProjectPreflight(await getProjectFiles(params.id));
     await sql`
       update projects
       set check_status = ${preflight.status}, check_results = ${JSON.stringify(preflight.issues)}, check_run_at = ${preflight.checkedAt}

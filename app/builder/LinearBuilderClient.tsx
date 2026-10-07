@@ -35,6 +35,7 @@ import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
 import type { MediaTemplate } from "@/lib/mediaTemplates";
 import { trackEvent } from "@/lib/analytics/track";
 import GitHubPushPanel from "./GitHubPushPanel";
+import { withPreviewShim } from "@/lib/userContent";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -95,6 +96,10 @@ interface Artifact {
   title: string;
   html: string;
   files: CodeFile[];
+  /** Real URL to preview from, for multi-file builds (or null to use srcDoc). */
+  previewUrl?: string | null;
+  /** Bumped whenever the files change, to reload the preview iframe. */
+  rev?: number;
   url: string;
   progress: number; // 0-100
   deployed: boolean;
@@ -1180,6 +1185,9 @@ interface GenerateDoneEvent {
   html: string;
   projectId?: string;
   suggestions?: string[];
+  /** Present for multi-file builds. */
+  files?: { path: string; content: string }[] | null;
+  previewUrl?: string | null;
 }
 interface GenerateStageEvent {
   type: "stage";
@@ -1205,6 +1213,7 @@ async function runRealGeneration(opts: {
   projectId?: string | null;
   image?: string;
   tier: ModelTier;
+  multiFile?: boolean;
   onStage: (label: string) => void;
   onAuthRequired: () => void;
   onNoCredits: () => void;
@@ -1223,6 +1232,7 @@ async function runRealGeneration(opts: {
       projectId: opts.projectId || undefined,
       image: opts.image,
       tier: opts.tier,
+      multiFile: opts.multiFile || undefined,
     }),
     signal: opts.signal,
   });
@@ -2270,6 +2280,13 @@ function MediaSkillsMenu({ onPick }: { onPick: (skill: MediaSkillDef) => void })
 
 type DeviceMode = "desktop" | "tablet" | "mobile";
 
+function languageForPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return ({ html: "html", css: "css", js: "javascript", json: "json", svg: "svg", md: "markdown", txt: "text" } as Record<string, string>)[ext] ?? "text";
+}
+
+const NEW_FILE_RE = /^[A-Za-z0-9._\-/]+\.(html|css|js|json|svg|md|txt)$/i;
+
 function ArtifactPanel({
   artifact,
   onClose,
@@ -2277,18 +2294,28 @@ function ArtifactPanel({
   onStartResize,
   onPublished,
   onPulled,
+  onFilesSaved,
 }: {
   artifact: Artifact | null;
   onClose: () => void;
   width: number;
   onStartResize: (e: React.MouseEvent) => void;
   onPublished: (artifactId: string) => void;
-  onPulled: (artifactId: string, projectId: string, html: string) => void;
+  onPulled: (artifactId: string, projectId: string, html: string, files?: { path: string; content: string }[] | null, previewUrl?: string | null) => void;
+  onFilesSaved: (artifactId: string, files: { path: string; content: string }[], previewUrl: string | null) => void;
 }) {
   const [githubOpen, setGithubOpen] = useState(false);
   const [tab, setTab] = useState<"preview" | "code" | "deploy">("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [activeFile, setActiveFile] = useState(0);
+  // Code editor state: unsaved edits by path (including brand-new files) and
+  // paths marked for removal. Cleared whenever the saved files change.
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [newFileName, setNewFileName] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [copied, setCopied] = useState(false);
   const [publishTitle, setPublishTitle] = useState("");
   const [publishTagline, setPublishTagline] = useState("");
@@ -2300,6 +2327,72 @@ function ArtifactPanel({
     setPublishTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length >= MAX_TAGS_PER_BUILD ? prev : [...prev, tag]
     );
+  }
+
+  useEffect(() => {
+    setEdits({});
+    setRemoved([]);
+    setNewFileName(null);
+    setSaveMsg("");
+    setSaveError("");
+    setActiveFile(0);
+  }, [artifact?.id, artifact?.projectId, artifact?.rev]);
+
+  // The file set as the editor currently shows it: saved files minus removed,
+  // with unsaved edits and new files laid over.
+  const editorFiles: CodeFile[] = (() => {
+    if (!artifact) return [];
+    const list: CodeFile[] = artifact.files
+      .filter((f) => !removed.includes(f.name))
+      .map((f) => ({ ...f, content: f.name in edits ? edits[f.name] : f.content }));
+    for (const name of Object.keys(edits)) {
+      if (!artifact.files.some((f) => f.name === name)) {
+        list.push({ name, language: languageForPath(name), content: edits[name] });
+      }
+    }
+    return list;
+  })();
+  const dirty = Object.keys(edits).length > 0 || removed.length > 0;
+  const canEdit = !!artifact?.projectId && (artifact?.progress ?? 0) >= 100;
+
+  async function saveFiles() {
+    if (!artifact?.projectId || saving || !dirty) return;
+    setSaving(true);
+    setSaveError("");
+    setSaveMsg("");
+    try {
+      const res = await fetch(`/api/projects/${artifact.projectId}/files`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: editorFiles.map((f) => ({ path: f.name, content: f.content })) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Could not save.");
+      onFilesSaved(artifact.id, data.files, data.previewUrl ?? null);
+      const n = Array.isArray(data.issues) ? data.issues.length : 0;
+      setSaveMsg(n ? `Saved. ${n} thing${n === 1 ? "" : "s"} to check.` : "Saved.");
+    } catch (e: any) {
+      setSaveError(e?.message || "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addFile() {
+    const name = (newFileName ?? "").trim().replace(/^\.\//, "");
+    if (!NEW_FILE_RE.test(name) || name.split("/").some((seg) => !seg || seg.startsWith("."))) {
+      setSaveError("Use a name like styles.css or pages/about.html (html, css, js, json, svg, md or txt).");
+      return;
+    }
+    if (editorFiles.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+      setSaveError("That file already exists.");
+      return;
+    }
+    setSaveError("");
+    setRemoved((r) => r.filter((x) => x !== name));
+    setEdits((e) => ({ ...e, [name]: "" }));
+    setNewFileName(null);
+    setActiveFile(editorFiles.length);
   }
 
   const deviceWidths: Record<DeviceMode, string> = {
@@ -2387,7 +2480,7 @@ function ArtifactPanel({
         <GitHubPushPanel
           projectId={artifact.projectId}
           onClose={() => setGithubOpen(false)}
-          onPulled={(r) => onPulled(artifact.id, r.projectId, r.html)}
+          onPulled={(r) => onPulled(artifact.id, r.projectId, r.html, r.files, r.previewUrl)}
         />
       )}
 
@@ -2417,12 +2510,34 @@ function ArtifactPanel({
             ))}
           </div>
           <div className="flex-1 overflow-auto bg-black/20 flex justify-center p-3">
-            <iframe
-              title="artifact-preview"
-              srcDoc={artifact.html}
-              style={{ width: deviceWidths[device], maxWidth: "100%" }}
-              className="h-full rounded-xl border border-white/10 bg-white"
-            />
+            {artifact.previewUrl ? (
+              // Multi-file build: load real URLs so relative links resolve.
+              // On the isolated user-content origin, allow-same-origin only
+              // grants that origin; otherwise the page is served sandboxed.
+              <iframe
+                key={`${artifact.id}-${artifact.rev ?? 0}`}
+                title="artifact-preview"
+                src={artifact.previewUrl}
+                sandbox={
+                  /^https?:/i.test(artifact.previewUrl)
+                    ? "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+                    : "allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+                }
+                style={{ width: deviceWidths[device], maxWidth: "100%" }}
+                className="h-full rounded-xl border border-white/10 bg-white"
+              />
+            ) : (
+              // Generated apps are untrusted code: no allow-same-origin, so
+              // the preview cannot reach this page's cookies or APIs. Storage
+              // APIs are replaced with in-memory stand-ins (see lib/userContent).
+              <iframe
+                title="artifact-preview"
+                srcDoc={withPreviewShim(artifact.html)}
+                sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+                style={{ width: deviceWidths[device], maxWidth: "100%" }}
+                className="h-full rounded-xl border border-white/10 bg-white"
+              />
+            )}
           </div>
           {artifact.progress < 100 && (
             <div className="h-1 bg-white/5 shrink-0">
@@ -2435,22 +2550,115 @@ function ArtifactPanel({
         </div>
       ) : tab === "code" ? (
         <div className="flex-1 flex min-h-0">
-          <div className="w-36 shrink-0 border-r border-white/8 overflow-y-auto py-2">
-            {artifact.files.map((f, i) => (
-              <button
-                key={f.name}
-                onClick={() => setActiveFile(i)}
-                className={`w-full text-left px-3 py-1.5 text-[11px] truncate ${
-                  activeFile === i ? "bg-[#FF0080]/10 text-[#FF0080]" : "text-white/60 hover:bg-white/5"
-                }`}
-              >
-                {f.name}
-              </button>
+          <div className="w-36 shrink-0 border-r border-white/8 overflow-y-auto py-2 flex flex-col">
+            {editorFiles.map((f, i) => (
+              <div key={f.name} className="group flex items-center">
+                <button
+                  onClick={() => setActiveFile(i)}
+                  className={`flex-1 min-w-0 text-left px-3 py-1.5 text-[11px] truncate ${
+                    activeFile === i ? "bg-[#FF0080]/10 text-[#FF0080]" : "text-white/60 hover:bg-white/5"
+                  }`}
+                  title={f.name}
+                >
+                  {f.name}
+                  {f.name in edits ? " \u2022" : ""}
+                </button>
+                {canEdit && f.name !== "index.html" && (
+                  <button
+                    onClick={() => {
+                      setRemoved((r) => (artifact.files.some((x) => x.name === f.name) ? [...r, f.name] : r));
+                      setEdits((e) => {
+                        const { [f.name]: _gone, ...rest } = e;
+                        return rest;
+                      });
+                      setActiveFile(0);
+                    }}
+                    className="px-1.5 text-[12px] text-white/25 hover:text-red-400 opacity-0 group-hover:opacity-100"
+                    title={`Remove ${f.name}`}
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
             ))}
+            {canEdit &&
+              (newFileName === null ? (
+                <button
+                  onClick={() => setNewFileName("")}
+                  className="mt-1 text-left px-3 py-1.5 text-[11px] text-white/40 hover:text-white/70"
+                >
+                  + New file
+                </button>
+              ) : (
+                <div className="px-2 py-1.5">
+                  <input
+                    autoFocus
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addFile();
+                      if (e.key === "Escape") setNewFileName(null);
+                    }}
+                    placeholder="styles.css"
+                    className="w-full rounded bg-white/5 border border-white/10 px-1.5 py-1 text-[11px] text-white outline-none"
+                  />
+                </div>
+              ))}
           </div>
-          <pre className="flex-1 overflow-auto p-3 text-[12px] leading-relaxed font-mono text-white/80">
-            <code>{highlightCode(artifact.files[activeFile]?.content || "")}</code>
-          </pre>
+          <div className="flex-1 min-w-0 flex flex-col">
+            {canEdit && (
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/8 shrink-0">
+                <button
+                  onClick={saveFiles}
+                  disabled={!dirty || saving}
+                  className="rounded-md bg-[#FF0080] text-white text-[11px] font-medium px-2.5 py-1 disabled:opacity-40"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <span className="text-[10px] text-white/40">
+                  {saveError ? (
+                    <span className="text-red-400">{saveError}</span>
+                  ) : dirty ? (
+                    "Unsaved changes. Saving is free."
+                  ) : (
+                    saveMsg || "Edit the code directly. Saving is free."
+                  )}
+                </span>
+              </div>
+            )}
+            {canEdit && editorFiles[activeFile] ? (
+              <textarea
+                key={editorFiles[activeFile].name}
+                value={editorFiles[activeFile].content}
+                spellCheck={false}
+                onChange={(e) => {
+                  const name = editorFiles[activeFile].name;
+                  setEdits((prev) => ({ ...prev, [name]: e.target.value }));
+                }}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+                    e.preventDefault();
+                    saveFiles();
+                  } else if (e.key === "Tab" && !e.shiftKey) {
+                    e.preventDefault();
+                    const el = e.currentTarget;
+                    const { selectionStart: a, selectionEnd: b, value } = el;
+                    const next = value.slice(0, a) + "  " + value.slice(b);
+                    const name = editorFiles[activeFile].name;
+                    setEdits((prev) => ({ ...prev, [name]: next }));
+                    requestAnimationFrame(() => {
+                      el.selectionStart = el.selectionEnd = a + 2;
+                    });
+                  }
+                }}
+                className="flex-1 w-full resize-none bg-transparent p-3 text-[12px] leading-relaxed font-mono text-white/85 outline-none whitespace-pre overflow-auto"
+              />
+            ) : (
+              <pre className="flex-1 overflow-auto p-3 text-[12px] leading-relaxed font-mono text-white/80">
+                <code>{highlightCode(editorFiles[activeFile]?.content || "")}</code>
+              </pre>
+            )}
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
@@ -2677,6 +2885,8 @@ function ChatCenter({
   onOpenProgram,
   tier,
   onChangeTier,
+  multiFile,
+  onToggleMultiFile,
   initialInput,
   brandOn,
   onToggleBrand,
@@ -2724,6 +2934,8 @@ function ChatCenter({
   onOpenProgram: () => void;
   tier: ModelTier;
   onChangeTier: (t: ModelTier) => void;
+  multiFile: boolean;
+  onToggleMultiFile: () => void;
   initialInput?: string;
   /** Brand Kit / Style Lock toggle (42-tool spec item 36) -- state lives
    *  in LinearBuilderApp (see brandKit/brandOn there) since it's a
@@ -3126,10 +3338,23 @@ function ChatCenter({
                   onPick={(label, runAt) => onSchedule(label, runAt)}
                 />
               )}
+              <button
+                type="button"
+                onClick={onToggleMultiFile}
+                aria-pressed={multiFile}
+                className={`ml-auto text-[11px] px-2 py-1 rounded-lg border ${
+                  multiFile
+                    ? "bg-[#FF0080]/15 border-[#FF0080]/40 text-[#FF0080]"
+                    : "bg-white/5 border-white/10 text-white/50 hover:text-white/80"
+                }`}
+                title="Build as several files (index.html, styles.css, app.js, extra pages) you can edit in the Code tab. Off: one self-contained page. Edits to a build that already has several files stay multi-file."
+              >
+                Multi-file
+              </button>
               <select
                 value={tier}
                 onChange={(e) => onChangeTier(e.target.value as ModelTier)}
-                className="ml-auto flex items-center gap-1 text-[11px] text-white/60 px-2 py-1 rounded-lg bg-white/5 border border-white/10 outline-none cursor-pointer"
+                className="flex items-center gap-1 text-[11px] text-white/60 px-2 py-1 rounded-lg bg-white/5 border border-white/10 outline-none cursor-pointer"
                 title="Model tier -- higher tiers cost more credits per build"
               >
                 {(Object.keys(TIER_LABELS) as ModelTier[]).map((t) => (
@@ -3228,6 +3453,7 @@ export default function LinearBuilderApp({
   const [rightMode, setRightMode] = useState<"artifact" | "program">("artifact");
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL);
   const [tier, setTier] = useState<ModelTier>("fast");
+  const [multiFile, setMultiFile] = useState(false);
   const [brandKit, setBrandKit] = useState<BrandKit | null>(initialBrandKit);
   const [brandOn, setBrandOn] = useState(false);
   const [showBrandModal, setShowBrandModal] = useState(false);
@@ -3320,6 +3546,13 @@ export default function LinearBuilderApp({
         artifacts: { ...s.artifacts, [artifactId]: artifact },
         activeChatId: chatId,
       }));
+      // A multi-file build resumes with all its files, not just index.html.
+      fetch(`/api/projects/${initialProjectId}/files`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && Array.isArray(d.files) && d.files.length > 1) applyFilesSaved(artifactId, d.files, d.previewUrl ?? null);
+        })
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -3509,7 +3742,7 @@ export default function LinearBuilderApp({
   }
 
   /** A pull from GitHub saved a new version: show it in place of the open one. */
-  function applyPulled(artifactId: string, projectId: string, html: string) {
+  function applyPulled(artifactId: string, projectId: string, html: string, files?: { path: string; content: string }[] | null, previewUrl?: string | null) {
     setState((s) => {
       const a = s.artifacts[artifactId];
       if (!a) return s;
@@ -3522,8 +3755,34 @@ export default function LinearBuilderApp({
             ...a,
             projectId,
             html,
-            files: [{ name: "index.html", language: "html", content: html }],
+            files: files && files.length
+              ? files.map((f) => ({ name: f.path, language: languageForPath(f.path), content: f.content }))
+              : [{ name: "index.html", language: "html", content: html }],
+            previewUrl: files && files.length > 1 ? previewUrl ?? null : null,
+            rev: (a.rev ?? 0) + 1,
             url: `${host}/publish/${projectId}`,
+          },
+        },
+      };
+    });
+  }
+
+  /** The code editor saved: show the saved files and reload the preview. */
+  function applyFilesSaved(artifactId: string, files: { path: string; content: string }[], previewUrl: string | null) {
+    setState((s) => {
+      const a = s.artifacts[artifactId];
+      if (!a) return s;
+      const entry = files.find((f) => f.path === "index.html");
+      return {
+        ...s,
+        artifacts: {
+          ...s.artifacts,
+          [artifactId]: {
+            ...a,
+            html: entry ? entry.content : a.html,
+            files: files.map((f) => ({ name: f.path, language: languageForPath(f.path), content: f.content })),
+            previewUrl,
+            rev: (a.rev ?? 0) + 1,
           },
         },
       };
@@ -3586,6 +3845,7 @@ export default function LinearBuilderApp({
         projectId: existingArtifact?.projectId ?? null,
         image,
         tier,
+        multiFile,
         onStage: setStreamingText,
         onAuthRequired: () => router.push(`/sign-in?redirect_url=${encodeURIComponent(builderPath)}`),
         onNoCredits: () => router.push("/pricing?reason=no_credits"),
@@ -3607,7 +3867,12 @@ export default function LinearBuilderApp({
         projectId: result.projectId ?? null,
         title: existingArtifact?.title ?? titleFromPrompt(prompt),
         html: result.html,
-        files: [{ name: "index.html", language: "html", content: result.html }],
+        files:
+          result.files && result.files.length
+            ? result.files.map((f) => ({ name: f.path, language: languageForPath(f.path), content: f.content }))
+            : [{ name: "index.html", language: "html", content: result.html }],
+        previewUrl: result.files && result.files.length > 1 ? result.previewUrl ?? null : null,
+        rev: (existingArtifact?.rev ?? 0) + 1,
         url,
         progress: 100,
         deployed: true,
@@ -4004,6 +4269,8 @@ export default function LinearBuilderApp({
         onOpenProgram={openProgram}
         tier={tier}
         onChangeTier={setTier}
+        multiFile={multiFile}
+        onToggleMultiFile={() => setMultiFile((v) => !v)}
         initialInput={!initialHtml ? initialPrompt : undefined}
         initialMediaSkillId={initialMediaSkillId}
         brandOn={brandOn}
@@ -4039,6 +4306,7 @@ export default function LinearBuilderApp({
             }}
             onPublished={markPublished}
             onPulled={applyPulled}
+            onFilesSaved={applyFilesSaved}
           />
         ))}
 
@@ -4062,6 +4330,7 @@ export default function LinearBuilderApp({
                 onStartResize={() => {}}
                 onPublished={markPublished}
                 onPulled={applyPulled}
+                onFilesSaved={applyFilesSaved}
               />
             )}
           </div>

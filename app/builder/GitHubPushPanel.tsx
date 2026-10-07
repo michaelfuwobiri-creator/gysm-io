@@ -26,7 +26,7 @@ export default function GitHubPushPanel({
   projectId: string;
   onClose: () => void;
   /** Called after a pull saved a new version, so the builder can show it. */
-  onPulled?: (result: { projectId: string; html: string }) => void;
+  onPulled?: (result: { projectId: string; html: string; files?: { path: string; content: string }[] | null; previewUrl?: string | null }) => void;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,8 +127,8 @@ export default function GitHubPushPanel({
         setNotice("Already up to date -- the repo matches this build.");
         return;
       }
-      setNotice("Pulled. The repo's index.html is now the open build, and your previous version is still in History.");
-      onPulled?.({ projectId: data.projectId, html: data.html });
+      setNotice(data.files ? "Pulled. The repo's files are now the open build, and your previous version is still in History." : "Pulled. The repo's index.html is now the open build, and your previous version is still in History.");
+      onPulled?.({ projectId: data.projectId, html: data.html, files: data.files ?? null, previewUrl: data.previewUrl ?? null });
     } catch {
       setError("Pull failed. Check your connection and try again.");
     } finally {

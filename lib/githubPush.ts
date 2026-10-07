@@ -110,3 +110,23 @@ export async function fetchFileText(token: string, owner: string, repo: string, 
     return { ok: false, error: `Could not reach GitHub: ${error.message}` };
   }
 }
+
+export type ListFilesResult = { ok: true; paths: string[]; truncated: boolean } | { ok: false; error: string };
+
+/** Lists file paths on a branch (one API call, recursive). */
+export async function listRepoFiles(token: string, owner: string, repo: string, branch: string): Promise<ListFilesResult> {
+  try {
+    const res = await fetch(`${API_BASE}/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+      headers: headers(token),
+    });
+    if (res.status === 401) return { ok: false, error: "That token was rejected by GitHub. Reconnect GitHub for this build." };
+    if (!res.ok) return { ok: false, error: `GitHub returned an error (${res.status}). Please try again.` };
+    const json = await res.json();
+    const paths = (Array.isArray(json?.tree) ? json.tree : [])
+      .filter((t: any) => t?.type === "blob" && typeof t.path === "string")
+      .map((t: any) => t.path as string);
+    return { ok: true, paths, truncated: !!json?.truncated };
+  } catch (error: any) {
+    return { ok: false, error: `Could not reach GitHub: ${error.message}` };
+  }
+}

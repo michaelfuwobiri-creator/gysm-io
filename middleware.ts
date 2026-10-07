@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless'
 import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 import { checkRateLimit } from './lib/rateLimit'
+import { isUserContentHost } from './lib/userContent'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
 const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)', '/shell(.*)'])
@@ -81,6 +82,15 @@ function isKnownHost(host: string): boolean {
 
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const host = req.headers.get('host') || ''
+
+  // The isolated user-content host (USER_CONTENT_ORIGIN, see lib/userContent.ts)
+  // serves generated apps under /a/ and nothing else: no Clerk, no APIs, no
+  // pages. Anything else on that host is a 404, so even if an app tries to
+  // reach /api/... on its own origin there is nothing there to call.
+  if (isUserContentHost(host)) {
+    if (req.nextUrl.pathname.startsWith('/a/')) return NextResponse.next()
+    return new NextResponse('Not found', { status: 404 })
+  }
 
   // Rate limiting runs before everything else below (custom-domain
   // lookup, Clerk auth, i18n) so an abusive caller gets rejected as

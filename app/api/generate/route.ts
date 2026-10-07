@@ -6,6 +6,11 @@ import { generateWebsite, editWebsite, BuildStage, ModelTier, extractSchemaSql, 
 import { buildSuggestions } from "@/lib/suggestions";
 import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
 import { runPreflightCheck } from "@/lib/preflightCheck";
+import { buildMultiFile } from "@/lib/ai/multiFile";
+import { getProjectFiles, hasExtraFiles, multiFileReady, MULTI_FILE_NOT_READY, replaceProjectFiles } from "@/lib/projectFiles";
+import { ENTRY_PATH, type ProjectFile } from "@/lib/projectFilesCore";
+import { runProjectPreflight } from "@/lib/projectPreflight";
+import { appFrameUrl } from "@/lib/userContent";
 import { relinkGithubConnection } from "@/lib/githubStore";
 import { runSql } from "@/lib/supabaseBackend";
 
@@ -51,6 +56,7 @@ export async function POST(req: NextRequest) {
   let projectId: string | undefined;
   let dataContext: string | undefined;
   let tier: ModelTier = "fast";
+  let multiFile = false;
   try {
     const body = await req.json();
     prompt = (body?.prompt ?? "").toString().trim();
@@ -65,6 +71,10 @@ export async function POST(req: NextRequest) {
     // sense to charge it the same as "best"). Anything other than exactly
     // "best" or "claude" falls back to "fast" rather than erroring, since
     // this is a nice-to-have toggle, not a required field.
+    // Opt-in: ask for a multi-file project (index.html, styles.css, app.js,
+    // extra pages). Edits to a build that already has several files use the
+    // multi-file path whether or not this is set.
+    multiFile = body?.multiFile === true;
     tier = body?.tier === "best" ? "best" : body?.tier === "claude" ? "claude" : "fast";
     // Optional snapshot from a connected Airtable/Google Sheets data
     // source (see DataImportPanel + /api/connectors/data/*) -- folded
@@ -164,9 +174,41 @@ export async function POST(req: NextRequest) {
         // stays exactly what the user typed.
         const generationText = `${dataContext ? dataContext + "\n\n" : ""}${prompt}${integrationContext}`;
 
-        const result = previousHtml
-          ? await editWebsite(previousHtml, generationText, onStage, image, backendContext, tier)
-          : await generateWebsite(generationText, onStage, image, backendContext, tier);
+        // Multi-file path: a new build that asked for it, or an edit of a
+        // build that already has several files (loaded here by id, not from
+        // what the browser sent).
+        let existingFiles: ProjectFile[] | null = null;
+        if (projectId && (await hasExtraFiles(projectId))) {
+          existingFiles = await getProjectFiles(projectId);
+        }
+        let multiFiles: ProjectFile[] | null = null;
+        if (multiFile && !existingFiles && !(await multiFileReady())) {
+          // Fail before any model call or credit use if files cannot be stored.
+          send({ type: "error", error: MULTI_FILE_NOT_READY });
+          controller.close();
+          return;
+        }
+        let result: { ok: true; html: string } | { ok: false; error: string; status: number };
+        if (multiFile || existingFiles) {
+          const built = await buildMultiFile({
+            instruction: generationText,
+            existing: existingFiles ?? (previousHtml ? [{ path: ENTRY_PATH, content: previousHtml }] : null),
+            tier,
+            imageDataUrl: image,
+            backendContext,
+            onStage,
+          });
+          if (built.ok === false) {
+            result = built;
+          } else {
+            multiFiles = built.files;
+            result = { ok: true, html: built.files.find((f) => f.path === ENTRY_PATH)!.content };
+          }
+        } else {
+          result = previousHtml
+            ? await editWebsite(previousHtml, generationText, onStage, image, backendContext, tier)
+            : await generateWebsite(generationText, onStage, image, backendContext, tier);
+        }
 
         if (!result.ok) {
           const failure = result as Extract<typeof result, { ok: false }>;
@@ -231,7 +273,10 @@ export async function POST(req: NextRequest) {
         // Automated pre-publish check (see lib/preflightCheck.ts) -- a
         // fast structural scan, not a full autonomous test run. Computed
         // up front so it saves in the same insert as everything else.
-        const preflight = runPreflightCheck(htmlToSave);
+        if (multiFiles) {
+          multiFiles = multiFiles.map((f) => (f.path === ENTRY_PATH ? { ...f, content: htmlToSave } : f));
+        }
+        const preflight = multiFiles ? runProjectPreflight(multiFiles) : runPreflightCheck(htmlToSave);
 
         let newProjectId: string | null = null;
         try {
@@ -243,6 +288,15 @@ export async function POST(req: NextRequest) {
           newProjectId = (rows[0] as any)?.id ?? null;
         } catch (error: any) {
           console.error("[generate] failed to save project:", error.message);
+        }
+
+        // Multi-file builds keep every non-entry file beside the new row.
+        if (newProjectId && multiFiles) {
+          try {
+            await replaceProjectFiles(newProjectId, multiFiles);
+          } catch (error: any) {
+            console.error("[generate] failed to save project files:", error.message);
+          }
         }
 
         // Edits always save as a new project row -- carry a database
@@ -296,6 +350,8 @@ export async function POST(req: NextRequest) {
         send({
           type: "done",
           html: htmlToSave,
+          files: multiFiles,
+          previewUrl: multiFiles && newProjectId ? appFrameUrl(newProjectId) ?? `/a/${newProjectId}/` : null,
           projectId: newProjectId,
           suggestions: buildSuggestions(prompt),
           preflight: { status: preflight.status, issues: preflight.issues },

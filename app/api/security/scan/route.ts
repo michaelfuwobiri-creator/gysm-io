@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { runPreflightCheck } from "@/lib/preflightCheck";
+import { getProjectFiles } from "@/lib/projectFiles";
+import { runProjectPreflight } from "@/lib/projectPreflight";
 
 // Re-runs the automated check (quality + exposed-secret scan) on the newest
 // version of each of the user's builds, and stores the result. Needed for
@@ -28,7 +29,9 @@ export async function POST() {
 
     let withSecrets = 0;
     for (const row of rows as any[]) {
-      const preflight = runPreflightCheck(String(row.html ?? ""));
+      // getProjectFiles returns just index.html for single-file builds, so
+      // this is the same check as before for them.
+      const preflight = runProjectPreflight(await getProjectFiles(row.id));
       if (preflight.issues.some((i) => i.type === "exposed_secret")) withSecrets += 1;
       await sql`
         update projects

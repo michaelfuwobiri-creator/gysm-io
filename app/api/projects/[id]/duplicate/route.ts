@@ -1,3 +1,4 @@
+import { copyProjectFiles } from "@/lib/projectFiles";
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
@@ -34,6 +35,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       returning id
     `;
     const newId = (inserted[0] as any)?.id;
+    if (newId) await copyProjectFiles(params.id, newId);
     return Response.json({ ok: true, id: newId });
   } catch (error: any) {
     console.error("[projects] failed to duplicate project:", error.message);

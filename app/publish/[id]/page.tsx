@@ -1,3 +1,5 @@
+import { appFrameUrl, userContentOrigin } from "@/lib/userContent";
+import { hasExtraFiles } from "@/lib/projectFiles";
 import { sql } from "@/lib/db";
 import { headers } from "next/headers";
 import { injectAiGeneratedMeta } from "@/lib/aiDisclosure";
@@ -94,6 +96,16 @@ export default async function PublishedProjectPage({
     }
   }
 
+  // Where to load the app from. Isolated origin when configured; otherwise a
+  // multi-file build still needs real URLs (served sandboxed by /a/...), while
+  // a classic single-file build keeps using srcDoc.
+  const isolatedFrame = userContentOrigin() !== null;
+  let frameSrc: string | null = null;
+  if (project) {
+    frameSrc = appFrameUrl(project.id);
+    if (!frameSrc && (await hasExtraFiles(project.id))) frameSrc = `/a/${project.id}/`;
+  }
+
   if (!project) {
     return (
       <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] grid place-items-center p-6 text-center">
@@ -128,12 +140,29 @@ export default async function PublishedProjectPage({
           }),
         }}
       />
-      <iframe
-        srcDoc={injectAiGeneratedMeta(project.html)}
-        sandbox="allow-scripts allow-same-origin"
-        className="flex-1 w-full border-0 bg-white"
-        title={project.prompt}
-      />
+      {frameSrc ? (
+        // Isolated origin (USER_CONTENT_ORIGIN) or a multi-file build:
+        // load from real URLs so relative links resolve. On the isolated
+        // origin allow-same-origin only grants access to THAT origin, which
+        // has none of GYSM's cookies or APIs.
+        <iframe
+          src={frameSrc}
+          sandbox={
+            isolatedFrame
+              ? "allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              : "allow-scripts allow-forms allow-popups allow-modals"
+          }
+          className="flex-1 w-full border-0 bg-white"
+          title={project.prompt}
+        />
+      ) : (
+        <iframe
+          srcDoc={injectAiGeneratedMeta(project.html)}
+          sandbox="allow-scripts allow-same-origin"
+          className="flex-1 w-full border-0 bg-white"
+          title={project.prompt}
+        />
+      )}
       <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-white border-t border-black/10 text-black/40 text-[11px]">
         <div
           className="flex items-center gap-2"

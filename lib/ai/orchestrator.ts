@@ -14,9 +14,9 @@ import { runPreflightCheck, type PreflightIssue } from "@/lib/preflightCheck";
 // after riding out the full request budget, instead of surfacing a fast,
 // actionable "that failed, try again." 100s x 2 sequential calls leaves
 // real headroom under the 240s ceiling for DB writes and stream overhead.
-const PER_CALL_TIMEOUT_MS = 100_000;
+export const PER_CALL_TIMEOUT_MS = 100_000;
 
-const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM builder. Generate ONE complete, production-quality HTML document for the user's request.
+export const STRUCTURE_SYSTEM_PROMPT = `You are the GYSM builder. Generate ONE complete, production-quality HTML document for the user's request.
 
 HARD RULES:
 - Output ONLY the HTML document. No markdown code fences, no commentary before or after it.
@@ -65,7 +65,7 @@ DESIGN TARGET -- push the document toward this house style (the same system GYSM
 - Rhythm: even out section spacing and center content in a consistent max-width container; tighten anything cramped, loosen anything crowded.
 - If the page sells or lists something and doesn't already end with one, add a closing high-contrast CTA moment (a dark rounded band with a subtle radial gradient glow works well) -- but only if you can do this without touching any element the script depends on.`;
 
-const EDIT_SYSTEM_PROMPT = `You are the GYSM builder, now editing an app you already built. You'll get the app's complete current HTML and one specific change to make. Apply exactly that change and return the complete updated document -- don't rewrite parts that weren't asked for.
+export const EDIT_SYSTEM_PROMPT = `You are the GYSM builder, now editing an app you already built. You'll get the app's complete current HTML and one specific change to make. Apply exactly that change and return the complete updated document -- don't rewrite parts that weren't asked for.
 
 HARD RULES:
 - Output ONLY the complete HTML document, starting with <!DOCTYPE html>. No commentary, no markdown fences.
@@ -76,7 +76,7 @@ HARD RULES:
 - If the requested change is ambiguous, make the most reasonable, tasteful interpretation rather than leaving it half-done -- there's no way to ask a follow-up here.
 - If a reference image is provided alongside the change request, use it as visual/content inspiration for that change.`;
 
-const BACKEND_SYSTEM_ADDENDUM = `
+export const BACKEND_SYSTEM_ADDENDUM = `
 REAL BACKEND -- this build has a connected Supabase project (the user's own, linked via "Connect database"). Use it for real data and real auth instead of localStorage or an in-memory array:
 - Load the Supabase client from CDN in <head>, before your inline <script>: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 - At the top of your inline <script>, initialize once with the EXACT values given to you below -- never invent placeholder URLs or keys: const sb = supabase.createClient("SUPABASE_URL_HERE", "SUPABASE_ANON_KEY_HERE");
@@ -143,19 +143,19 @@ HARD RULES:
 // existing GPT pipeline.
 export type ModelTier = "fast" | "best" | "claude";
 
-const CLAUDE_MODEL = "claude-sonnet-5";
+export const CLAUDE_MODEL = "claude-sonnet-5";
 
 /** Vercel's edge/serverless functions don't run a real DOM/Buffer-heavy
  *  library for this, so parse the data URL's mime type by hand. Falls back
  *  to image/png if the prefix doesn't match a type the Claude API accepts. */
-function claudeImageMediaType(dataUrl: string): "image/png" | "image/jpeg" | "image/webp" | "image/gif" {
+export function claudeImageMediaType(dataUrl: string): "image/png" | "image/jpeg" | "image/webp" | "image/gif" {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z]+);base64,/);
   const mime = match?.[1];
   if (mime === "image/png" || mime === "image/jpeg" || mime === "image/webp" || mime === "image/gif") return mime;
   return "image/png";
 }
 
-function structureModelFor(tier: ModelTier): string {
+export function structureModelFor(tier: ModelTier): string {
   return tier === "best" ? "gpt-5.6-sol" : "gpt-5.6-terra";
 }
 

@@ -12,7 +12,7 @@
 import { scanForSecrets } from "./secretScan";
 
 export type PreflightIssue = {
-  type: "truncated" | "unbalanced_tags" | "broken_anchor" | "placeholder_text" | "missing_alt" | "exposed_secret";
+  type: "truncated" | "unbalanced_tags" | "broken_anchor" | "placeholder_text" | "missing_alt" | "exposed_secret" | "missing_file";
   message: string;
   detail?: string;
 };
