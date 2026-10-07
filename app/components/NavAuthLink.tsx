@@ -21,12 +21,22 @@ import { useUser } from "@clerk/nextjs";
 // component does with the returned value. ssr:false sidesteps this by
 // construction: this component never runs on the server at all, so there's
 // nothing for its first client render to mismatch against.
-export default function NavAuthLink() {
+//
+// `variant="mobile"` renders the same auth-aware link with mobile-menu
+// styling instead of the desktop `hidden md:block` treatment -- used inside
+// MobileNavMenu's authSlot. It's still the exact same dynamically-imported,
+// ssr:false component instance, just called a second time with a different
+// prop, so the hydration fix above still applies.
+export default function NavAuthLink({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
   const { isLoaded, isSignedIn } = useUser();
   if (!isLoaded) return null;
+  const className =
+    variant === "mobile"
+      ? "block text-[17px] font-medium"
+      : "text-[13px] font-medium opacity-60 hidden md:block mr-2";
   return isSignedIn ? (
-    <a href="/builder" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Dashboard</a>
+    <a href="/builder" className={className}>Dashboard</a>
   ) : (
-    <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>
+    <a href="/sign-in" className={className}>Log in</a>
   );
 }

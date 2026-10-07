@@ -2,6 +2,7 @@ import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
 import CommandPalette, { CommandPaletteTrigger } from "./CommandPalette";
+import MobileAppHeader from "./MobileAppHeader";
 
 // Persistent left-sidebar shell for the signed-in app pages (dashboard,
 // templates, connectors, buildguild). Modeled on the left-nav pattern
@@ -181,6 +182,11 @@ export default async function AppShell({
   const displayName = user?.name || user?.email || "there";
   const initial = displayName.trim().charAt(0).toUpperCase() || "G";
 
+  const mobileGroups = NAV_GROUPS.map((group) => ({
+    title: group.title,
+    items: group.items.map((item) => ({ ...item, active: active === item.key })),
+  }));
+
   return (
     <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A] flex">
       <aside className="hidden md:flex w-60 shrink-0 flex-col justify-between border-r border-black/10 bg-white p-3 fixed inset-y-0 left-0 z-20">
@@ -259,7 +265,27 @@ export default async function AppShell({
           </div>
         </div>
       </aside>
-      <main className="flex-1 min-w-0 md:ml-60">{children}</main>
+      <div className="flex-1 min-w-0 md:ml-60 flex flex-col min-h-screen">
+        <MobileAppHeader
+          groups={mobileGroups}
+          displayName={displayName}
+          initial={initial}
+          credits={credits}
+          footerSlot={
+            <>
+              <OrganizationSwitcher
+                afterCreateOrganizationUrl="/dashboard"
+                afterSelectOrganizationUrl="/dashboard"
+                afterSelectPersonalUrl="/dashboard"
+                afterLeaveOrganizationUrl="/dashboard"
+                appearance={{ elements: { organizationSwitcherTrigger: "text-black text-xs" } }}
+              />
+              <UserButton afterSignOutUrl="/" />
+            </>
+          }
+        />
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
       <CommandPalette />
     </div>
   );

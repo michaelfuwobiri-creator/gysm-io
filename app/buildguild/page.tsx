@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth";
 import BuildCard from "./BuildCard";
 import SubmitBuildModal from "./SubmitBuildModal";
 import FeaturedApps from "./FeaturedApps";
+import MobileNavMenu from "../components/MobileNavMenu";
 
 // BuildGuild -- public gallery of every app users have opted to publish
 // (projects.is_public = true, set via POST /api/projects/[id]/publish).
@@ -227,6 +228,18 @@ export default async function BuildGuildPage({
           <div className="flex items-center gap-2">
             <a href="/dashboard" className="text-[13px] font-medium text-white/60 hover:text-white hidden md:block mr-2">Dashboard</a>
             <SubmitBuildModal signedIn={signedIn} variant="nav" />
+            <MobileNavMenu
+              theme="dark"
+              links={[
+                { href: "/dashboard", label: "Dashboard" },
+                { href: "/builder", label: "AI Builder" },
+                { href: "/builder-blocks", label: "Lego Builder", badge: "Beta" },
+                { href: "/templates", label: "Templates" },
+                { href: "/connectors", label: "Connectors" },
+                { href: "/marketplace", label: "Marketplace" },
+                { href: "/pricing", label: "Pricing" },
+              ]}
+            />
             <a href="/builder" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
               Start Building
             </a>

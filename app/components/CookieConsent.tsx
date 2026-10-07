@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Cookie/analytics consent banner. GDPR/ePrivacy require an opt-in, granular
 // choice before anything non-essential runs (see @vercel/analytics,
@@ -38,6 +38,7 @@ export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [analyticsChoice, setAnalyticsChoice] = useState(true);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (readConsent() !== null) {
@@ -59,6 +60,29 @@ export default function CookieConsent() {
     setVisible(true);
   }, []);
 
+  useEffect(() => {
+    if (!visible) {
+      document.body.style.paddingBottom = "";
+      return;
+    }
+    const el = panelRef.current;
+    if (!el) return;
+    const applyPadding = () => {
+      document.body.style.paddingBottom = `${el.offsetHeight}px`;
+    };
+    applyPadding();
+    const ro = new ResizeObserver(applyPadding);
+    ro.observe(el);
+    window.addEventListener("resize", applyPadding);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", applyPadding);
+      document.body.style.paddingBottom = "";
+    };
+    // `expanded` changes the panel's height (the analytics toggle row), so
+    // re-measure whenever it flips.
+  }, [visible, expanded]);
+
   if (!visible) return null;
 
   const accept = (analytics: boolean) => {
@@ -72,6 +96,7 @@ export default function CookieConsent() {
       aria-live="polite"
       aria-label="Cookie preferences"
       className="fixed inset-x-0 bottom-0 z-[100] p-4 sm:p-5"
+      ref={panelRef}
     >
       <div className="mx-auto max-w-[640px] rounded-2xl border border-black/10 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.15)] p-5">
         <p className="text-[13px] leading-relaxed text-black/70">

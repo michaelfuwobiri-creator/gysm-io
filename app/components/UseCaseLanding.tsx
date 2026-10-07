@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { IMAGE_BLUR, IMAGE_DIMENSIONS } from "@/lib/imagePlaceholders";
+import MobileNavMenu from "./MobileNavMenu";
 
 export type UseCasePoint = { title: string; body: string };
 
@@ -68,6 +69,19 @@ export default function UseCaseLanding({
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Pricing</a>
             <a href="/sign-in" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Log in</a>
+            <MobileNavMenu
+              theme="light"
+              links={[
+                { href: "/builder", label: "AI Builder" },
+                { href: "/builder-blocks", label: "Lego Builder", badge: "Beta" },
+                { href: "/buildguild", label: "BuildGuild" },
+                { href: "/templates", label: "Templates" },
+                { href: "/connectors", label: "Connectors" },
+                { href: "/marketplace", label: "Marketplace" },
+                { href: "/pricing", label: "Pricing" },
+                { href: "/sign-in", label: "Log in" },
+              ]}
+            />
             <button onClick={() => startBuilding(examplePrompt)} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">Start Building</button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import NewsletterSignup from "../components/NewsletterSignup";
 import ProductsNavMenu from "../components/ProductsNavMenu";
+import MobileNavMenu from "../components/MobileNavMenu";
 import { trackEvent } from "@/lib/analytics/track";
 import { PRICING_PLANS } from "@/lib/stripe";
 
@@ -151,6 +152,19 @@ export default function Page() {
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
             <a href="/pricing" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">{t("nav.pricing")}</a>
             <NavAuthLink />
+            <MobileNavMenu
+              theme="light"
+              links={[
+                { href: "/builder", label: "AI Builder", description: "Describe your app in plain English -- GYSM builds it." },
+                { href: "/builder-blocks", label: "Lego Builder", badge: "Beta", description: "Drag and drop real blocks -- auth, payments, forms -- to build an app." },
+                { href: "/buildguild", label: "BuildGuild" },
+                { href: "/templates", label: t("nav.templates") },
+                { href: "/connectors", label: "Connectors" },
+                { href: "/marketplace", label: "Marketplace" },
+                { href: "/pricing", label: t("nav.pricing") },
+              ]}
+              authSlot={<NavAuthLink variant="mobile" />}
+            />
             <button onClick={() => startBuilding()} className="h-8 md:h-9 px-5 rounded-full bg-black text-white text-[13px] font-semibold grid place-items-center">{t("nav.startBuilding")}</button>
           </div>
         </div>
