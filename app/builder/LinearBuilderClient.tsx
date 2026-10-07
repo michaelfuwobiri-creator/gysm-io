@@ -36,6 +36,7 @@ import type { MediaTemplate } from "@/lib/mediaTemplates";
 import { trackEvent } from "@/lib/analytics/track";
 import GitHubPushPanel from "./GitHubPushPanel";
 import { withPreviewShim } from "@/lib/userContent";
+import { applyVisualEdit, isHexColor, isSafePath, withVisualEditBridge, type VisualEdit } from "@/lib/visualEdit";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -2317,6 +2318,25 @@ function ArtifactPanel({
   const [saveMsg, setSaveMsg] = useState("");
   const [saveError, setSaveError] = useState("");
   const [copied, setCopied] = useState(false);
+  // Visual edit: click an element in the preview, change its text or colours.
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [visualOn, setVisualOn] = useState(false);
+  const [vSel, setVSel] = useState<{
+    path: string;
+    tag: string;
+    expect: string;
+    leaf: boolean;
+    text: string;
+    color: string | null;
+    background: string | null;
+  } | null>(null);
+  const [vText, setVText] = useState("");
+  const [vColor, setVColor] = useState<string | null>(null);
+  const [vBg, setVBg] = useState<string | null>(null);
+  const [vBusy, setVBusy] = useState(false);
+  const [vMsg, setVMsg] = useState("");
+  const [vErr, setVErr] = useState("");
+  const [vUndo, setVUndo] = useState<string[]>([]);
   const [publishTitle, setPublishTitle] = useState("");
   const [publishTagline, setPublishTagline] = useState("");
   const [publishTags, setPublishTags] = useState<string[]>([]);
@@ -2327,6 +2347,109 @@ function ArtifactPanel({
     setPublishTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length >= MAX_TAGS_PER_BUILD ? prev : [...prev, tag]
     );
+  }
+
+  // Messages from the preview. The iframe has an opaque origin, so the only
+  // check available is that the message comes from OUR iframe's window; the
+  // content is still treated as untrusted and validated field by field.
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+      const d = e.data as any;
+      if (!d || d.gysm !== "select") return;
+      if (!isSafePath(d.path) || typeof d.tag !== "string" || !/^[a-z][a-z0-9]*$/.test(d.tag)) return;
+      if (typeof d.expect !== "string" || d.expect.length > 200) return;
+      const text = typeof d.text === "string" ? d.text.slice(0, 2000) : "";
+      setVSel({
+        path: d.path,
+        tag: d.tag,
+        expect: d.expect,
+        leaf: d.leaf === true,
+        text,
+        color: isHexColor(d.color) ? d.color : null,
+        background: isHexColor(d.background) ? d.background : null,
+      });
+      setVText(text);
+      setVColor(null);
+      setVBg(null);
+      setVErr("");
+      setVMsg("");
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  function postToPreview(msg: Record<string, unknown>) {
+    iframeRef.current?.contentWindow?.postMessage(msg, "*");
+  }
+
+  useEffect(() => {
+    postToPreview({ gysm: "edit", on: visualOn });
+    if (!visualOn) setVSel(null);
+  }, [visualOn, tab]);
+
+  useEffect(() => {
+    setVUndo([]);
+    setVSel(null);
+    setVMsg("");
+    setVErr("");
+  }, [artifact?.id, artifact?.projectId]);
+
+  async function putIndexHtml(html: string) {
+    if (!artifact?.projectId) throw new Error("Save the build first.");
+    const res = await fetch(`/api/projects/${artifact.projectId}/files`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: [{ path: "index.html", content: html }] }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Could not save.");
+    onFilesSaved(artifact.id, data.files, data.previewUrl ?? null);
+  }
+
+  async function applyVisual() {
+    if (!artifact || !vSel || vBusy) return;
+    const edit: VisualEdit = { path: vSel.path, tag: vSel.tag, expect: vSel.expect };
+    if (vSel.leaf && vText !== vSel.text) edit.setText = vText;
+    if (vColor) edit.color = vColor;
+    if (vBg) edit.background = vBg;
+    if (edit.setText === undefined && edit.color === undefined && edit.background === undefined) {
+      setVErr("Change the text or a colour first.");
+      return;
+    }
+    setVBusy(true);
+    setVErr("");
+    setVMsg("");
+    try {
+      const r = applyVisualEdit(artifact.html, edit, (h) => new DOMParser().parseFromString(h, "text/html"));
+      if (r.ok === false) throw new Error(r.error);
+      const before = artifact.html;
+      await putIndexHtml(r.html);
+      setVUndo((u) => [...u.slice(-19), before]);
+      setVSel(null);
+      setVMsg("Saved. No credits used.");
+    } catch (e: any) {
+      setVErr(e?.message || "Could not save.");
+    } finally {
+      setVBusy(false);
+    }
+  }
+
+  async function undoVisual() {
+    if (!artifact || vBusy || vUndo.length === 0) return;
+    const prev = vUndo[vUndo.length - 1];
+    setVBusy(true);
+    setVErr("");
+    try {
+      await putIndexHtml(prev);
+      setVUndo((u) => u.slice(0, -1));
+      setVSel(null);
+      setVMsg("Undone.");
+    } catch (e: any) {
+      setVErr(e?.message || "Could not undo.");
+    } finally {
+      setVBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -2508,7 +2631,82 @@ function ArtifactPanel({
                 {d}
               </button>
             ))}
+            {canEdit && !artifact.previewUrl && (
+              <button
+                onClick={() => setVisualOn((v) => !v)}
+                aria-pressed={visualOn}
+                className={`ml-3 text-[10px] px-2 py-1 rounded-md border ${
+                  visualOn ? "bg-[#FF0080]/15 border-[#FF0080]/40 text-[#FF0080]" : "border-white/10 text-white/50 hover:text-white/80"
+                }`}
+                title="Click an element in the preview to change its text or colours. Free: no AI call."
+              >
+                Visual edit
+              </button>
+            )}
           </div>
+          {visualOn && canEdit && !artifact.previewUrl && (
+            <div className="px-3 py-2 border-b border-white/8 shrink-0 text-[11px] text-white/60 flex flex-wrap items-center gap-2">
+              {!vSel ? (
+                <span>Click any element in the preview to edit it. Links and buttons won&apos;t fire while this is on.</span>
+              ) : (
+                <>
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/80">&lt;{vSel.tag}&gt;</span>
+                  {vSel.leaf ? (
+                    <input
+                      value={vText}
+                      onChange={(e) => {
+                        setVText(e.target.value);
+                        postToPreview({ gysm: "preview", text: e.target.value });
+                      }}
+                      className="min-w-[120px] flex-1 rounded bg-white/5 border border-white/10 px-2 py-1 text-[11px] text-white outline-none"
+                      aria-label="Text"
+                    />
+                  ) : (
+                    <span className="text-white/40">Contains other elements: select the text itself to change it.</span>
+                  )}
+                  <label className="flex items-center gap-1">
+                    Text
+                    <input
+                      type="color"
+                      value={vColor ?? vSel.color ?? "#000000"}
+                      onChange={(e) => {
+                        setVColor(e.target.value);
+                        postToPreview({ gysm: "preview", color: e.target.value });
+                      }}
+                      className="h-5 w-6 bg-transparent"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1">
+                    Fill
+                    <input
+                      type="color"
+                      value={vBg ?? vSel.background ?? "#ffffff"}
+                      onChange={(e) => {
+                        setVBg(e.target.value);
+                        postToPreview({ gysm: "preview", background: e.target.value });
+                      }}
+                      className="h-5 w-6 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={applyVisual}
+                    disabled={vBusy}
+                    className="rounded-md bg-[#FF0080] text-white text-[11px] font-medium px-2.5 py-1 disabled:opacity-40"
+                  >
+                    {vBusy ? "Saving..." : "Apply"}
+                  </button>
+                </>
+              )}
+              <button
+                onClick={undoVisual}
+                disabled={vBusy || vUndo.length === 0}
+                className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/60 disabled:opacity-30"
+              >
+                Undo
+              </button>
+              {vErr ? <span className="text-red-400">{vErr}</span> : vMsg ? <span className="text-emerald-300">{vMsg}</span> : null}
+            </div>
+          )}
           <div className="flex-1 overflow-auto bg-black/20 flex justify-center p-3">
             {artifact.previewUrl ? (
               // Multi-file build: load real URLs so relative links resolve.
@@ -2531,8 +2729,10 @@ function ArtifactPanel({
               // the preview cannot reach this page's cookies or APIs. Storage
               // APIs are replaced with in-memory stand-ins (see lib/userContent).
               <iframe
+                ref={iframeRef}
                 title="artifact-preview"
-                srcDoc={withPreviewShim(artifact.html)}
+                srcDoc={withVisualEditBridge(withPreviewShim(artifact.html))}
+                onLoad={() => postToPreview({ gysm: "edit", on: visualOn })}
                 sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
                 style={{ width: deviceWidths[device], maxWidth: "100%" }}
                 className="h-full rounded-xl border border-white/10 bg-white"
