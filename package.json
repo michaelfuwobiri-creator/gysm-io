@@ -27,6 +27,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.3",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/sandbox": "^3.5.1",
     "jszip": "^3.10.1",
     "next": "^14.2.35",
     "next-intl": "^3.26.3",

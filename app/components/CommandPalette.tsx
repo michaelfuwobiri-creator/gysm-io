@@ -20,6 +20,7 @@ const ACTIONS: Action[] = [
   { label: "Dashboard", href: "/dashboard", keywords: "home projects builds" },
   { label: "New build", href: "/builder", keywords: "create ai prompt generate" },
   { label: "Lego Builder (beta)", href: "/builder-blocks", keywords: "drag drop blocks" },
+  { label: "Shell (beta)", href: "/shell", keywords: "terminal command line linux bash cloud computer ai agent" },
   { label: "Templates", href: "/templates", keywords: "gallery starter" },
   { label: "Connectors", href: "/connectors", keywords: "supabase database backend" },
   { label: "Analytics", href: "/dashboard/analytics", keywords: "mrr users chart" },

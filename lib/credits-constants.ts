@@ -138,3 +138,44 @@ export const BUILDS_PER_PLAN = {
 export const CREDITS_PER_PLAN = Object.fromEntries(
   Object.entries(BUILDS_PER_PLAN).map(([id, builds]) => [id, builds * CREDIT_COST_PER_BUILD])
 ) as Record<keyof typeof BUILDS_PER_PLAN, number>;
+
+// ---------------------------------------------------------------------------
+// GYSM Shell (app/shell, app/api/shell/*, lib/shell/*).
+//
+// Same cost-based model as builds above: charged at real AI cost, metered
+// per Claude call from the API's own `usage` numbers (not an estimate --
+// an agent turn can be 1 model call or 8, so a flat per-turn price would
+// either overcharge short questions or lose money on long tasks). Credits
+// are converted at the same USD-per-credit rate a default build implies,
+// so 1 credit means the same thing everywhere in GYSM.
+export const SHELL_MODEL = "claude-sonnet-5";
+const SHELL_MODEL_RATE = MODEL_COST_PER_1M_TOKENS["claude-sonnet-5"];
+const USD_PER_CREDIT = BUILD_COST_USD.fast / CREDIT_COST_PER_BUILD;
+
+export function shellCreditsForUsage(usage: {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}): number {
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const usd =
+    (input * SHELL_MODEL_RATE.input +
+      cacheWrite * SHELL_MODEL_RATE.input * 1.25 +
+      cacheRead * SHELL_MODEL_RATE.input * 0.1 +
+      output * SHELL_MODEL_RATE.output) /
+    1_000_000;
+  return Math.max(1, Math.ceil(usd / USD_PER_CREDIT));
+}
+
+// Flat charge per command actually executed in the user's sandbox (manual
+// or AI-run), covering Vercel Sandbox compute time. PLACEHOLDER -- tune
+// once real Sandbox invoices come in.
+export const SHELL_CREDITS_PER_COMMAND = 5;
+
+// Minimum balance to start an AI turn, so a user can't kick off a long
+// multi-step task on 3 credits and run it into the negative.
+export const SHELL_MIN_BALANCE_FOR_AI = 100;
