@@ -111,14 +111,14 @@ export function getRival(slug: string): Rival | undefined {
 export const GYSM_FACTS = {
   output:
     "One complete, self-contained web page per build, with a live preview, a code view you can copy, a downloadable project folder and a public share link",
-  codeExport: "Download the project, or connect GitHub and push to it",
+  codeExport: "Download the project, or connect a GitHub repo with a token you paste in, push your build and pull edits back (index.html only)",
   backend: "Connect your own Supabase project and run the generated database schema against it",
   hosting: "Publish to a public page, install it as a web app, or attach your own custom domain",
   teams: "Organizations, API keys, a public generation API and an audit log",
   extras: "A sandboxed AI shell, a media factory, a template marketplace and BuildGuild, a public gallery of published apps",
   limits: [
     "Each build is a single HTML page, not a multi-file project, and there is no in-product multi-file code editor yet.",
-    "Git sync is push-only: edits made on GitHub are not pulled back in.",
+    "GitHub sync covers the build's single index.html, not a multi-file repository.",
     "There is no managed database or auth: you connect a Supabase project of your own.",
   ],
 };

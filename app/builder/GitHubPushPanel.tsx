@@ -18,7 +18,16 @@ type Status = {
 // one button, one bit of open/close state. See app/api/github/* for the
 // PAT-based connect/push/disconnect this drives, and lib/githubPush.ts
 // for why a pasted token instead of an OAuth App.
-export default function GitHubPushPanel({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+export default function GitHubPushPanel({
+  projectId,
+  onClose,
+  onPulled,
+}: {
+  projectId: string;
+  onClose: () => void;
+  /** Called after a pull saved a new version, so the builder can show it. */
+  onPulled?: (result: { projectId: string; html: string }) => void;
+}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
@@ -27,6 +36,8 @@ export default function GitHubPushPanel({ projectId, onClose }: { projectId: str
   const [branch, setBranch] = useState("main");
   const [saving, setSaving] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -96,6 +107,35 @@ export default function GitHubPushPanel({ projectId, onClose }: { projectId: str
     }
   }
 
+  async function pull() {
+    if (pulling) return;
+    setPulling(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await fetch("/api/github/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Pull failed.");
+        return;
+      }
+      if (!data.changed) {
+        setNotice("Already up to date -- the repo matches this build.");
+        return;
+      }
+      setNotice("Pulled. The repo's index.html is now the open build, and your previous version is still in History.");
+      onPulled?.({ projectId: data.projectId, html: data.html });
+    } catch {
+      setError("Pull failed. Check your connection and try again.");
+    } finally {
+      setPulling(false);
+    }
+  }
+
   async function disconnect() {
     await fetch("/api/github/disconnect", {
       method: "POST",
@@ -114,13 +154,13 @@ export default function GitHubPushPanel({ projectId, onClose }: { projectId: str
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-lg font-black tracking-tight">Push to GitHub</h3>
+          <h3 className="text-lg font-black tracking-tight">GitHub sync</h3>
           <button onClick={onClose} className="text-black/40 hover:text-black text-xl leading-none">
             ×
           </button>
         </div>
         <p className="text-black/45 text-[13px] mb-4">
-          Syncs this build to a repo you own, using a token you paste in -- not a GYSM login. Re-run any time to push your latest changes as a new commit.
+          Syncs this build to a repo you own, using a token you paste in -- not a GYSM login. Push sends your latest build as a new commit. Pull loads the repo's index.html back in as a new version, so edits made on GitHub come back to GYSM.
         </p>
 
         {loading ? (
@@ -148,6 +188,7 @@ export default function GitHubPushPanel({ projectId, onClose }: { projectId: str
               {!status.last_pushed_at && <div className="text-emerald-700/60 mt-1">Not pushed yet.</div>}
             </div>
             {error && <div className="text-red-600 text-[13px]">{error}</div>}
+            {notice && <div className="text-emerald-700 text-[13px]">{notice}</div>}
             <div className="flex gap-2">
               <button
                 onClick={push}
@@ -155,6 +196,13 @@ export default function GitHubPushPanel({ projectId, onClose }: { projectId: str
                 className="flex-1 py-2.5 rounded-full bg-black text-white text-[13px] font-bold hover:opacity-90 disabled:opacity-40 transition"
               >
                 {pushing ? "Pushing…" : "Push now"}
+              </button>
+              <button
+                onClick={pull}
+                disabled={pulling}
+                className="flex-1 py-2.5 rounded-full border border-black/15 text-black text-[13px] font-bold hover:bg-black/5 disabled:opacity-40 transition"
+              >
+                {pulling ? "Pulling…" : "Pull latest"}
               </button>
               <button
                 onClick={disconnect}

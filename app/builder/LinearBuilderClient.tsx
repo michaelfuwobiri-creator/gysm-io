@@ -34,6 +34,7 @@ import type { BrandKit } from "@/lib/brandKit";
 import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
 import type { MediaTemplate } from "@/lib/mediaTemplates";
 import { trackEvent } from "@/lib/analytics/track";
+import GitHubPushPanel from "./GitHubPushPanel";
 
 /* --------------------------------------------------------------------- */
 /* Types                                                                  */
@@ -2275,13 +2276,16 @@ function ArtifactPanel({
   width,
   onStartResize,
   onPublished,
+  onPulled,
 }: {
   artifact: Artifact | null;
   onClose: () => void;
   width: number;
   onStartResize: (e: React.MouseEvent) => void;
   onPublished: (artifactId: string) => void;
+  onPulled: (artifactId: string, projectId: string, html: string) => void;
 }) {
+  const [githubOpen, setGithubOpen] = useState(false);
   const [tab, setTab] = useState<"preview" | "code" | "deploy">("preview");
   const [device, setDevice] = useState<DeviceMode>("desktop");
   const [activeFile, setActiveFile] = useState(0);
@@ -2352,6 +2356,11 @@ function ArtifactPanel({
           >
             {copied ? "Copied" : "Copy"}
           </button>
+          {artifact?.projectId && (
+            <button onClick={() => setGithubOpen(true)} className="text-[11px] text-white/50 hover:text-white px-1.5">
+              GitHub
+            </button>
+          )}
           {artifact?.url && (
             <a
               href={`https://${artifact.url}`}
@@ -2373,6 +2382,14 @@ function ArtifactPanel({
           </button>
         </div>
       </div>
+
+      {githubOpen && artifact?.projectId && (
+        <GitHubPushPanel
+          projectId={artifact.projectId}
+          onClose={() => setGithubOpen(false)}
+          onPulled={(r) => onPulled(artifact.id, r.projectId, r.html)}
+        />
+      )}
 
       {!artifact ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
@@ -3491,6 +3508,28 @@ export default function LinearBuilderApp({
     setMobileArtifactOpen(true);
   }
 
+  /** A pull from GitHub saved a new version: show it in place of the open one. */
+  function applyPulled(artifactId: string, projectId: string, html: string) {
+    setState((s) => {
+      const a = s.artifacts[artifactId];
+      if (!a) return s;
+      const host = typeof window !== "undefined" ? window.location.host : "gysm.io";
+      return {
+        ...s,
+        artifacts: {
+          ...s.artifacts,
+          [artifactId]: {
+            ...a,
+            projectId,
+            html,
+            files: [{ name: "index.html", language: "html", content: html }],
+            url: `${host}/publish/${projectId}`,
+          },
+        },
+      };
+    });
+  }
+
   function markPublished(artifactId: string) {
     setState((s) => ({
       ...s,
@@ -3999,6 +4038,7 @@ export default function LinearBuilderApp({
               resizing.current = true;
             }}
             onPublished={markPublished}
+            onPulled={applyPulled}
           />
         ))}
 
@@ -4021,6 +4061,7 @@ export default function LinearBuilderApp({
                 width={"100%" as unknown as number}
                 onStartResize={() => {}}
                 onPublished={markPublished}
+                onPulled={applyPulled}
               />
             )}
           </div>

@@ -6,6 +6,7 @@ import { generateWebsite, editWebsite, BuildStage, ModelTier, extractSchemaSql, 
 import { buildSuggestions } from "@/lib/suggestions";
 import { getConnection, getValidAccessToken, markActive, relinkProjectId } from "@/lib/backendStore";
 import { runPreflightCheck } from "@/lib/preflightCheck";
+import { relinkGithubConnection } from "@/lib/githubStore";
 import { runSql } from "@/lib/supabaseBackend";
 
 // This route runs two sequential AI calls (an OpenAI structure pass, then
@@ -252,6 +253,16 @@ export async function POST(req: NextRequest) {
             await relinkProjectId(projectId, newProjectId);
           } catch (error: any) {
             console.error("[generate] failed to relink backend connection:", error.message);
+          }
+        }
+
+        // Same for a GitHub sync link: edits save as a new row, so move the
+        // connection onto it or Push/Pull would vanish after the first edit.
+        if (newProjectId && projectId) {
+          try {
+            await relinkGithubConnection(projectId, newProjectId);
+          } catch (error: any) {
+            console.error("[generate] failed to relink github connection:", error.message);
           }
         }
 

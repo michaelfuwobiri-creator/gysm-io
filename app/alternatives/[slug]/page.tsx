@@ -38,7 +38,7 @@ export default function Page({ params }: { params: { slug: string } }) {
     },
     {
       q: `Can I move a GYSM project to GitHub?`,
-      a: `Yes. You can download the project or connect GitHub and push to it. Syncing is one way for now: changes made on GitHub are not pulled back into GYSM.`,
+      a: `Yes. You can download the project, or connect a GitHub repo with a token you paste in. Push sends your build as a commit and Pull loads the repo's index.html back in as a new version. Sync covers a single index.html, not a multi-file repository.`,
     },
   ];
 

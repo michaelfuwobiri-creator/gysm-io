@@ -9,6 +9,8 @@
 // are" posture. Token is encrypted at rest (lib/crypto.ts) and only ever
 // decrypted server-side.
 
+import { MAX_PULL_BYTES } from "./githubPull";
+
 const API_BASE = "https://api.github.com";
 
 function headers(token: string) {
@@ -86,4 +88,25 @@ export async function pushFiles(
     }
   }
   return { ok: true, commitUrls };
+}
+
+export type FetchFileResult = { ok: true; content: string } | { ok: false; error: string; notFound?: boolean };
+
+/** Reads one text file from the repo (raw contents, so files over 1 MB still work). */
+export async function fetchFileText(token: string, owner: string, repo: string, branch: string, path: string): Promise<FetchFileResult> {
+  try {
+    const res = await fetch(`${API_BASE}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`, {
+      headers: { ...headers(token), Accept: "application/vnd.github.raw+json" },
+    });
+    if (res.status === 404) {
+      return { ok: false, notFound: true, error: `${path} was not found on branch ${branch}. Push from GYSM first, or check the branch name.` };
+    }
+    if (res.status === 401) return { ok: false, error: "That token was rejected by GitHub. Reconnect GitHub for this build." };
+    if (!res.ok) return { ok: false, error: `GitHub returned an error (${res.status}). Please try again.` };
+    const length = Number(res.headers.get("content-length") || 0);
+    if (length > MAX_PULL_BYTES) return { ok: false, error: `${path} in the repo is larger than 2 MB, which GYSM can't load.` };
+    return { ok: true, content: await res.text() };
+  } catch (error: any) {
+    return { ok: false, error: `Could not reach GitHub: ${error.message}` };
+  }
 }
