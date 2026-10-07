@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Terms of Service</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated September 1, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated October 7, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -30,6 +30,7 @@ export default function TermsPage() {
             Building with GYSM uses credits, purchased individually or through a subscription plan. All
             payments are processed securely by Stripe. Prices and plans are shown at checkout and may
             change going forward; purchases are generally non-refundable except where required by law.
+            No redemption for fiat at this time. Credits are for platform access only.
             See our <a href="/refund" className="underline">Refund Policy</a> for how failed
             generations, credit packs, and subscription cancellations are actually handled.
           </p>
