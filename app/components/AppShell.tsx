@@ -54,6 +54,7 @@ const NAV_GROUPS: {
       { key: "team", label: "Team", href: "/team", icon: "team" },
       { key: "api-keys", label: "API Keys", href: "/settings/api-keys", icon: "key" },
       { key: "wallet", label: "Wallet", href: "/settings/wallet", icon: "wallet" },
+      { key: "security", label: "Security", href: "/settings/security", icon: "shield" },
     ],
   },
 ];
@@ -141,6 +142,14 @@ function NavIcon({ name }: { name: string }) {
         <path d="M2.5 19c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" />
         <circle cx="18" cy="8.5" r="2.4" />
         <path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3" />
+      </svg>
+    );
+  }
+  if (name === "shield") {
+    return (
+      <svg {...common}>
+        <path d="M12 3l7 3v5.5c0 4.2-2.8 7.6-7 9.5-4.2-1.9-7-5.3-7-9.5V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
       </svg>
     );
   }
