@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Mobile header + drawer for the signed-in app shell (AppShell.tsx), which
 // hides its entire left sidebar -- every nav item, the credits/upgrade
@@ -19,6 +20,12 @@ import { useEffect, useState } from "react";
 // (hidden on mobile via CSS, not conditionally mounted) in the desktop
 // sidebar without hydration issues, so reusing the same elements here is
 // safe too.
+//
+// The drawer is rendered via createPortal into document.body (see the
+// identical fix and explanation in MobileNavMenu.tsx) -- AppShell's own
+// ancestor chain has no backdrop-filter/filter/transform today, but
+// portaling removes the risk entirely rather than relying on that staying
+// true.
 type NavItem = { key: string; label: string; href: string; active?: boolean };
 type NavGroup = { title: string; items: NavItem[] };
 
@@ -69,7 +76,7 @@ export default function MobileAppHeader({ groups, displayName, initial, credits,
         </button>
       </div>
 
-      {open && (
+      {open && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -138,7 +145,8 @@ export default function MobileAppHeader({ groups, displayName, initial, credits,
               <div className="flex items-center justify-between gap-2 px-1 pb-3">{footerSlot}</div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Mobile navigation: a hamburger button (visible only below the `md`
 // breakpoint) that opens a full-screen link list. This exists because every
@@ -16,6 +17,15 @@ import { useEffect, useState } from "react";
 // next/dynamic(..., { ssr: false }) by the page, never rendered directly
 // here, or React hydration breaks. This component itself never calls
 // useUser() and is safe to render during SSR.
+//
+// The drawer is rendered via createPortal into document.body rather than
+// in place. Every caller wraps this in a <nav> that uses `backdrop-blur-xl`
+// -- a backdrop-filter -- and per spec, filter/backdrop-filter on an
+// ancestor makes that ancestor the containing block for `position: fixed`
+// descendants. Left in place, the drawer's `fixed inset-0` was being sized
+// against the 56px-tall nav bar instead of the viewport, collapsing the
+// full-screen overlay down to a sliver. Portaling to the body sidesteps
+// that regardless of what any future ancestor does with filter/transform.
 export type MobileNavLink = {
   href: string;
   label: string;
@@ -63,7 +73,7 @@ export default function MobileNavMenu({ links, theme = "light", authSlot }: Mobi
         </svg>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -119,7 +129,8 @@ export default function MobileNavMenu({ links, theme = "light", authSlot }: Mobi
               </div>
             )}
           </nav>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
