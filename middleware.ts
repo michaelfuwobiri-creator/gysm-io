@@ -7,7 +7,7 @@ import { checkRateLimit } from './lib/rateLimit'
 import { isUserContentHost } from './lib/userContent'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
-const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/admin(.*)', '/shell(.*)'])
+const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/gysmlink(.*)', '/shield(.*)', '/admin(.*)', '/shell(.*)'])
 
 // Item #9 of GYSM_IO_HANDOFF.md: "add rate limiting ... 100 req/min per
 // IP". Applied to every /api/* route EXCEPT inbound webhooks and Vercel
@@ -23,6 +23,7 @@ const isRateLimitExempt = createRouteMatcher([
   '/api/voiie/webhooks(.*)',
   '/api/voiie/cron(.*)',
   '/api/cron(.*)',
+  '/api/shield/ingest(.*)',
 ])
 
 // Locale-aware homepage. Scoped narrowly on purpose: this repo has ~80

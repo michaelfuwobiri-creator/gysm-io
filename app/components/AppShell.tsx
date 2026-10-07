@@ -37,6 +37,8 @@ const NAV_GROUPS: {
       { key: "builder-blocks", label: "Blocks (beta)", href: "/builder-blocks", icon: "blocks" },
       // AI-first cloud terminal -- see app/shell/page.tsx.
       { key: "shell", label: "Shell (beta)", href: "/shell", icon: "terminal" },
+      { key: "gysmlink", label: "gysmlink", href: "/gysmlink", icon: "link" },
+      { key: "shield", label: "Shield", href: "/shield", icon: "shield" },
     ],
   },
   {
@@ -142,6 +144,14 @@ function NavIcon({ name }: { name: string }) {
         <path d="M2.5 19c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" />
         <circle cx="18" cy="8.5" r="2.4" />
         <path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3" />
+      </svg>
+    );
+  }
+  if (name === "link") {
+    return (
+      <svg {...common}>
+        <path d="M10 13a5 5 0 0 0 7.1 0l2.8-2.8a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+        <path d="M14 11a5 5 0 0 0-7.1 0L4.1 13.8a5 5 0 0 0 7.1 7.1l1.1-1.1" />
       </svg>
     );
   }
