@@ -23,6 +23,7 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "DuckDuckBot", allow: "/" },
       // AI assistant / answer-engine crawlers (real-time browsing on behalf
       // of a user query -- e.g. ChatGPT search, Perplexity answers)
+      { userAgent: "OAI-SearchBot", allow: "/" },
       { userAgent: "ChatGPT-User", allow: "/" },
       { userAgent: "PerplexityBot", allow: "/" },
       { userAgent: "Claude-User", allow: "/" },
