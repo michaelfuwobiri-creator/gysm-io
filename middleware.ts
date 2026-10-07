@@ -33,22 +33,6 @@ const isRateLimitExempt = createRouteMatcher([
 const handleI18nRouting = createIntlMiddleware(routing)
 const LOCALE_ROOT_PATHS = new Set<string>(['/', ...routing.locales.map((l) => `/${l}`)])
 
-// IP-country -> locale, applied once per visitor on their very first
-// bare-root visit. Once someone picks a language (or next-intl negotiates
-// one), the NEXT_LOCALE cookie takes over and this block is skipped.
-// x-vercel-ip-country is populated by Vercel in production/preview; it's
-// simply absent locally, where next-intl's own Accept-Language negotiation
-// (below, inside handleI18nRouting) takes care of it instead.
-const COUNTRY_TO_LOCALE: Record<string, string> = {
-  HR: 'hr', BA: 'hr', RS: 'hr',
-  DE: 'de', AT: 'de', CH: 'de',
-  FR: 'fr', BE: 'fr',
-  ES: 'es', MX: 'es', AR: 'es',
-  IN: 'hi',
-  JP: 'ja',
-  BR: 'pt', PT: 'pt',
-}
-
 const clerkHandler = clerkMiddleware(async (auth, req) => {
   if (isBuilderRoute(req)) {
     const { userId } = await auth()
@@ -73,16 +57,8 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
 
   const pathname = req.nextUrl.pathname
   if (LOCALE_ROOT_PATHS.has(pathname)) {
-    if (pathname === '/' && !req.cookies.get('NEXT_LOCALE')?.value) {
-      const country = req.headers.get('x-vercel-ip-country') || ''
-      const countryLocale = COUNTRY_TO_LOCALE[country]
-      if (countryLocale && countryLocale !== routing.defaultLocale) {
-        const redirectUrl = new URL(`/${countryLocale}`, req.url)
-        const res = NextResponse.redirect(redirectUrl)
-        res.cookies.set('NEXT_LOCALE', countryLocale, { maxAge: 60 * 60 * 24 * 365, path: '/' })
-        return res
-      }
-    }
+    // No IP-country or Accept-Language redirect: "/" always serves English
+    // (see localeDetection in i18n/routing.js).
     return handleI18nRouting(req)
   }
 })

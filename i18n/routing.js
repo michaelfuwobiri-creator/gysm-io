@@ -9,6 +9,11 @@ export const routing = defineRouting({
   locales: ["en", "hr", "de", "fr", "es", "hi", "ja", "pt"],
   defaultLocale: "en",
   localePrefix: "as-needed",
+  // Never redirect "/" based on Accept-Language or the NEXT_LOCALE cookie:
+  // gysm.io must always serve the same English page to people and crawlers.
+  // Other languages stay reachable at /hi, /de etc. via the language switcher
+  // and the hreflang alternates in app/[locale]/layout.tsx.
+  localeDetection: false,
   localeCookie: {
     name: "NEXT_LOCALE",
     maxAge: 60 * 60 * 24 * 365,
