@@ -1,0 +1,41 @@
+name: Web CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # Build with dummy values so a missing import, bad route or type error
+      # fails the PR. Nothing here talks to real services: the values only
+      # need to look valid enough for the framework to start.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_dummy
+          DATABASE_URL: postgresql://user:pass@localhost/db
+          NEXT_TELEMETRY_DISABLED: "1"

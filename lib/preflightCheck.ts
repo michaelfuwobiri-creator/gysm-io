@@ -9,8 +9,10 @@
 // missing alt text. Results are informational (never block publishing),
 // shown as a small trust badge on /publish pages.
 
+import { scanForSecrets } from "./secretScan";
+
 export type PreflightIssue = {
-  type: "truncated" | "unbalanced_tags" | "broken_anchor" | "placeholder_text" | "missing_alt";
+  type: "truncated" | "unbalanced_tags" | "broken_anchor" | "placeholder_text" | "missing_alt" | "exposed_secret";
   message: string;
   detail?: string;
 };
@@ -96,6 +98,20 @@ export function runPreflightCheck(html: string): PreflightResult {
   const missingAlt = imgs.filter((m) => !/\balt=["'][^"']*["']/i.test(m[0])).length;
   if (missingAlt > 0) {
     issues.push({ type: "missing_alt", message: `${missingAlt} image${missingAlt > 1 ? "s" : ""} missing alt text.` });
+  }
+
+  // 6. Exposed secrets -- a generated build is a public page, so a private
+  // key in it is public the moment it's published. Informational like the
+  // other checks (it never blocks publishing or triggers a paid fix pass),
+  // but the badge says so. Only a redacted preview is kept, never the key.
+  for (const f of scanForSecrets(trimmed)) {
+    issues.push({
+      type: "exposed_secret",
+      message: f.severity === "high"
+        ? `${f.label} found in the page source -- remove it and rotate the key.`
+        : `Possible secret in the page source: ${f.label}.`,
+      detail: f.count > 1 ? `${f.preview} (x${f.count})` : f.preview,
+    });
   }
 
   return {
