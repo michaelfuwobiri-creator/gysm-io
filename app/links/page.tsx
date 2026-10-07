@@ -24,6 +24,10 @@ const SECTIONS = [
       { href: "/pricing", label: "Pricing" },
       { href: "/roadmap", label: "Roadmap" },
       { href: "/changelog", label: "Changelog" },
+      { href: "/feedback", label: "Feedback" },
+      { href: "/build/saas", label: "Build a SaaS app" },
+      { href: "/build/dating-app", label: "Build a dating app" },
+      { href: "/build/booking-app", label: "Build a booking app" },
     ],
   },
   {
@@ -41,6 +45,7 @@ const SECTIONS = [
       { href: "/support", label: "Support" },
       { href: "/terms", label: "Terms" },
       { href: "/privacy", label: "Privacy" },
+      { href: "/refund", label: "Refund policy" },
     ],
   },
 ] as const;
