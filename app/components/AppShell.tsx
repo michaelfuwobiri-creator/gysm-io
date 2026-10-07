@@ -35,6 +35,8 @@ const NAV_GROUPS: {
       // the prompt-driven AI builder above (see /builder-blocks route
       // comment for why this isn't a replacement for /builder).
       { key: "builder-blocks", label: "Blocks (beta)", href: "/builder-blocks", icon: "blocks" },
+      // AI-first cloud terminal -- see app/shell/page.tsx.
+      { key: "shell", label: "Shell (beta)", href: "/shell", icon: "terminal" },
     ],
   },
   {
@@ -93,6 +95,15 @@ function NavIcon({ name }: { name: string }) {
         <rect x="14" y="3" width="7" height="7" rx="1.5" />
         <rect x="3" y="14" width="7" height="7" rx="1.5" />
         <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    );
+  }
+  if (name === "terminal") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M7 9l3 3-3 3" />
+        <path d="M13 15h4" />
       </svg>
     );
   }

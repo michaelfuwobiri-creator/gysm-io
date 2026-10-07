@@ -74,3 +74,23 @@ export async function addCredits(userId: string, amount: number): Promise<void> 
     throw error;
   }
 }
+
+// Metered (after-the-fact) charge for usage-priced features like GYSM Shell,
+// where the real cost is only known once the model call returns. Unlike
+// deductCredit this never fails for "insufficient balance" -- the work
+// already happened, so it takes what's left and floors at 0. Callers gate
+// on a minimum balance BEFORE starting work (see SHELL_MIN_BALANCE_FOR_AI).
+export async function chargeCredits(userId: string, amount: number): Promise<number> {
+  try {
+    const rows = await sql`
+      update credits
+      set balance = greatest(balance - ${amount}, 0), updated_at = now()
+      where user_id = ${userId}
+      returning balance
+    `;
+    return (rows[0] as any)?.balance ?? 0;
+  } catch (error: any) {
+    console.error("[credits] chargeCredits failed:", error.message);
+    return 0;
+  }
+}
