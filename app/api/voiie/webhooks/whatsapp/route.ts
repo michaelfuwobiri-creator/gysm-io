@@ -1,5 +1,12 @@
 import { NextRequest } from "next/server";
-import { verifyWebhookChallenge, verifyWebhookSignature, parseIncomingMessage } from "@/lib/voiie/whatsapp";
+import {
+  verifyWebhookChallenge,
+  verifyWebhookSignature,
+  parseIncomingMessage,
+  verifyTwilioSignature,
+  parseTwilioIncoming,
+  type IncomingWhatsAppMessage,
+} from "@/lib/voiie/whatsapp";
 import { findLeadByContact, getConsultationAnswers } from "@/lib/voiie/db";
 import { saveReplyAndAdvance } from "@/lib/voiie/consultation-server";
 
@@ -17,19 +24,36 @@ export async function GET(req: NextRequest) {
  *  owner, since a webhook request carries no signed-in user. */
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
-  const signature = req.headers.get("x-hub-signature-256");
-  if (!verifyWebhookSignature(rawBody, signature)) {
-    return new Response("Invalid signature", { status: 401 });
+  const isTwilio = (req.headers.get("content-type") || "").includes("application/x-www-form-urlencoded");
+  let incoming: IncomingWhatsAppMessage | null;
+
+  if (isTwilio) {
+    // Twilio posts form-encoded params signed with X-Twilio-Signature over
+    // the exact public URL it called (TWILIO_WEBHOOK_URL pins that URL;
+    // otherwise it's rebuilt from the forwarded host headers).
+    const params = Object.fromEntries(new URLSearchParams(rawBody)) as Record<string, string>;
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    const proto = req.headers.get("x-forwarded-proto") || "https";
+    const url = process.env.TWILIO_WEBHOOK_URL || `${proto}://${host}${req.nextUrl.pathname}`;
+    if (!verifyTwilioSignature(url, params, req.headers.get("x-twilio-signature"))) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+    incoming = parseTwilioIncoming(params);
+  } else {
+    const signature = req.headers.get("x-hub-signature-256");
+    if (!verifyWebhookSignature(rawBody, signature)) {
+      return new Response("Invalid signature", { status: 401 });
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    incoming = parseIncomingMessage(payload);
   }
 
-  let payload: unknown;
-  try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
-  }
-
-  const incoming = parseIncomingMessage(payload);
   if (!incoming) return Response.json({ ok: true }); // status update / non-text event -- nothing to do
 
   try {
