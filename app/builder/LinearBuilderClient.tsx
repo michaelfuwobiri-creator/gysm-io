@@ -34,6 +34,7 @@ import type { BrandKit } from "@/lib/brandKit";
 import type { MediaAsset, AssetCategory } from "@/lib/mediaAssets";
 import type { MediaTemplate } from "@/lib/mediaTemplates";
 import { trackEvent } from "@/lib/analytics/track";
+import TeamPanel from "./TeamPanel";
 import GitHubPushPanel from "./GitHubPushPanel";
 import { withPreviewShim } from "@/lib/userContent";
 import { applyVisualEdit, isHexColor, isSafePath, withVisualEditBridge, type VisualEdit } from "@/lib/visualEdit";
@@ -2572,6 +2573,7 @@ function ArtifactPanel({
           >
             {copied ? "Copied" : "Copy"}
           </button>
+          {artifact?.projectId && <TeamPanel projectId={artifact.projectId} />}
           {artifact?.projectId && (
             <button onClick={() => setGithubOpen(true)} className="text-[11px] text-white/50 hover:text-white px-1.5">
               GitHub
