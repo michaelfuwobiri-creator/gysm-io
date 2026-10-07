@@ -56,6 +56,15 @@ export async function POST(req: Request) {
   }
   if (evt.type === 'user.deleted') {
     await sql`DELETE FROM users WHERE clerk_id=${id}`
+    // Drop linked wallet addresses and pending challenges too. Best-effort: the
+    // tables only exist once migration 0025 has run, and a failure here must not
+    // make Clerk retry the whole webhook.
+    try {
+      await sql`DELETE FROM user_wallets WHERE user_id=${id}`
+      await sql`DELETE FROM wallet_nonces WHERE user_id=${id}`
+    } catch (e: any) {
+      console.error('[clerk webhook] wallet cleanup failed:', e.message)
+    }
   }
 
   return new Response('OK', { status: 200 })

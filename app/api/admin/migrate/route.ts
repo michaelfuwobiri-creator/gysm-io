@@ -520,6 +520,40 @@ const STATEMENTS: { id: string; run: () => Promise<unknown> }[] = [
     id: "0024_audit_log_created_at_idx",
     run: () => sql`create index if not exists audit_log_created_at_idx on audit_log (created_at desc)`,
   },
+  {
+    id: "0025_user_wallets",
+    run: () => sql`
+      create table if not exists user_wallets (
+        id           uuid primary key default gen_random_uuid(),
+        user_id      text not null,
+        address      text not null unique,
+        chain_family text not null default 'evm',
+        linked_at    timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0025_user_wallets_user_id_idx",
+    run: () => sql`create index if not exists user_wallets_user_id_idx on user_wallets (user_id)`,
+  },
+  {
+    id: "0025_wallet_nonces",
+    run: () => sql`
+      create table if not exists wallet_nonces (
+        nonce      text primary key,
+        user_id    text not null,
+        address    text not null,
+        message    text not null,
+        expires_at timestamptz not null,
+        used_at    timestamptz,
+        created_at timestamptz not null default now()
+      )
+    `,
+  },
+  {
+    id: "0025_wallet_nonces_user_id_idx",
+    run: () => sql`create index if not exists wallet_nonces_user_id_idx on wallet_nonces (user_id, created_at desc)`,
+  },
 ];
 
 export async function POST(_req: NextRequest) {

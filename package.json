@@ -39,6 +39,7 @@
     "stripe": "^22.4.0",
     "svix": "^1.99.1",
     "twitter-api-v2": "^1.19.1",
+    "viem": "^2.57.3",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

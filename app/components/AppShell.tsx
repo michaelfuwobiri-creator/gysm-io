@@ -51,6 +51,7 @@ const NAV_GROUPS: {
       { key: "billing", label: "Billing", href: "/billing", icon: "card" },
       { key: "team", label: "Team", href: "/team", icon: "team" },
       { key: "api-keys", label: "API Keys", href: "/settings/api-keys", icon: "key" },
+      { key: "wallet", label: "Wallet", href: "/settings/wallet", icon: "wallet" },
     ],
   },
 ];
@@ -129,6 +130,15 @@ function NavIcon({ name }: { name: string }) {
         <path d="M2.5 19c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" />
         <circle cx="18" cy="8.5" r="2.4" />
         <path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3" />
+      </svg>
+    );
+  }
+  if (name === "wallet") {
+    return (
+      <svg {...common}>
+        <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a1 1 0 0 1 1 1v2" />
+        <path d="M3 7.5V17a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z" />
+        <circle cx="16" cy="13.5" r="1.1" />
       </svg>
     );
   }
