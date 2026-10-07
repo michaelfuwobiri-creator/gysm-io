@@ -1,6 +1,6 @@
 # GYSM
 
-> GYSM is an AI app builder: describe an app in plain English and get a real, working website back -- with authentication, payments, and a live preview -- generated in seconds, not a mockup you have to rebuild.
+> GYSM is an AI app builder: describe an app in plain English and get a real, working website back -- with a live preview, a code view and a public link -- generated in seconds, not a mockup you have to rebuild.
 
 GYSM uses a two-model AI pipeline (a structure/content pass followed by a visual design pass) to turn a short natural-language prompt into a complete, styled, interactive single-page web app. Every generated app gets a live preview, a code view you can copy, and a public shareable link.
 

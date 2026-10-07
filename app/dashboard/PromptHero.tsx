@@ -102,7 +102,7 @@ export default function PromptHero({ greetingName }: { greetingName: string | nu
           Ready to build{greetingName ? `, ${greetingName}` : ""}?
         </h1>
         <p className="text-black/50 text-sm mt-2 mb-6">
-          Describe the app you want. GYSM builds it -- auth, database, and payments included.
+          Describe the app you want. GYSM builds it -- live preview, code view, and real auth and data when you connect Supabase.
         </p>
         <div className="flex flex-col sm:flex-row gap-2 rounded-[20px] sm:rounded-full border border-black/10 bg-white p-2 shadow-sm">
           <input

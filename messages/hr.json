@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – AI graditelj aplikacija bez koda za osnivače i startupove",
-      "description": "GYSM je AI graditelj aplikacija bez koda: opišite aplikaciju koju želite na običnom jeziku i dobijte pravu, funkcionalnu full-stack web aplikaciju — s autentifikacijom, bazom podataka i plaćanjima — bez potrebe za programiranjem."
+      "description": "GYSM je AI graditelj aplikacija bez koda: opišite aplikaciju koju želite na običnom jeziku i dobijte funkcionalnu web aplikaciju s pregledom uživo, prikazom koda i javnom poveznicom. Povežite vlastiti Supabase projekt za pravu registraciju i podatke."
     },
     "nav": {
       "startBuilding": "Počni graditi",
@@ -14,7 +14,7 @@
       "titleHighlight": "PROIZVODA",
       "titleLine2": "LANSIRAJ DANAS",
       "tagline": "[mogao bi biti sljedeći web mogul]",
-      "subtitle": "AI tvornica bez koda. Od upita do proizvoda. Autentifikacija, baza podataka, plaćanja, pregled uživo — objavi.",
+      "subtitle": "AI tvornica bez koda. Od upita do proizvoda. Pregled uživo, prikaz koda, objavi.",
       "placeholder": "Opiši aplikaciju koju želiš izgraditi…",
       "cta": "Generiraj moju aplikaciju",
       "ctaLoading": "Trenutak…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "Uzmemo tvoju ideju i",
       "title": "Udahnemo joj život.",
-      "subtitle": "Osn. 2024. — GYSM je AI graditelj aplikacija bez koda. Od upita do proizvoda: autentifikacija, baza podataka i Stripe plaćanja uključeni, bez pisanja ijedne linije koda.",
+      "subtitle": "Osn. 2024. — GYSM je AI graditelj aplikacija bez koda. Od upita do proizvoda: pregled uživo, kod koji možete kopirati te prava registracija i podaci kada povežete vlastiti Supabase projekt.",
       "cta": "Pogledaj što je izgrađeno →"
     },
     "story": {
       "founders": {
         "title": "za osnivače.",
-        "sub": "od upita do proizvoda // autentifikacija, baza podataka, plaćanja, pregled uživo"
+        "sub": "od upita do proizvoda // pregled uživo, prikaz koda, objava"
       },
       "shippers": {
         "title": "za one koji objavljuju.",

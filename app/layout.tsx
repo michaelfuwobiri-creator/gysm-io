@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
   description:
-    "GYSM is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required.",
+    "GYSM is an AI no-code app builder: describe the app you want in plain English and get a working web app with a live preview, a code view and a public link. Connect your own Supabase project for real sign-up and data.",
   applicationName: "GYSM",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   // the SEO / AI-discoverability side of things.
   openGraph: {
     title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
-    description: "Describe the app you want. GYSM's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
+    description: "Describe the app you want. GYSM's AI no-code app builder generates a working web app in seconds -- no coding required.",
     url: siteUrl,
     siteName: "GYSM",
     type: "website",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "GYSM \u2013 AI No-Code App Builder for Founders & Startups",
-    description: "Describe the app you want. GYSM's AI no-code app builder generates a real, working full-stack app in seconds -- no coding required.",
+    description: "Describe the app you want. GYSM's AI no-code app builder generates a working web app in seconds -- no coding required.",
   },
 };
 
@@ -60,7 +60,7 @@ const organizationJsonLd = {
   url: siteUrl,
   logo: `${siteUrl}/icons/icon-512.png`,
   description:
-    "GYSM is an AI app builder: describe an app in plain English and get a real, working website with auth, payments, and a live preview.",
+    "GYSM is an AI app builder: describe an app in plain English and get a working web app with a live preview, a code view and a public link.",
   sameAs: [],
 };
 

@@ -3,7 +3,6 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { routing } from "@/i18n/routing";
-import JsonLd from "@/app/components/JsonLd";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -69,25 +68,6 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <JsonLd
-        data={{
-          "@context": "https://schema.org",
-          "@graph": [
-            { "@type": "Organization", "@id": `${siteUrl}/#organization`, name: "GYSM", url: siteUrl, logo: `${siteUrl}/favicon.png` },
-            { "@type": "WebSite", "@id": `${siteUrl}/#website`, name: "GYSM", url: siteUrl, publisher: { "@id": `${siteUrl}/#organization` } },
-            {
-              "@type": "SoftwareApplication",
-              name: "GYSM",
-              url: siteUrl,
-              applicationCategory: "DeveloperApplication",
-              operatingSystem: "Web",
-              description:
-                "GYSM is an AI app builder: describe an app in plain English and get a working web app back, with a live preview, a code view and a public shareable link.",
-              publisher: { "@id": `${siteUrl}/#organization` },
-            },
-          ],
-        }}
-      />
       {children}
     </NextIntlClientProvider>
   );

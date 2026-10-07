@@ -9,8 +9,7 @@ export default function PrivacyPage() {
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
           GYSM ("GYSM," "we," "us") is an AI app builder: you describe the app you want in plain
-          English and GYSM generates a real, working product with authentication, a database, and
-          Stripe payments already wired in. This policy explains what data we collect when you use
+          English and GYSM generates a working web app with a live preview and a code view. This policy explains what data we collect when you use
           gysm.io, why we collect it, how AI is involved, and how you can control it.
         </p>
 

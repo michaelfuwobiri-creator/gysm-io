@@ -4,7 +4,7 @@ import UseCaseLanding from "@/app/components/UseCaseLanding";
 export const metadata: Metadata = {
   title: "Build a SaaS App with AI — GYSM",
   description:
-    "Describe your SaaS idea and GYSM generates a real, working product — auth, a database, and Stripe subscriptions included. Ship an MVP without writing boilerplate.",
+    "Describe your SaaS idea and GYSM generates a working product with a live preview and code you can export. Connect your own Supabase project for real sign-up and data. Ship an MVP without writing boilerplate.",
   alternates: { canonical: "https://www.gysm.io/build/saas" },
 };
 
@@ -14,7 +14,7 @@ export default function Page() {
       badge="AI app builder for SaaS founders"
       headlineLead="Your SaaS MVP,"
       headlineHighlight="one prompt away."
-      subheadline="Skip the weeks of scaffolding. Describe what your SaaS does and GYSM generates a real product — auth, a database, and Stripe subscriptions, wired in from the first build."
+      subheadline="Skip the weeks of scaffolding. Describe what your SaaS does and GYSM generates a working product you can preview, copy and publish — with real sign-up and data when you connect your own Supabase project."
       examplePrompt="A project management SaaS for freelancers with client dashboards, task boards, and monthly subscription billing"
       promptPlaceholder="A project management SaaS for freelancers with client dashboards…"
       screenshot={{
@@ -23,8 +23,8 @@ export default function Page() {
         caption: "Describe it once. Get a real, working product — not a mockup.",
       }}
       points={[
-        { title: "Subscriptions from day one", body: "Every generated SaaS gets Stripe checkout and recurring billing wired in automatically — no separate payments integration to build." },
-        { title: "A real database, not a mock", body: "Your data model is generated alongside the UI, so the dashboards, forms, and tables you describe actually persist and work." },
+        { title: "Pricing and checkout screens", body: "Describe your plans and GYSM lays out the pricing page and upgrade flow. You connect your own payment provider to take real payments." },
+        { title: "Real data when you connect Supabase", body: "Connect your own Supabase project and the dashboards, forms and tables you describe read and write real data, with real sign-up and login. Without one, a build keeps its data in the page." },
         { title: "Export the code or keep iterating", body: "Copy the code out and self-host, or keep refining in the builder — GYSM doesn't lock your SaaS into a black box." },
       ]}
       proofScreenshot={{

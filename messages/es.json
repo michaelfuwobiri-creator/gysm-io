@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – Creador de aplicaciones sin código con IA para fundadores y startups",
-      "description": "GYSM es un creador de aplicaciones sin código con IA: describe la aplicación que quieres en lenguaje natural y obtén una aplicación web completa y funcional — con autenticación, base de datos y pagos incluidos — sin escribir una sola línea de código."
+      "description": "GYSM es un creador de aplicaciones sin código con IA: describe la aplicación que quieres en lenguaje natural y obtén una aplicación web funcional con vista previa en vivo, vista de código y enlace público. Conecta tu propio proyecto de Supabase para tener registro y datos reales."
     },
     "nav": {
       "startBuilding": "Empezar a crear",
@@ -14,7 +14,7 @@
       "titleHighlight": "PRODUCTO",
       "titleLine2": "LÁNZALO HOY",
       "tagline": "[podrías ser el próximo magnate de la web]",
-      "subtitle": "Fábrica de IA sin código. De la idea al producto. Autenticación, base de datos, pagos, vista previa en vivo — publica.",
+      "subtitle": "Fábrica de IA sin código. De la idea al producto. Vista previa en vivo, vista de código, publica.",
       "placeholder": "Describe la aplicación que quieres crear…",
       "cta": "Generar mi aplicación",
       "ctaLoading": "Un momento…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "Tomamos tu idea y le",
       "title": "Damos vida.",
-      "subtitle": "Fundada en 2024 — GYSM es un creador de aplicaciones sin código con IA. De la idea al producto: autenticación, base de datos y pagos con Stripe incluidos, sin escribir una sola línea de código.",
+      "subtitle": "Fundada en 2024 — GYSM es un creador de aplicaciones sin código con IA. De la idea al producto: vista previa en vivo, código que puedes copiar, y registro y datos reales cuando conectas tu propio proyecto de Supabase.",
       "cta": "Ver lo que se ha creado →"
     },
     "story": {
       "founders": {
         "title": "para los fundadores.",
-        "sub": "de la idea al producto // autenticación, base de datos, pagos, vista previa en vivo"
+        "sub": "de la idea al producto // vista previa en vivo, vista de código, publicar"
       },
       "shippers": {
         "title": "para quienes lanzan.",

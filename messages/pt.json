@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – Criador de aplicativos sem código com IA para fundadores e startups",
-      "description": "GYSM é um criador de aplicativos sem código com IA: descreva o aplicativo que você quer em linguagem simples e receba um aplicativo web completo e funcional — com autenticação, banco de dados e pagamentos incluídos — sem escrever uma linha de código."
+      "description": "GYSM é um criador de aplicativos sem código com IA: descreva o aplicativo que você quer em linguagem simples e receba um aplicativo web funcional com prévia ao vivo, visualização do código e link público. Conecte seu próprio projeto Supabase para ter cadastro e dados reais."
     },
     "nav": {
       "startBuilding": "Começar a criar",
@@ -14,7 +14,7 @@
       "titleHighlight": "PRODUTO",
       "titleLine2": "LANCE HOJE",
       "tagline": "[você pode ser o próximo magnata da web]",
-      "subtitle": "Fábrica de IA sem código. Do prompt ao produto. Autenticação, banco de dados, pagamentos, prévia ao vivo — publique.",
+      "subtitle": "Fábrica de IA sem código. Do prompt ao produto. Prévia ao vivo, visualização do código, publique.",
       "placeholder": "Descreva o aplicativo que você quer criar…",
       "cta": "Gerar meu aplicativo",
       "ctaLoading": "Um instante…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "Pegamos sua ideia e",
       "title": "Damos vida a ela.",
-      "subtitle": "Fundada em 2024 — GYSM é um criador de aplicativos sem código com IA. Do prompt ao produto: autenticação, banco de dados e pagamentos via Stripe incluídos, sem escrever uma linha de código.",
+      "subtitle": "Fundada em 2024 — GYSM é um criador de aplicativos sem código com IA. Do prompt ao produto: prévia ao vivo, código que você pode copiar, e cadastro e dados reais quando você conecta seu próprio projeto Supabase.",
       "cta": "Ver o que já foi criado →"
     },
     "story": {
       "founders": {
         "title": "para os fundadores.",
-        "sub": "do prompt ao produto // autenticação, banco de dados, pagamentos, prévia ao vivo"
+        "sub": "do prompt ao produto // prévia ao vivo, visualização do código, publicação"
       },
       "shippers": {
         "title": "para quem lança.",

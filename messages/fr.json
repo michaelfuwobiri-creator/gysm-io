@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – Créateur d'applications sans code par IA pour fondateurs et startups",
-      "description": "GYSM est un créateur d'applications sans code propulsé par l'IA : décrivez l'application que vous voulez en langage courant et obtenez une véritable application web complète — authentification, base de données et paiements inclus — sans écrire une ligne de code."
+      "description": "GYSM est un créateur d'applications sans code propulsé par l'IA : décrivez l'application que vous voulez en langage courant et obtenez une application web fonctionnelle avec aperçu en direct, vue du code et lien public. Connectez votre propre projet Supabase pour une vraie inscription et de vraies données."
     },
     "nav": {
       "startBuilding": "Commencer à créer",
@@ -14,7 +14,7 @@
       "titleHighlight": "PRODUIT",
       "titleLine2": "LANCÉ AUJOURD'HUI",
       "tagline": "[vous pourriez être le prochain magnat du web]",
-      "subtitle": "L'usine no-code par IA. Du prompt au produit. Authentification, base de données, paiements, aperçu en direct — publiez.",
+      "subtitle": "L'usine no-code par IA. Du prompt au produit. Aperçu en direct, vue du code, publiez.",
       "placeholder": "Décrivez l'application que vous voulez créer…",
       "cta": "Générer mon application",
       "ctaLoading": "Un instant…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "On prend votre idée et on lui",
       "title": "Donne vie.",
-      "subtitle": "Fondé en 2024 — GYSM est un créateur d'applications sans code par IA. Du prompt au produit : authentification, base de données et paiements Stripe inclus, sans écrire une seule ligne de code.",
+      "subtitle": "Fondé en 2024 — GYSM est un créateur d'applications sans code par IA. Du prompt au produit : aperçu en direct, code que vous pouvez copier, et inscription et données réelles quand vous connectez votre propre projet Supabase.",
       "cta": "Voir ce qui a été créé →"
     },
     "story": {
       "founders": {
         "title": "pour les fondateurs.",
-        "sub": "du prompt au produit // authentification, base de données, paiements, aperçu en direct"
+        "sub": "du prompt au produit // aperçu en direct, vue du code, publication"
       },
       "shippers": {
         "title": "pour ceux qui livrent.",

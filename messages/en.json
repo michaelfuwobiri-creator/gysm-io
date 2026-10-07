@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – AI No-Code App Builder for Founders & Startups",
-      "description": "GYSM is an AI no-code app builder: describe the app you want in plain English and get a real, working full-stack web app -- auth, database, and payments included -- with no coding required."
+      "description": "GYSM is an AI no-code app builder: describe the app you want in plain English and get a working web app with a live preview, a code view and a public link. Connect your own Supabase project for real sign-up and data."
     },
     "nav": {
       "startBuilding": "Start Building",
@@ -14,7 +14,7 @@
       "titleHighlight": "PRODUCT",
       "titleLine2": "SHIP TODAY",
       "tagline": "[you could be the next web mogul]",
-      "subtitle": "AI no-code factory. Prompt → product. Auth, database, payments, live preview — ship.",
+      "subtitle": "AI no-code factory. Prompt → product. Live preview, code view, publish.",
       "placeholder": "Describe the app you want to build…",
       "cta": "Generate my app",
       "ctaLoading": "One sec…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "We take your idea and",
       "title": "Give it life.",
-      "subtitle": "Est. 2024 — GYSM is an AI no-code app builder. From prompt to product: auth, database, and Stripe payments included, without writing a line of code.",
+      "subtitle": "Est. 2024 — GYSM is an AI no-code app builder. From prompt to product: live preview, code you can copy, and real sign-up and data when you connect your own Supabase project.",
       "cta": "See what's been built →"
     },
     "story": {
       "founders": {
         "title": "for the founders.",
-        "sub": "prompt to product // auth, database, payments, live preview"
+        "sub": "prompt to product // live preview, code view, publish"
       },
       "shippers": {
         "title": "for the shippers.",

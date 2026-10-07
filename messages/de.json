@@ -2,7 +2,7 @@
   "Home": {
     "meta": {
       "title": "GYSM – KI-No-Code-App-Builder für Gründer & Startups",
-      "description": "GYSM ist ein KI-No-Code-App-Builder: Beschreibe die App, die du willst, in normaler Sprache und erhalte eine echte, funktionierende Full-Stack-Web-App — inklusive Login, Datenbank und Zahlungen — ganz ohne Programmieren."
+      "description": "GYSM ist ein KI-No-Code-App-Builder: Beschreibe die App, die du willst, in normaler Sprache und erhalte eine funktionierende Web-App mit Live-Vorschau, Code-Ansicht und öffentlichem Link. Verbinde dein eigenes Supabase-Projekt für echte Anmeldung und Daten."
     },
     "nav": {
       "startBuilding": "Jetzt bauen",
@@ -14,7 +14,7 @@
       "titleHighlight": "PRODUKT",
       "titleLine2": "HEUTE STARTEN",
       "tagline": "[du könntest der nächste Web-Mogul sein]",
-      "subtitle": "KI-No-Code-Fabrik. Vom Prompt zum Produkt. Login, Datenbank, Zahlungen, Live-Vorschau — veröffentlichen.",
+      "subtitle": "KI-No-Code-Fabrik. Vom Prompt zum Produkt. Live-Vorschau, Code-Ansicht, veröffentlichen.",
       "placeholder": "Beschreibe die App, die du bauen willst…",
       "cta": "Meine App generieren",
       "ctaLoading": "Einen Moment…",
@@ -24,13 +24,13 @@
     "highlights": {
       "eyebrow": "Wir nehmen deine Idee und",
       "title": "Erwecken sie zum Leben.",
-      "subtitle": "Gegr. 2024 — GYSM ist ein KI-No-Code-App-Builder. Vom Prompt zum Produkt: inklusive Login, Datenbank und Stripe-Zahlungen, ohne eine einzige Zeile Code zu schreiben.",
+      "subtitle": "Gegr. 2024 — GYSM ist ein KI-No-Code-App-Builder. Vom Prompt zum Produkt: Live-Vorschau, kopierbarer Code sowie echte Anmeldung und Daten, wenn du dein eigenes Supabase-Projekt verbindest.",
       "cta": "Ansehen, was gebaut wurde →"
     },
     "story": {
       "founders": {
         "title": "für Gründer.",
-        "sub": "vom Prompt zum Produkt // Login, Datenbank, Zahlungen, Live-Vorschau"
+        "sub": "vom Prompt zum Produkt // Live-Vorschau, Code-Ansicht, Veröffentlichung"
       },
       "shippers": {
         "title": "für alle, die liefern.",

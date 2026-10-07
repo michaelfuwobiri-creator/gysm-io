@@ -9,8 +9,8 @@ export default function TermsPage() {
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
           These terms govern your use of GYSM ("GYSM," "we," "us"), an AI app
-          builder that turns a plain-English description into a real, working app with authentication,
-          a database, and Stripe payments included. By creating an account or using gysm.io, you agree
+          builder that turns a plain-English description into a working web app, with a live preview and a code view.
+          When you connect your own Supabase project, generated apps can use real sign-up and data. By creating an account or using gysm.io, you agree
           to these terms.
         </p>
 

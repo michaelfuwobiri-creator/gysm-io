@@ -6,8 +6,8 @@ export default function WelcomeEmail({ name }: { name: string | null }) {
     <EmailLayout preview="Welcome to GYSM -- describe an app, get a real one.">
       <Text style={headingStyle}>Welcome{name ? `, ${name}` : ""}.</Text>
       <Text style={textStyle}>
-        You&apos;re in. GYSM turns a plain-English description into a real, working app -- authentication,
-        a database, and payments already wired in. Describe what you want, and we&apos;ll build it.
+        You&apos;re in. GYSM turns a plain-English description into a working web app with a live preview and a code view.
+        Describe what you want, and we&apos;ll build it.
       </Text>
       <Button href="https://www.gysm.io/builder" style={buttonStyle}>
         Start building

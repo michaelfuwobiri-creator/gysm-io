@@ -107,7 +107,7 @@ export default function UseCaseLanding({
               Generate my app →
             </button>
           </div>
-          <div className="mt-3 text-[12px] text-black/40 font-medium">Live preview in seconds • auth, database, and payments included</div>
+          <div className="mt-3 text-[12px] text-black/40 font-medium">Live preview in seconds • connect your own Supabase for real auth and data</div>
         </div>
       </section>
 
