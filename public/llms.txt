@@ -12,6 +12,8 @@ GYSM uses a two-model AI pipeline (a structure/content pass followed by a visual
 - [BuildGuild](https://www.gysm.io/buildguild): a public gallery of apps other users have built and published with GYSM, open for comments and discussion.
 - [Roadmap](https://www.gysm.io/roadmap): what's planned, in progress, and shipped -- users can vote on what gets built next.
 - [Changelog](https://www.gysm.io/changelog): a real log of what's shipped recently.
+- [Best AI app builders compared](https://www.gysm.io/best-ai-app-builder): GYSM, Lovable, Bolt, v0, Base44 and Replit side by side, from each product's own pricing page, with GYSM's limits stated.
+- [Lovable alternative](https://www.gysm.io/alternatives/lovable), [Bolt alternative](https://www.gysm.io/alternatives/bolt), [Replit alternative](https://www.gysm.io/alternatives/replit): one-to-one comparisons.
 
 ## API access
 

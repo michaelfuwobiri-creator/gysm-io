@@ -22,6 +22,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Site directory (Product/Account/Company links moved off the homepage
     // footer here -- see app/links/page.tsx) -- not in any nav, so this is
     // its only path to being crawled/discovered.
+    { url: `${siteUrl}/best-ai-app-builder`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${siteUrl}/alternatives/lovable`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${siteUrl}/alternatives/bolt`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${siteUrl}/alternatives/replit`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${siteUrl}/links`, changeFrequency: "monthly", priority: 0.3 },
     // GYSM's own legal/support pages -- previously missing from this
     // sitemap entirely (only the separate "apps/orbit" sub-app's copies
