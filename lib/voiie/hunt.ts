@@ -62,7 +62,7 @@ async function collectCandidates(query: string, platforms: Platform[], placesQue
           // index dedupes on, same role @handle plays for Twitter/Threads.
           handle: b.placeId,
           platform: "places",
-          pain: `${b.category}, no website listed${b.rating ? ` (${b.rating}★ on Google)` : ""}`,
+          pain: `${b.category}, ${b.socialUrl ? `only a social page (${b.socialUrl}), no real website` : "no website listed"}${b.rating ? ` (${b.rating}★ on Google)` : ""}`,
           displayName: b.name,
           bio: b.address,
           contactPhone: b.phone,

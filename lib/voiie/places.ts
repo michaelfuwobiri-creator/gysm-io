@@ -19,6 +19,37 @@ export interface PlaceLead {
   phone: string | null;
   rating: number | null;
   category: string;
+  /** Set when the listing's "website" is just a social / link-in-bio /
+   *  free-page URL (e.g. their Facebook Page) rather than a real site. */
+  socialUrl: string | null;
+}
+
+// Hosts that mean "this business has no real website, just a profile":
+// a Facebook Page listed as the website is extremely common for small
+// local businesses and is as strong a buy signal as no website at all.
+const SOCIAL_ONLY_HOSTS = [
+  "facebook.com",
+  "fb.com",
+  "fb.me",
+  "instagram.com",
+  "linktr.ee",
+  "linktree.com",
+  "beacons.ai",
+  "tiktok.com",
+  "twitter.com",
+  "x.com",
+  "yelp.com",
+  "business.site", // Google's retired free Business Profile sites
+  "square.site",
+];
+
+export function isSocialOnlyUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+    return SOCIAL_ONLY_HOSTS.some((h) => host === h || host.endsWith("." + h));
+  } catch {
+    return false;
+  }
 }
 
 const FIELD_MASK = [
@@ -34,7 +65,8 @@ const FIELD_MASK = [
 /**
  * Searches for businesses matching `query` (e.g. "plumbers in Austin, TX"
  * -- a category + location works best, same as typing into Google Maps)
- * and returns only the ones with no websiteUri on file. Google simply
+ * and returns only the ones with no websiteUri on file (or only a social
+ * profile in its place). Google simply
  * omits that field when a business hasn't listed one, so "field absent"
  * is the actual signal -- there's no query syntax for "without a
  * website," the filtering happens here after the fetch.
@@ -79,7 +111,9 @@ export async function searchBusinessesWithoutWebsite(query: string, maxResults =
   };
 
   return (json.places ?? [])
-    .filter((p) => !p.websiteUri) // the actual "needs a website" filter
+    // The actual "needs a website" filter: no websiteUri at all, OR only a
+    // social / link-in-bio profile standing in for one.
+    .filter((p) => !p.websiteUri || isSocialOnlyUrl(p.websiteUri))
     .map((p) => ({
       placeId: p.id,
       name: p.displayName?.text ?? "Unknown business",
@@ -87,5 +121,6 @@ export async function searchBusinessesWithoutWebsite(query: string, maxResults =
       phone: p.internationalPhoneNumber ?? null,
       rating: p.rating ?? null,
       category: p.primaryTypeDisplayName?.text ?? "local business",
+      socialUrl: p.websiteUri && isSocialOnlyUrl(p.websiteUri) ? p.websiteUri : null,
     }));
 }
