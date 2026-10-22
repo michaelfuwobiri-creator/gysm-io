@@ -159,6 +159,7 @@ export async function toolDeploy(userId: string, args: any): Promise<ToolResult>
 
   // Wait for the build (up to ~100s; the turn has a 300s budget).
   let state: string = created.readyState || "QUEUED";
+  let aliases: string[] = Array.isArray(created.alias) ? created.alias : [];
   for (let i = 0; i < 25 && !["READY", "ERROR", "CANCELED"].includes(state); i++) {
     await new Promise((r) => setTimeout(r, 4000));
     const poll = await fetch(`https://api.vercel.com/v13/deployments/${created.id}?${cfg.qs}`, {
@@ -166,8 +167,13 @@ export async function toolDeploy(userId: string, args: any): Promise<ToolResult>
     });
     const info: any = await poll.json().catch(() => ({}));
     state = info?.readyState || state;
+    if (Array.isArray(info?.alias) && info.alias.length) aliases = info.alias;
   }
-  const url = `https://${created.url}`;
+  // The per-deployment URL sits behind Vercel's deployment protection by
+  // default; the project's production alias (<name>.vercel.app) is the
+  // public one, so prefer it.
+  const publicHost = aliases.find((a) => a === `${name}.vercel.app`) || aliases.find((a) => a.endsWith(".vercel.app") && !a.includes("-git-")) || created.url;
+  const url = `https://${publicHost}`;
   try {
     await sql`insert into agent_deployments (user_id, project, vercel_deployment_id, url, state) values (${userId}, ${project}, ${created.id}, ${url}, ${state})`;
   } catch {
