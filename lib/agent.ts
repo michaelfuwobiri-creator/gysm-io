@@ -3,6 +3,7 @@ import { chargeCredits } from "@/lib/credits";
 import {
   AGENT_CREDITS_PER_COMMAND,
   AGENT_CREDITS_PER_DEPLOY,
+  AGENT_CREDITS_LIGHT,
   AGENT_MODEL,
   agentCreditsForUsage,
 } from "@/lib/credits-constants";
@@ -27,7 +28,7 @@ export type AgentEvent =
   | { type: "text"; text: string }
   | { type: "tool"; toolCallId: string; name: string; summary: string }
   | { type: "tool_result"; toolCallId: string; name: string; ok: boolean; output: string }
-  | { type: "proposal"; toolCallId: string; name: string; summary: string; detail: string; risky: boolean }
+  | { type: "proposal"; toolCallId: string; name: string; summary: string; detail: string; risky: boolean; secretInput?: { label: string } }
   | { type: "declined"; toolCallId: string; name: string }
   | { type: "credits"; spent: number; balance: number }
   | { type: "state"; messages: ChatMessage[] }
@@ -39,6 +40,7 @@ function proposalDetail(name: string, args: any): string {
   if (name === "create_db_table") return String(args?.sql ?? "").slice(0, 6000);
   if (name === "run_command") return String(args?.cmd ?? "").slice(0, 2000);
   if (name === "deploy") return `Folder: ${String(args?.project ?? "")}`;
+  if (name === "set_env") return String(args?.purpose ?? "").slice(0, 300);
   return "";
 }
 
@@ -46,7 +48,7 @@ export async function runAgentTurn(opts: {
   userId: string;
   history: ChatMessage[];
   userText?: string;
-  decision?: { toolCallId: string; approve: boolean };
+  decision?: { toolCallId: string; approve: boolean; secret?: string };
   emit: (e: AgentEvent) => void;
 }): Promise<void> {
   const { userId, emit } = opts;
@@ -60,12 +62,13 @@ export async function runAgentTurn(opts: {
     balance = await chargeCredits(userId, credits);
   };
 
-  const run = async (id: string, name: string, args: any): Promise<string> => {
+  const run = async (id: string, name: string, args: any, secret?: string): Promise<string> => {
     emit({ type: "tool", toolCallId: id, name, summary: describeCall(name, args) });
-    const result = await executeTool(userId, name, args);
+    const result = await executeTool(userId, name, args, secret);
     if (result.creditsKind === "command") await charge(AGENT_CREDITS_PER_COMMAND);
     if (result.creditsKind === "deploy") await charge(AGENT_CREDITS_PER_DEPLOY);
     if (result.creditsKind === "db") await charge(AGENT_CREDITS_PER_COMMAND);
+    if (result.creditsKind === "light") await charge(AGENT_CREDITS_LIGHT);
     emit({ type: "tool_result", toolCallId: id, name, ok: result.ok, output: result.output.slice(0, RESULT_UI_MAX) });
     return result.output;
   };
@@ -77,7 +80,7 @@ export async function runAgentTurn(opts: {
     // Re-check on the server that this call really is one that needs
     // approval; anything else in a pending slot is just executed normally.
     if (opts.decision && opts.decision.toolCallId === pending.id && opts.decision.approve) {
-      resultText = await run(pending.id, pending.name, pending.args);
+      resultText = await run(pending.id, pending.name, pending.args, opts.decision.secret);
     } else {
       emit({ type: "declined", toolCallId: pending.id, name: pending.name });
       resultText = "The user declined this action. Do not retry it; ask what they'd like instead.";
@@ -131,6 +134,7 @@ export async function runAgentTurn(opts: {
           summary: describeCall(name, args),
           detail: proposalDetail(name, args),
           risky: name === "run_command" ? isRiskyCommand(String(args?.cmd ?? ""), args?.risky === true) : true,
+          ...(name === "set_env" ? { secretInput: { label: String(args?.key ?? "Value") } } : {}),
         });
         break; // wait for the user's decision
       }

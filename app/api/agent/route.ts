@@ -26,7 +26,13 @@ export async function POST(req: Request) {
   const userText = typeof body?.text === "string" ? body.text.trim().slice(0, 8000) : "";
   const decision =
     body?.decision && typeof body.decision.toolCallId === "string"
-      ? { toolCallId: body.decision.toolCallId as string, approve: body.decision.approve === true }
+      ? {
+          toolCallId: body.decision.toolCallId as string,
+          approve: body.decision.approve === true,
+          // Secrets (set_env values) travel only in this one request; they are
+          // never added to the conversation history sent to the model.
+          secret: typeof body.decision.secret === "string" ? body.decision.secret.slice(0, 4000) : undefined,
+        }
       : undefined;
 
   if (!userText && !decision) {

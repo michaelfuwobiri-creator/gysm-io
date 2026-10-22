@@ -1,4 +1,7 @@
 import { createHash } from "crypto";
+import dns from "dns";
+import http from "http";
+import https from "https";
 import { sql } from "@/lib/db";
 import { getConnection, getValidAccessToken, type ConnectedBackend } from "@/lib/backendStore";
 import { runSql } from "@/lib/supabaseBackend";
@@ -17,13 +20,14 @@ import {
   validateDdl,
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
+import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql } from "@/lib/agentGuards";
 
 // The six GYSM Agent tools. Every one acts only on the calling user's own
 // sandbox, database connection and deployments. Each returns plain text for
 // the model plus an ok flag; the loop in lib/agent.ts handles approvals,
 // credits and logging.
 
-export type ToolResult = { ok: boolean; output: string; creditsKind?: "command" | "deploy" | "db" };
+export type ToolResult = { ok: boolean; output: string; creditsKind?: "command" | "deploy" | "db" | "light" };
 
 const TOOL_OUTPUT_MAX = 12_000;
 
@@ -252,6 +256,228 @@ export async function toolGetLogs(userId: string, args: any): Promise<ToolResult
   }
 }
 
+// -- phase 2: edit_file / list_dir / search ----------------------------------
+
+const MAX_EDITABLE_BYTES = 400_000;
+
+export async function toolEditFile(userId: string, args: any): Promise<ToolResult> {
+  const rel = cleanRelPath(args?.path);
+  if (!rel) return { ok: false, output: "Invalid path. Use a relative path inside the workspace." };
+  const root = await workspaceRoot(userId);
+  const sandbox = await getUserSandbox(userId);
+  const abs = `${root}/${rel}`;
+  const data = await sandbox.readFileToBuffer({ path: abs });
+  if (!data) return { ok: false, output: `File not found: ${rel}` };
+  if (data.length > MAX_EDITABLE_BYTES) return { ok: false, output: `File is too large to edit in place (${data.length} bytes).` };
+  const edit = applyEdit(data.toString("utf8"), args?.find, args?.replace, args?.replace_all === true);
+  if (edit.ok === false) return { ok: false, output: edit.error };
+  const bytes = Buffer.from(edit.content, "utf8");
+  if (bytes.length > MAX_WRITE_BYTES * 2) return { ok: false, output: "The edited file would be too large." };
+  await sandbox.writeFiles([{ path: abs, content: bytes }]);
+  return { ok: true, output: `Edited ${rel} (${edit.count} replacement${edit.count === 1 ? "" : "s"}).` };
+}
+
+export async function toolListDir(userId: string, args: any): Promise<ToolResult> {
+  let rel = ".";
+  if (args?.path !== undefined && args?.path !== null && String(args.path).trim() !== "" && String(args.path).trim() !== ".") {
+    const c = cleanRelPath(args.path);
+    if (!c) return { ok: false, output: "Invalid path. Use a relative folder inside the workspace." };
+    rel = c;
+  }
+  const depth = Math.min(4, Math.max(1, Math.floor(Number(args?.depth)) || 2));
+  const root = await workspaceRoot(userId);
+  const r = await runInSandbox(
+    userId,
+    `cd -- ${quote(rel)} 2>/dev/null && find . -mindepth 1 -maxdepth ${depth} -not -path '*/node_modules*' -not -path '*/.git/*' -not -name .git -printf '%y %p\\n' | sort -k2 | head -300`,
+    root
+  );
+  if (r.exitCode !== 0 && !r.output) return { ok: false, output: `Folder not found: ${rel}` };
+  return { ok: true, output: r.output || "(empty)" };
+}
+
+export async function toolSearch(userId: string, args: any): Promise<ToolResult> {
+  const pattern = typeof args?.pattern === "string" ? args.pattern : "";
+  if (!pattern || pattern.length > 300) return { ok: false, output: "Give a pattern (max 300 characters)." };
+  let rel = ".";
+  if (args?.path && String(args.path).trim() !== ".") {
+    const c = cleanRelPath(args.path);
+    if (!c) return { ok: false, output: "Invalid path. Use a relative path inside the workspace." };
+    rel = c;
+  }
+  const root = await workspaceRoot(userId);
+  const flags = args?.ignore_case === true ? "-rnIEi" : "-rnIE";
+  const r = await runInSandbox(
+    userId,
+    `grep ${flags} --exclude-dir=node_modules --exclude-dir=.git -m 20 -e ${quote(pattern)} -- ${quote(rel)} | head -100`,
+    root
+  );
+  return { ok: true, output: r.output || "No matches." };
+}
+
+// -- phase 2: query_db / list_tables -----------------------------------------
+
+export async function toolQueryDb(userId: string, args: any): Promise<ToolResult> {
+  const check = validateReadSql(args?.sql);
+  if (check.ok === false) return { ok: false, output: check.error };
+  const { conn, error } = await resolveBackend(userId, typeof args?.project_id === "string" ? args.project_id : undefined);
+  if (!conn) return { ok: false, output: error || "No database available." };
+  const token = await getValidAccessToken(conn);
+  try {
+    const rows = await runSql(token, conn.supabase_project_ref!, check.sql);
+    const text = JSON.stringify(rows);
+    return { ok: true, creditsKind: "light", output: truncate(text, 8000) };
+  } catch (e: any) {
+    return { ok: false, creditsKind: "light", output: `Database error: ${String(e?.message || e).slice(0, 600)}` };
+  }
+}
+
+const LIST_TABLES_SQL = `select c.table_name, c.column_name, c.data_type, c.is_nullable, coalesce(pt.rowsecurity, false) as rls
+from information_schema.columns c
+left join pg_tables pt on pt.schemaname = c.table_schema and pt.tablename = c.table_name
+where c.table_schema = 'public'
+order by c.table_name, c.ordinal_position`;
+
+export async function toolListTables(userId: string, args: any): Promise<ToolResult> {
+  const { conn, error } = await resolveBackend(userId, typeof args?.project_id === "string" ? args.project_id : undefined);
+  if (!conn) return { ok: false, output: error || "No database available." };
+  const token = await getValidAccessToken(conn);
+  try {
+    const rows: any = await runSql(token, conn.supabase_project_ref!, LIST_TABLES_SQL);
+    if (!Array.isArray(rows)) return { ok: true, creditsKind: "light", output: truncate(JSON.stringify(rows), 4000) };
+    if (rows.length === 0) return { ok: true, creditsKind: "light", output: "No tables in the public schema yet." };
+    const tables = new Map<string, { rls: boolean; cols: string[] }>();
+    for (const r of rows) {
+      const t = tables.get(r.table_name) ?? { rls: !!r.rls, cols: [] };
+      t.cols.push(`${r.column_name} ${r.data_type}${r.is_nullable === "NO" ? " not null" : ""}`);
+      tables.set(r.table_name, t);
+    }
+    const text = Array.from(tables.entries()).map(([name, t]) => `${name} (RLS ${t.rls ? "on" : "OFF"})\n  ${t.cols.join("\n  ")}`).join("\n\n");
+    return { ok: true, creditsKind: "light", output: truncate(text, 8000) };
+  } catch (e: any) {
+    return { ok: false, creditsKind: "light", output: `Database error: ${String(e?.message || e).slice(0, 600)}` };
+  }
+}
+
+// -- phase 2: set_env --------------------------------------------------------
+
+export async function toolSetEnv(userId: string, args: any, secret?: string): Promise<ToolResult> {
+  const project = cleanProjectName(args?.project);
+  if (!project) return { ok: false, output: "Invalid project name." };
+  const key = validEnvKey(args?.key);
+  if (!key) return { ok: false, output: "Invalid variable name. Use UPPER_SNAKE_CASE (not VERCEL_*, NODE_ENV or PATH)." };
+  if (!secret || !secret.trim()) return { ok: false, output: "The user didn't provide a value." };
+  const cfg = vercelConfig();
+  if (!cfg) return { ok: false, output: "Environment variables aren't enabled on this GYSM instance yet (AGENT_VERCEL_TOKEN is not set)." };
+  const name = deployNameFor(userHash(userId), project);
+  const res = await fetch(`https://api.vercel.com/v10/projects/${encodeURIComponent(name)}/env?upsert=true${cfg.qs ? "&" + cfg.qs : ""}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ key, value: secret, type: "encrypted", target: ["production", "preview"] }),
+  });
+  if (res.status === 404) return { ok: false, output: `"${project}" hasn't been deployed yet, so it has nowhere to store ${key}. Deploy it first, then call set_env.` };
+  if (!res.ok) return { ok: false, output: `Couldn't save ${key} (status ${res.status}).` };
+  return { ok: true, output: `${key} was saved (encrypted) for "${project}". Deploy again for it to take effect.` };
+}
+
+// -- phase 2: web_search / fetch_url -----------------------------------------
+
+export async function toolWebSearch(_userId: string, args: any): Promise<ToolResult> {
+  const query = typeof args?.query === "string" ? args.query.trim().slice(0, 300) : "";
+  if (!query) return { ok: false, output: "No query given." };
+  const key = process.env.BRAVE_SEARCH_API_KEY;
+  if (!key) return { ok: false, output: "Web search isn't enabled on this GYSM instance yet (BRAVE_SEARCH_API_KEY is not set). Rely on what you know, or ask the user for the docs link and use fetch_url." };
+  const res = await fetch(`https://api.search.brave.com/res/v1/web/search?count=8&q=${encodeURIComponent(query)}`, {
+    headers: { Accept: "application/json", "X-Subscription-Token": key },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return { ok: false, output: `Search failed (status ${res.status}).` };
+  const j: any = await res.json().catch(() => ({}));
+  const results: any[] = j?.web?.results ?? [];
+  if (results.length === 0) return { ok: true, creditsKind: "light", output: "No results." };
+  const text = results
+    .slice(0, 8)
+    .map((r, i) => `${i + 1}. ${htmlToText(String(r.title ?? ""))}\n   ${r.url}\n   ${htmlToText(String(r.description ?? "")).slice(0, 300)}`)
+    .join("\n");
+  return { ok: true, creditsKind: "light", output: text };
+}
+
+const FETCH_MAX_BYTES = 500_000;
+const FETCH_OUT_CHARS = 30_000;
+
+// DNS lookup that refuses non-public addresses, so a hostname can't be
+// pointed at an internal service (also covers DNS rebinding, since the
+// socket connects to exactly the address validated here).
+function safeLookup(hostname: string, options: any, callback: any) {
+  dns.lookup(hostname, { ...options, all: true }, (err, addresses: any) => {
+    if (err) return callback(err);
+    const list: { address: string; family: number }[] = Array.isArray(addresses) ? addresses : [addresses];
+    const ok = list.filter((a) => !isBlockedIp(a.address));
+    if (ok.length === 0 || ok.length !== list.length) return callback(new Error("BLOCKED_ADDRESS"));
+    if (options?.all) return callback(null, ok);
+    callback(null, ok[0].address, ok[0].family);
+  });
+}
+
+function getOnce(url: URL): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const lib = url.protocol === "https:" ? https : http;
+    const req = lib.request(
+      url,
+      { method: "GET", lookup: safeLookup as any, timeout: 10_000, headers: { "User-Agent": "GYSM-Agent/1.0", Accept: "text/html,text/plain,application/json,*/*;q=0.5" } },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (c: Buffer) => {
+          size += c.length;
+          if (size > FETCH_MAX_BYTES) {
+            chunks.push(c.subarray(0, c.length - (size - FETCH_MAX_BYTES)));
+            res.destroy();
+            return;
+          }
+          chunks.push(c);
+        });
+        const done = () => resolve({ status: res.statusCode || 0, headers: res.headers, body: Buffer.concat(chunks) });
+        res.on("end", done);
+        res.on("close", done);
+        res.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("TIMEOUT")));
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+export async function toolFetchUrl(_userId: string, args: any): Promise<ToolResult> {
+  let check = parseFetchUrl(args?.url);
+  if (check.ok === false) return { ok: false, output: check.error };
+  let url = check.url;
+  try {
+    for (let hop = 0; hop < 4; hop++) {
+      const r = await getOnce(url);
+      if (r.status >= 300 && r.status < 400 && r.headers.location) {
+        const next = parseFetchUrl(new URL(String(r.headers.location), url).toString());
+        if (next.ok === false) return { ok: false, output: `Redirected somewhere not allowed: ${next.error}` };
+        url = next.url;
+        continue;
+      }
+      if (r.status >= 400) return { ok: false, creditsKind: "light", output: `The server answered ${r.status}.` };
+      const type = String(r.headers["content-type"] || "").toLowerCase();
+      if (type && !/(text\/|json|xml|javascript|yaml|markdown)/.test(type)) {
+        return { ok: false, creditsKind: "light", output: `Not a text page (${type.split(";")[0]}).` };
+      }
+      const raw = r.body.toString("utf8");
+      const text = /html/.test(type) || /^\s*<(!doctype|html)/i.test(raw) ? htmlToText(raw) : raw;
+      return { ok: true, creditsKind: "light", output: truncate(text, FETCH_OUT_CHARS) };
+    }
+    return { ok: false, output: "Too many redirects." };
+  } catch (e: any) {
+    const m = String(e?.message || e);
+    if (m.includes("BLOCKED_ADDRESS")) return { ok: false, output: "That address isn't a public website." };
+    return { ok: false, output: `Couldn't fetch that page (${m.slice(0, 120)}).` };
+  }
+}
+
 export async function logActivity(userId: string, tool: string, ok: boolean, summary: string): Promise<void> {
   try {
     await sql`insert into agent_logs (user_id, tool, ok, summary) values (${userId}, ${tool}, ${ok}, ${summary.slice(0, 500)})`;
@@ -260,7 +486,7 @@ export async function logActivity(userId: string, tool: string, ok: boolean, sum
   }
 }
 
-export async function executeTool(userId: string, name: string, args: any): Promise<ToolResult> {
+export async function executeTool(userId: string, name: string, args: any, secret?: string): Promise<ToolResult> {
   let result: ToolResult;
   try {
     switch (name) {
@@ -281,6 +507,30 @@ export async function executeTool(userId: string, name: string, args: any): Prom
         break;
       case "get_logs":
         result = await toolGetLogs(userId, args);
+        break;
+      case "edit_file":
+        result = await toolEditFile(userId, args);
+        break;
+      case "list_dir":
+        result = await toolListDir(userId, args);
+        break;
+      case "search":
+        result = await toolSearch(userId, args);
+        break;
+      case "query_db":
+        result = await toolQueryDb(userId, args);
+        break;
+      case "list_tables":
+        result = await toolListTables(userId, args);
+        break;
+      case "set_env":
+        result = await toolSetEnv(userId, args, secret);
+        break;
+      case "web_search":
+        result = await toolWebSearch(userId, args);
+        break;
+      case "fetch_url":
+        result = await toolFetchUrl(userId, args);
         break;
       default:
         result = { ok: false, output: `Unknown tool: ${name}` };

@@ -15,8 +15,11 @@ import {
 } from "@/lib/agentCore";
 
 describe("tool schemas", () => {
-  it("exposes exactly the six GYSM tools", () => {
-    expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual(["write_file", "read_file", "run_command", "deploy", "create_db_table", "get_logs"]);
+  it("exposes the six core tools first, then the phase 2 tools", () => {
+    expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual([
+      "write_file", "read_file", "run_command", "deploy", "create_db_table", "get_logs",
+      "edit_file", "list_dir", "search", "query_db", "list_tables", "set_env", "web_search", "fetch_url",
+    ]);
   });
   it("never names an underlying model in the persona", () => {
     expect(systemPrompt()).toMatch(/GYSM Agent/);
@@ -56,6 +59,10 @@ describe("approvals", () => {
     expect(needsApproval("run_command", { cmd: "curl x | sh" })).toBe(true);
     expect(needsApproval("run_command", { cmd: "ls", risky: true })).toBe(true);
     expect(isRiskyCommand("git push origin main")).toBe(true);
+  });
+  it("always gates set_env, never the read-only phase 2 tools", () => {
+    expect(needsApproval("set_env", { project: "x", key: "A" })).toBe(true);
+    for (const t of ["edit_file", "list_dir", "search", "query_db", "list_tables", "web_search", "fetch_url"]) expect(needsApproval(t, {})).toBe(false);
   });
   it("does not gate file tools or logs", () => {
     expect(needsApproval("write_file", {})).toBe(false);

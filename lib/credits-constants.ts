@@ -196,3 +196,5 @@ export const AGENT_CREDITS_PER_COMMAND = SHELL_CREDITS_PER_COMMAND;
 export const AGENT_CREDITS_PER_DEPLOY = 25;
 export const AGENT_MIN_BALANCE = SHELL_MIN_BALANCE_FOR_AI;
 export const AGENT_DEPLOYS_PER_DAY = 5;
+// Small flat charge for read-only lookups (database reads, web search/fetch).
+export const AGENT_CREDITS_LIGHT = 1;

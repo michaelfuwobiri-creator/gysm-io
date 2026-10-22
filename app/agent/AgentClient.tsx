@@ -18,6 +18,7 @@ type Item =
       summary: string;
       detail: string;
       risky: boolean;
+      secretLabel?: string;
       resolved?: "approved" | "declined";
     }
   | { id: string; kind: "note"; text: string; tone?: "error" | "muted" };
@@ -44,6 +45,14 @@ const TOOL_LABEL: Record<string, string> = {
   deploy: "Deploy",
   create_db_table: "Database schema",
   get_logs: "Logs",
+  edit_file: "Edit file",
+  list_dir: "List folder",
+  search: "Search files",
+  query_db: "Database query",
+  list_tables: "Database tables",
+  set_env: "Secret",
+  web_search: "Web search",
+  fetch_url: "Fetch page",
 };
 
 export default function AgentClient({ initialCredits, userKey }: { initialCredits: number; userKey: string }) {
@@ -53,6 +62,8 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [credits, setCredits] = useState(initialCredits);
+  // Secret values live only in this in-memory map: never saved, never added to the chat history.
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<unknown[]>([]);
   messagesRef.current = messages;
@@ -86,7 +97,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
   const push = useCallback((item: Item) => setItems((prev) => [...prev, item]), []);
 
   const send = useCallback(
-    async (body: { text?: string; decision?: { toolCallId: string; approve: boolean } }) => {
+    async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string } }) => {
       setBusy(true);
       try {
         const res = await fetch("/api/agent", {
@@ -112,7 +123,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
               prev.map((i) => (i.kind === "tool" && i.callId === e.toolCallId ? { ...i, running: false, ok: e.ok, output: e.output } : i))
             );
           else if (e.type === "proposal")
-            push({ id: uid(), kind: "proposal", callId: e.toolCallId, name: e.name, summary: e.summary, detail: e.detail, risky: e.risky });
+            push({ id: uid(), kind: "proposal", callId: e.toolCallId, name: e.name, summary: e.summary, detail: e.detail, risky: e.risky, secretLabel: e.secretInput?.label });
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
             if (e.balance || e.spent) setCredits(e.balance);
@@ -154,8 +165,14 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
 
   const decide = (item: Extract<Item, { kind: "proposal" }>, approve: boolean) => {
     if (busy) return;
+    const secret = item.secretLabel ? secrets[item.id] : undefined;
+    if (approve && item.secretLabel && !secret?.trim()) return;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
-    void send({ decision: { toolCallId: item.callId, approve } });
+    setSecrets((prev) => {
+      const { [item.id]: _drop, ...rest } = prev;
+      return rest;
+    });
+    void send({ decision: { toolCallId: item.callId, approve, secret } });
   };
 
   const reset = () => {
@@ -224,6 +241,16 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
                 <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{item.risky ? "Needs your approval" : "Approval"}</div>
                 <div style={{ fontWeight: 600, marginBottom: 6 }}>{item.summary}</div>
                 {item.detail && <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, maxHeight: 220, overflow: "auto", margin: "0 0 8px" }}>{item.detail}</pre>}
+                {item.secretLabel && !item.resolved && (
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    placeholder={`${item.secretLabel} (only you can see this)`}
+                    value={secrets[item.id] ?? ""}
+                    onChange={(e) => setSecrets((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    style={{ width: "100%", boxSizing: "border-box", marginBottom: 8, padding: 8, borderRadius: 8, border: "1px solid #8886", background: "none", color: "inherit" }}
+                  />
+                )}
                 {item.resolved ? (
                   <div style={{ fontSize: 13, opacity: 0.8 }}>{item.resolved === "approved" ? "Approved" : "Declined"}</div>
                 ) : (
@@ -272,7 +299,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
           Send
         </button>
       </form>
-      <div style={{ fontSize: 11, opacity: 0.6, paddingBottom: 8 }}>AI usage is billed in credits; each command costs 5, each deploy 25.</div>
+      <div style={{ fontSize: 11, opacity: 0.6, paddingBottom: 8 }}>AI usage is billed in credits; each command costs 5, each deploy 25, lookups 1.</div>
     </div>
   );
 }
