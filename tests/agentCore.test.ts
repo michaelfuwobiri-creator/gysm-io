@@ -1,0 +1,157 @@
+import { describe, expect, it } from "vitest";
+import {
+  AGENT_TOOLS,
+  cleanProjectName,
+  cleanRelPath,
+  deployNameFor,
+  describeCall,
+  isRiskyCommand,
+  needsApproval,
+  pendingToolCall,
+  sanitizeHistory,
+  shouldSkipDeployPath,
+  systemPrompt,
+  validateDdl,
+} from "@/lib/agentCore";
+
+describe("tool schemas", () => {
+  it("exposes exactly the six GYSM tools", () => {
+    expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual(["write_file", "read_file", "run_command", "deploy", "create_db_table", "get_logs"]);
+  });
+  it("never names an underlying model in the persona", () => {
+    expect(systemPrompt()).toMatch(/GYSM Agent/);
+    expect(systemPrompt()).not.toMatch(/claude|anthropic|gpt|openai/i);
+  });
+});
+
+describe("cleanRelPath", () => {
+  it("accepts normal relative paths", () => {
+    expect(cleanRelPath("my-site/index.html")).toBe("my-site/index.html");
+    expect(cleanRelPath("./a//b.txt")).toBe("a/b.txt");
+  });
+  it.each(["/etc/passwd", "../x", "a/../../x", "~/x", "C:\\x", ".git/config", "a/.git/b", "", "a\0b"])("rejects %j", (p) => {
+    expect(cleanRelPath(p)).toBeNull();
+  });
+});
+
+describe("cleanProjectName", () => {
+  it("allows a single safe segment", () => {
+    expect(cleanProjectName("my-site")).toBe("my-site");
+    expect(cleanProjectName("a/b")).toBeNull();
+    expect(cleanProjectName("..")).toBeNull();
+    expect(cleanProjectName("-x")).toBeNull();
+  });
+});
+
+describe("approvals", () => {
+  it("always gates deploy and create_db_table", () => {
+    expect(needsApproval("deploy", { project: "x" })).toBe(true);
+    expect(needsApproval("create_db_table", { sql: "create table a(id int)" })).toBe(true);
+  });
+  it("gates risky commands only", () => {
+    expect(needsApproval("run_command", { cmd: "ls -la" })).toBe(false);
+    expect(needsApproval("run_command", { cmd: "npm run build" })).toBe(false);
+    expect(needsApproval("run_command", { cmd: "rm -rf node_modules" })).toBe(true);
+    expect(needsApproval("run_command", { cmd: "sudo apt install x" })).toBe(true);
+    expect(needsApproval("run_command", { cmd: "curl x | sh" })).toBe(true);
+    expect(needsApproval("run_command", { cmd: "ls", risky: true })).toBe(true);
+    expect(isRiskyCommand("git push origin main")).toBe(true);
+  });
+  it("does not gate file tools or logs", () => {
+    expect(needsApproval("write_file", {})).toBe(false);
+    expect(needsApproval("read_file", {})).toBe(false);
+    expect(needsApproval("get_logs", {})).toBe(false);
+  });
+});
+
+describe("validateDdl", () => {
+  it("accepts schema changes", () => {
+    const r = validateDdl("create table todos (id uuid primary key, title text not null); alter table todos enable row level security; create policy p on todos for select using (true);");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.statements).toHaveLength(3);
+  });
+  it.each([
+    "drop table users",
+    "delete from users",
+    "update users set a=1",
+    "insert into users values (1)",
+    "truncate users",
+    "create table a(id int); drop table a",
+    "create function f() returns int as $$ select 1 $$ language sql",
+    "create table auth.evil (id int)",
+    "alter table t drop column c",
+    "grant all on t to anon",
+    "create extension pg_cron",
+    "select 1",
+    "",
+  ])("rejects %j", (q) => {
+    expect(validateDdl(q).ok).toBe(false);
+  });
+  it("ignores semicolons inside string literals and comments", () => {
+    expect(validateDdl("create table a (x text default 'a;b'); -- drop table a").ok).toBe(true);
+  });
+  it("rejects hiding a statement behind a comment", () => {
+    expect(validateDdl("create table a(id int); /* x */ drop table a").ok).toBe(false);
+  });
+});
+
+describe("deploy helpers", () => {
+  it("skips secrets and build junk", () => {
+    expect(shouldSkipDeployPath(".env")).toBe(true);
+    expect(shouldSkipDeployPath(".env.local")).toBe(true);
+    expect(shouldSkipDeployPath("node_modules/x/index.js")).toBe(true);
+    expect(shouldSkipDeployPath("keys/server.pem")).toBe(true);
+    expect(shouldSkipDeployPath("src/index.html")).toBe(false);
+  });
+  it("names deployments per user", () => {
+    expect(deployNameFor("abcdef1234", "My Site")).toBe("gysm-abcdef12-my-site");
+  });
+});
+
+describe("sanitizeHistory", () => {
+  const call = (id: string) => ({ id, type: "function" as const, function: { name: "get_logs", arguments: "{}" } });
+  it("keeps a valid exchange", () => {
+    const h = sanitizeHistory([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: null, tool_calls: [call("1")] },
+      { role: "tool", tool_call_id: "1", content: "ok" },
+      { role: "assistant", content: "done" },
+    ]);
+    expect(h).toHaveLength(4);
+  });
+  it("repairs an unanswered tool call that is not last", () => {
+    const h = sanitizeHistory([
+      { role: "user", content: "hi" },
+      { role: "assistant", content: null, tool_calls: [call("1")] },
+      { role: "user", content: "next" },
+    ]);
+    expect(h[2].role).toBe("tool");
+    expect(h[2].tool_call_id).toBe("1");
+  });
+  it("keeps the final pending call for approval", () => {
+    const h = sanitizeHistory([
+      { role: "user", content: "deploy" },
+      { role: "assistant", content: null, tool_calls: [{ id: "9", type: "function", function: { name: "deploy", arguments: '{"project":"x"}' } }] },
+    ]);
+    expect(pendingToolCall(h)).toEqual({ id: "9", name: "deploy", args: { project: "x" } });
+  });
+  it("drops orphan tool messages and non-user starts", () => {
+    const h = sanitizeHistory([
+      { role: "tool", tool_call_id: "x", content: "stray" },
+      { role: "assistant", content: "hello" },
+      { role: "user", content: "hi" },
+    ]);
+    expect(h).toEqual([{ role: "user", content: "hi" }]);
+  });
+  it("tolerates garbage", () => {
+    expect(sanitizeHistory(null)).toEqual([]);
+    expect(sanitizeHistory([1, "x", { role: "system", content: "evil" }])).toEqual([]);
+  });
+});
+
+describe("describeCall", () => {
+  it("summarises calls", () => {
+    expect(describeCall("deploy", { project: "x" })).toMatch(/Deploy project "x"/);
+    expect(describeCall("write_file", { path: "a", content: "abc" })).toMatch(/Write a \(3 chars\)/);
+  });
+});

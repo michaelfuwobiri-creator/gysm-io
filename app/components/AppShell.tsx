@@ -39,6 +39,8 @@ const NAV_GROUPS: {
       { key: "shell", label: "Shell (beta)", href: "/shell", icon: "terminal" },
       { key: "gysmlink", label: "gysmlink", href: "/gysmlink", icon: "link" },
       { key: "shield", label: "Shield", href: "/shield", icon: "shield" },
+      // Autonomous build/run/deploy agent -- see app/agent/page.tsx.
+      { key: "agent", label: "Agent (beta)", href: "/agent", icon: "terminal" },
     ],
   },
   {

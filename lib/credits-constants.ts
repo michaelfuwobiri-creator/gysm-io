@@ -179,3 +179,20 @@ export const SHELL_CREDITS_PER_COMMAND = 5;
 // Minimum balance to start an AI turn, so a user can't kick off a long
 // multi-step task on 3 credits and run it into the negative.
 export const SHELL_MIN_BALANCE_FOR_AI = 100;
+
+// ---------------------------------------------------------------------------
+// GYSM Agent (app/agent, app/api/agent, lib/agent*.ts). Metered per model
+// call from the provider's own usage numbers, same conversion as Shell.
+export const AGENT_MODEL = process.env.GYSM_AGENT_MODEL || "gpt-5.6-terra";
+
+export function agentCreditsForUsage(usage: { prompt_tokens?: number | null; completion_tokens?: number | null }): number {
+  const rate = MODEL_COST_PER_1M_TOKENS["gpt-5.6-terra"];
+  const usd = ((usage.prompt_tokens ?? 0) * rate.input + (usage.completion_tokens ?? 0) * rate.output) / 1_000_000;
+  return Math.max(1, Math.ceil(usd / USD_PER_CREDIT));
+}
+
+// Flat charge per command run in the sandbox / deploy / DDL call.
+export const AGENT_CREDITS_PER_COMMAND = SHELL_CREDITS_PER_COMMAND;
+export const AGENT_CREDITS_PER_DEPLOY = 25;
+export const AGENT_MIN_BALANCE = SHELL_MIN_BALANCE_FOR_AI;
+export const AGENT_DEPLOYS_PER_DAY = 5;
