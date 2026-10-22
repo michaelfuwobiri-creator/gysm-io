@@ -37,8 +37,6 @@ const NAV_GROUPS: {
       { key: "builder-blocks", label: "Blocks (beta)", href: "/builder-blocks", icon: "blocks" },
       // AI-first cloud terminal -- see app/shell/page.tsx.
       { key: "shell", label: "Shell (beta)", href: "/shell", icon: "terminal" },
-      { key: "gysmlink", label: "gysmlink", href: "/gysmlink", icon: "link" },
-      { key: "shield", label: "Shield", href: "/shield", icon: "shield" },
       // Autonomous build/run/deploy agent -- see app/agent/page.tsx.
       { key: "agent", label: "Agent (beta)", href: "/agent", icon: "terminal" },
     ],
