@@ -1,3 +1,4 @@
+import ReportBuildButton from "./ReportBuildButton";
 import { sql } from "@/lib/db";
 import CommentSection from "./CommentSection";
 import ShareButton from "@/app/components/ShareButton";
@@ -105,6 +106,7 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
                 Published by {app.publisher_name || "a GYSM builder"} on{" "}
                 {new Date(app.published_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
                 {" · "}{app.views || 0} views
+                {" · "}<ReportBuildButton projectId={app.id} />
               </p>
             </div>
             <div className="shrink-0 flex items-center gap-2">

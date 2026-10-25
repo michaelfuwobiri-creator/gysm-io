@@ -23,6 +23,34 @@ type Comment = {
 export default function CommentSection({ projectId }: { projectId: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [note, setNote] = useState("");
+
+  // Guideline 1.2: report objectionable comments, and block abusive users.
+  async function reportComment(id: string) {
+    const reason = window.prompt("What's wrong with this comment? (optional)") ?? null;
+    if (reason === null) return;
+    const res = await fetch("/api/reports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "comment", targetId: id, reason }),
+    });
+    setNote(res.ok ? "Thanks. We'll review this report within 24 hours." : res.status === 401 ? "Sign in to report content." : "Couldn't submit the report.");
+  }
+
+  async function blockAuthor(id: string) {
+    if (!window.confirm("Block this user? You won't see their comments any more.")) return;
+    const res = await fetch("/api/blocks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commentId: id }),
+    });
+    if (res.ok) {
+      setComments((prev) => prev.filter((c) => c.id !== id));
+      setNote("User blocked.");
+    } else {
+      setNote(res.status === 401 ? "Sign in to block users." : "Couldn't block this user.");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -59,10 +87,16 @@ export default function CommentSection({ projectId }: { projectId: string }) {
                 </span>
               </div>
               <p className="mt-0.5 opacity-70 leading-relaxed whitespace-pre-wrap break-words">{c.body}</p>
+              <div className="mt-1 flex gap-3 text-[11px] opacity-40">
+                <button onClick={() => reportComment(c.id)} className="hover:opacity-100 underline">Report</button>
+                <button onClick={() => blockAuthor(c.id)} className="hover:opacity-100 underline">Block user</button>
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {note && <p className="mt-3 text-[12px] text-black/60">{note}</p>}
 
       <div className="mt-4 pt-4 border-t border-black/5">
         <CommentComposer projectId={projectId} onPosted={(c) => setComments((prev) => [...prev, c])} />

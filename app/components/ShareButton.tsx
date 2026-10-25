@@ -49,7 +49,14 @@ export default function ShareButton({ url, title, variant = "dark", dropUp = fal
   return (
     <div ref={ref} className={`relative inline-block ${className}`}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Use the system share sheet where available (iOS app / mobile).
+          if (typeof navigator !== "undefined" && typeof (navigator as any).share === "function") {
+            (navigator as any).share({ title, text: `${title} — built with GYSM`, url }).catch(() => {});
+            return;
+          }
+          setOpen((v) => !v);
+        }}
         className={
           (isDark
             ? "border border-white/15 text-white/80 hover:bg-white/10"

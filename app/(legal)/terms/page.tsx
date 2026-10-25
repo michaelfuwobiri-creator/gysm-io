@@ -48,7 +48,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">BuildGuild</h2>
-          <p>Publishing a build to BuildGuild makes it publicly visible and open to comments from other users. You&apos;re responsible for anything you choose to publish there and can unpublish it at any time from your dashboard.</p>
+          <p>Publishing a build to BuildGuild makes it publicly visible and open to comments from other users. You&apos;re responsible for anything you choose to publish there and can unpublish it at any time from your dashboard. There is zero tolerance for objectionable content (hateful, abusive, sexually explicit, or illegal material). You can report any comment or build and block any user from BuildGuild; we review reports within 24 hours, remove violating content, and suspend repeat offenders. Contact support@gysm.io.</p>
         </section>
 
         <section>

@@ -9,18 +9,35 @@ import { sql } from "@/lib/db";
 // on a private/unpublished build by guessing its id.
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const viewer = await getUser();
     const project = await sql`select id from projects where id = ${params.id} and is_public = true limit 1`;
     if (project.length === 0) {
       return Response.json({ error: "Build not found." }, { status: 404 });
     }
 
-    const comments = await sql`
-      select id, author_name, body, created_at
-      from comments
-      where project_id = ${params.id}
-      order by created_at asc
-      limit 500
-    `;
+    // Hide comments from users the viewer has blocked (Guideline 1.2). If the
+    // moderation tables aren't migrated yet, fall back to the unfiltered list.
+    let comments;
+    try {
+      comments = await sql`
+        select id, author_name, body, created_at
+        from comments
+        where project_id = ${params.id}
+          and (${viewer?.id ?? null}::text is null
+               or user_id is null
+               or user_id not in (select blocked_id from user_blocks where blocker_id = ${viewer?.id ?? null}::text))
+        order by created_at asc
+        limit 500
+      `;
+    } catch {
+      comments = await sql`
+        select id, author_name, body, created_at
+        from comments
+        where project_id = ${params.id}
+        order by created_at asc
+        limit 500
+      `;
+    }
     return Response.json({ comments });
   } catch (error: any) {
     console.error("[comments] failed to load comments:", error.message);
@@ -44,6 +61,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (!body) {
     return Response.json({ error: "Comment can't be empty." }, { status: 400 });
+  }
+  if (/\b(n[i1]gg(er|a)s?|f[a4]gg?ot|k[i1]ke|ch[i1]nk|retard(ed)?)\b/i.test(body)) {
+    return Response.json({ error: "That comment breaks the community rules and can't be posted." }, { status: 400 });
   }
 
   try {

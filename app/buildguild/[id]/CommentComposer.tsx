@@ -68,6 +68,10 @@ export default function CommentComposer({
         className="w-full text-[13px] rounded-[12px] border border-black/10 p-3 resize-none focus:outline-none focus:border-black/30"
       />
       {error && <p className="text-[12px] text-red-600">{error}</p>}
+      <p className="text-[11px] opacity-40">
+        By posting you agree to our <a href="/terms" className="underline">Terms</a>. No abusive, hateful or
+        explicit content; we remove it within 24 hours of a report and ban repeat offenders.
+      </p>
       <button
         onClick={submit}
         disabled={!draft.trim() || posting}
