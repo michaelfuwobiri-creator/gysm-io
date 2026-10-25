@@ -1,0 +1,110 @@
+# Codemagic CI/CD for the GYSM iOS app (Capacitor shell, bundle id io.gysm.app).
+#
+# One-time setup in the Codemagic dashboard (see docs/codemagic-ios-setup.md):
+#   1. Add this repo as an application.
+#   2. Teams -> Integrations -> Developer Portal -> add an App Store Connect API key
+#      and name it exactly:  gysm_asc   (the key stays inside Codemagic).
+#   3. Create an environment variable group named  gysm_ios  with:
+#        APP_STORE_APPLE_ID   numeric Apple ID of the app in App Store Connect
+#                             (App Store Connect -> App -> App Information -> Apple ID)
+#
+# Workflows:
+#   ios-testflight   build + upload to TestFlight (run this first)
+#   ios-release      build + upload + submit for App Store review
+#                    (run only after the App Store listing, IAPs and screenshots are complete)
+
+definitions:
+  instance: &instance
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+  environment: &environment
+    groups:
+      - gysm_ios
+    node: 22
+    xcode: latest
+    cocoapods: default
+    vars:
+      BUNDLE_ID: "io.gysm.app"
+      XCODE_PROJECT: "ios/App/App.xcodeproj"
+      XCODE_SCHEME: "App"
+  scripts:
+    - &install_js
+      name: Install JS dependencies
+      script: npm ci
+    - &cap_sync
+      name: Sync Capacitor iOS project
+      script: npx cap sync ios
+    - &set_signing
+      name: Apply App Store signing profile to the Xcode project
+      script: xcode-project use-profiles
+    - &set_build_number
+      name: Set build number from the latest App Store Connect build
+      script: |
+        LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+        LATEST=${LATEST:-0}
+        NEXT=$((LATEST + 1))
+        echo "Latest build: $LATEST -> using $NEXT"
+        cd ios/App
+        agvtool new-version -all "$NEXT"
+    - &build_ipa
+      name: Build signed .ipa
+      script: |
+        xcode-project build-ipa \
+          --project "$XCODE_PROJECT" \
+          --scheme "$XCODE_SCHEME"
+  artifacts: &artifacts
+    - build/ios/ipa/*.ipa
+    - /tmp/xcodebuild_logs/*.log
+    - $HOME/Library/MobileDevice/Provisioning Profiles/*.mobileprovision
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    <<: *instance
+    integrations:
+      app_store_connect: gysm_asc
+    environment:
+      <<: *environment
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.gysm.app
+    triggering:
+      events: []   # manual only: click "Start new build"
+    scripts:
+      - *install_js
+      - *cap_sync
+      - *set_signing
+      - *set_build_number
+      - *build_ipa
+    artifacts: *artifacts
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
+
+  ios-release:
+    name: iOS → App Store review
+    <<: *instance
+    integrations:
+      app_store_connect: gysm_asc
+    environment:
+      <<: *environment
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.gysm.app
+    triggering:
+      events: []
+    scripts:
+      - *install_js
+      - *cap_sync
+      - *set_signing
+      - *set_build_number
+      - *build_ipa
+    artifacts: *artifacts
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: true
+        release_type: MANUAL   # approved build waits until you press Release

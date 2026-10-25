@@ -62,3 +62,14 @@ export async function purchasePlanNative(plan: PricingPlan, clerkUserId: string)
   const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
   return customerInfo;
 }
+
+/**
+ * Restore Purchases (required by App Store Guideline 3.1.1 for any app
+ * that sells subscriptions). Re-syncs the user's StoreKit receipts with
+ * RevenueCat; RevenueCat then calls /api/billing/iap-webhook as usual.
+ */
+export async function restorePurchasesNative(clerkUserId: string) {
+  const Purchases = await ensureConfigured(clerkUserId);
+  const { customerInfo } = await Purchases.restorePurchases();
+  return customerInfo;
+}
