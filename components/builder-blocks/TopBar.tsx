@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useBuilderBlocksStore } from "@/store/builderBlocksStore";
 import { generateHtml } from "@/lib/builderBlocks/codeGenerator";
+import { generateLiquid, sectionHandle } from "@/lib/builderBlocks/liquidGenerator";
 
 // Heavy editor, loaded only when the Code modal actually opens -- no
 // reason to ship Monaco's bundle to every visitor of the canvas.
@@ -18,6 +19,8 @@ export default function TopBar() {
   const [error, setError] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [codeTab, setCodeTab] = useState<"html" | "liquid">("html");
+  const [copied, setCopied] = useState(false);
 
   async function save(): Promise<string | null> {
     setSaving(true);
@@ -58,6 +61,25 @@ export default function TopBar() {
   }
 
   const code = generateHtml(blocks, projectName);
+  const liquid = generateLiquid(blocks, projectName);
+  const shown = codeTab === "liquid" ? liquid : code;
+
+  function copyCode() {
+    navigator.clipboard.writeText(shown).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  function downloadCode() {
+    const isLiquid = codeTab === "liquid";
+    const blob = new Blob([shown], { type: isLiquid ? "text/plain" : "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = isLiquid ? `${sectionHandle(projectName)}.liquid` : "index.html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   return (
     <>
@@ -100,13 +122,31 @@ export default function TopBar() {
         <div className="fixed inset-0 z-[200] bg-black/60 grid place-items-center p-6" onClick={() => setShowCode(false)}>
           <div className="w-full max-w-[900px] h-[80vh] bg-[#1e1e1e] rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="h-11 flex items-center justify-between px-4 border-b border-white/10">
-              <span className="text-[12px] font-bold text-white/60">Generated code (read-only)</span>
-              <button onClick={() => setShowCode(false)} className="text-[12px] font-semibold text-white/60 hover:text-white">Close</button>
+              <div className="flex items-center gap-1">
+                {(["html", "liquid"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setCodeTab(t)}
+                    className={
+                      "text-[12px] font-bold px-3 py-1 rounded-full " +
+                      (codeTab === t ? "bg-white text-black" : "text-white/60 hover:text-white")
+                    }
+                  >
+                    {t === "html" ? "HTML" : "Shopify Liquid"}
+                  </button>
+                ))}
+                <span className="ml-2 text-[11px] text-white/40">read-only</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={copyCode} className="text-[12px] font-semibold text-white/60 hover:text-white">{copied ? "Copied" : "Copy"}</button>
+                <button onClick={downloadCode} className="text-[12px] font-semibold text-white/60 hover:text-white">Download</button>
+                <button onClick={() => setShowCode(false)} className="text-[12px] font-semibold text-white/60 hover:text-white">Close</button>
+              </div>
             </div>
             <MonacoEditor
               height="calc(80vh - 44px)"
-              defaultLanguage="html"
-              value={code}
+              language="html"
+              value={shown}
               theme="vs-dark"
               options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13 }}
             />
