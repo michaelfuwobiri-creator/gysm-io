@@ -7,8 +7,8 @@ GYSM uses a two-model AI pipeline (a structure/content pass followed by a visual
 ## Product
 
 - [Homepage](https://www.gysm.io/): what GYSM is, pricing, real apps built on the platform, testimonials.
-- [Pricing](https://www.gysm.io/pricing): credit packs and subscription plans.
-- [Builder](https://www.gysm.io/builder): the app-generation tool itself (requires a free account).
+- [Pricing](https://www.gysm.io/pricing): one plan, EUR 20 a month, with usage that resets every 5 hours plus a weekly limit.
+- [Builder](https://www.gysm.io/agent): the GYSM Agent, which builds, previews and publishes sites to name.gysm.io (requires a subscription).
 - [BuildGuild](https://www.gysm.io/buildguild): a public gallery of apps other users have built and published with GYSM, open for comments and discussion.
 - [Roadmap](https://www.gysm.io/roadmap): what's planned, in progress, and shipped -- users can vote on what gets built next.
 - [Changelog](https://www.gysm.io/changelog): a real log of what's shipped recently.
@@ -17,7 +17,7 @@ GYSM uses a two-model AI pipeline (a structure/content pass followed by a visual
 
 ## API access
 
-GYSM has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. An optional `"tier": "best"` field switches the generation model from the default fast tier to the flagship tier, for 2x the credit cost. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call costs the same credits as a build made in the builder UI and returns the generated app's HTML plus a public share URL.
+GYSM has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. An optional `"tier": "best"` field switches the generation model from the default fast tier to the flagship tier, which uses more of the plan's usage allowance. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call counts toward the account's plan usage, like a build made in the app, and returns the generated app's HTML plus a public share URL.
 
 ## Notable apps built with GYSM
 

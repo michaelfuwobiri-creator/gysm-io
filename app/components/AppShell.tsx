@@ -222,7 +222,7 @@ export default async function AppShell({
   children: React.ReactNode;
 }) {
   const user = await getUser();
-  const usage: UsageSummary = user ? await getUsageSummary(user.id) : { title: "Credits", value: "0", cta: { href: "/pricing", label: "Subscribe →" } };
+  const usage: UsageSummary = user ? await getUsageSummary(user.id) : { title: "Plan", value: "None", cta: { href: "/pricing", label: "Subscribe →" } };
   const displayName = user?.name || user?.email || "there";
   const initial = displayName.trim().charAt(0).toUpperCase() || "G";
 

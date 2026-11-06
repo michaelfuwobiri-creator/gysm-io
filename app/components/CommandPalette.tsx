@@ -18,7 +18,7 @@ type Action = { label: string; hint?: string; href?: string; run?: () => void; k
 // -- and can't collide with -- that in-builder search.
 const ACTIONS: Action[] = [
   { label: "Dashboard", href: "/dashboard", keywords: "home projects builds" },
-  { label: "New build", href: "/builder", keywords: "create ai prompt generate" },
+  { label: "New build", href: "/agent", keywords: "create ai prompt generate" },
   { label: "Lego Builder (beta)", href: "/builder-blocks", keywords: "drag drop blocks" },
   { label: "Shell (beta)", href: "/shell", keywords: "terminal command line linux bash cloud computer ai agent" },
   { label: "Templates", href: "/templates", keywords: "gallery starter" },
@@ -27,7 +27,7 @@ const ACTIONS: Action[] = [
   { label: "BuildGuild", href: "/buildguild", keywords: "community published apps" },
   { label: "Roadmap", href: "/roadmap", keywords: "planned shipped vote" },
   { label: "Feedback", href: "/feedback", keywords: "idea suggest request" },
-  { label: "Billing", href: "/billing", keywords: "plan subscription credits invoice" },
+  { label: "Billing", href: "/billing", keywords: "plan subscription usage invoice" },
   { label: "Pricing", href: "/pricing", keywords: "upgrade plans" },
   { label: "Team", href: "/team", keywords: "members invite organization" },
   { label: "API Keys", href: "/settings/api-keys", keywords: "developer token" },

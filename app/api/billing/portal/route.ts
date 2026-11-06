@@ -22,7 +22,7 @@ export async function POST(_req: NextRequest) {
     const customerId = (rows[0] as any)?.stripe_customer_id as string | undefined;
     if (!customerId) {
       return NextResponse.json(
-        { error: "No subscription to manage yet. Credit packs don't need billing management -- see /pricing to subscribe to a plan." },
+        { error: "No subscription to manage yet. See /pricing to subscribe." },
         { status: 404 }
       );
     }

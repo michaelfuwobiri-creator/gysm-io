@@ -60,7 +60,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       // the `user_id = ${user.id}` WHERE clause above.
       const message = result.error || "Generation failed.";
       await markFailed(row.id, user, row.credit_cost, row.kind, message);
-      return Response.json({ id: row.id, status: "failed", error: `${message} Your credits were refunded.` });
+      return Response.json({ id: row.id, status: "failed", error: `${message} It didn't count toward your usage.` });
     }
     return Response.json({ id: row.id, status: "processing" });
   } catch (error: any) {

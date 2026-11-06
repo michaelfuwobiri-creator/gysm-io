@@ -10,6 +10,6 @@ export default function AuthRedirect({
 }: {
   searchParams: { redirect?: string };
 }) {
-  const target = searchParams?.redirect || "/builder";
+  const target = searchParams?.redirect || "/agent";
   redirect(`/sign-in?redirect_url=${encodeURIComponent(target)}`);
 }

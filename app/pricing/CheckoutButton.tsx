@@ -46,7 +46,7 @@ export default function CheckoutButton({
 
         const { purchasePlanNative } = await import("@/lib/iap-client");
         await purchasePlanNative(plan, clerkUser.id);
-        router.push("/builder?success=true&source=iap");
+        router.push("/agent?subscribed=1");
         return;
       }
 

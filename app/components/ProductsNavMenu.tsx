@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 // app/dashboard/CardMenu.tsx.
 const PRODUCTS = [
   {
-    href: "/builder",
+    href: "/agent",
     label: "AI Builder",
     description: "Describe your app in plain English -- GYSM builds it.",
   },

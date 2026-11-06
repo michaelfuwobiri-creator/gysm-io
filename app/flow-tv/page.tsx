@@ -39,7 +39,7 @@ export default async function FlowTvPage() {
             <MobileNavMenu
               theme="dark"
               links={[
-                { href: "/builder", label: "AI Builder" },
+                { href: "/agent", label: "AI Builder" },
                 { href: "/builder-blocks", label: "Lego Builder", badge: "Beta" },
                 { href: "/buildguild", label: "BuildGuild" },
                 { href: "/templates", label: "Templates" },
@@ -49,7 +49,7 @@ export default async function FlowTvPage() {
               ]}
             />
             <a
-              href="/builder"
+              href="/agent"
               className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors"
             >
               Start Building

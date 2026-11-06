@@ -44,7 +44,7 @@ export default function Page({ params }: { params: { slug: string } }) {
 
   const rows: [string, string, string][] = [
     ["Pricing", gysmPriceSummary(), rival.pricing],
-    ["Usage allowance", "Credits per build; packs never expire", rival.allowance],
+    ["Usage allowance", "Usage that refills every 5 hours, with a weekly limit", rival.allowance],
     ["What you get", GYSM_FACTS.output, rival.listed.join("; ")],
     ["Code and Git", GYSM_FACTS.codeExport, rival.listed.find((l) => /git|code/i.test(l)) ?? "Not listed on its pricing page"],
     ["Backend and hosting", GYSM_FACTS.backend + ". " + GYSM_FACTS.hosting + ".", rival.listed.find((l) => /database|auth|hosting/i.test(l)) ?? "Not listed on its pricing page"],
@@ -109,7 +109,7 @@ export default function Page({ params }: { params: { slug: string } }) {
           <h2 className="text-[20px] font-black tracking-tight">Choose GYSM if</h2>
           <ul className="mt-3 list-disc pl-5 space-y-2 text-[15px] text-black/75">
             <li>You want to go from a plain-English description to a published, installable web app quickly.</li>
-            <li>You prefer paying for credits that never expire over a monthly subscription.</li>
+            <li>You want one simple plan with usage that refills every few hours.</li>
             <li>You want more than a builder: {GYSM_FACTS.extras}.</li>
           </ul>
         </section>

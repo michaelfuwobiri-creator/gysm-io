@@ -157,7 +157,5 @@ export async function getUsageSummary(userId: string): Promise<UsageSummary> {
     const u = await getPlanUsage(userId);
     return { title: "Usage", value: `${percentLeft(u)}% left`, cta: { href: "/billing", label: "View usage →" } };
   }
-  const { getCreditBalance } = await import("@/lib/credits");
-  const balance = await getCreditBalance(userId);
-  return { title: "Credits", value: String(balance), cta: { href: "/pricing", label: "Subscribe →" } };
+  return { title: "Plan", value: "None", cta: { href: "/pricing", label: "Subscribe →" } };
 }

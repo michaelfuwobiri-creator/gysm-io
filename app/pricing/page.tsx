@@ -19,7 +19,7 @@ const PricingBanners = dynamic(() => import("./PricingBanners"), { ssr: false })
 
 export const metadata: Metadata = {
   title: "Pricing | GYSM",
-  description: "Simple, transparent pricing for the GYSM AI website builder — pay as you go or subscribe monthly.",
+  description: "One simple plan for the GYSM AI website builder: €20 a month, cancel anytime.",
 };
 
 // Server Component reading straight from lib/stripe.ts PRICING_PLANS.
@@ -42,7 +42,7 @@ export default function PricingPage() {
     "@context": "https://schema.org",
     "@type": "Product",
     name: "GYSM AI App Builder",
-    description: "AI website/app builder credit packs and subscription plans.",
+    description: "The GYSM monthly plan for the AI website builder.",
     brand: { "@type": "Brand", name: "GYSM" },
     offers: monthly.map((p) => ({
       "@type": "Offer",
@@ -66,7 +66,7 @@ export default function PricingPage() {
           <a href="/" className="text-2xl font-black">
             GYSM
           </a>
-          <a href="/builder" className="text-[11px] opacity-50 hover:opacity-100">
+          <a href="/agent" className="text-[11px] opacity-50 hover:opacity-100">
             Back to builder
           </a>
         </div>

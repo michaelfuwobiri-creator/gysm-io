@@ -33,8 +33,8 @@ export default async function ApiKeysPage() {
           Generate real apps outside the builder UI --{" "}
           <code className="text-[12px] bg-black/5 px-1.5 py-0.5 rounded">POST /api/v1/generate</code> with{" "}
           <code className="text-[12px] bg-black/5 px-1.5 py-0.5 rounded">{"{\"prompt\": \"...\"}"}</code> and an{" "}
-          <code className="text-[12px] bg-black/5 px-1.5 py-0.5 rounded">Authorization: Bearer</code> header. Same
-          credit cost as a build in the UI.
+          <code className="text-[12px] bg-black/5 px-1.5 py-0.5 rounded">Authorization: Bearer</code> header. Calls
+          count toward your plan&apos;s usage, like a build in the app.
         </p>
         <ApiKeysClient initialKeys={keys} />
       </div>

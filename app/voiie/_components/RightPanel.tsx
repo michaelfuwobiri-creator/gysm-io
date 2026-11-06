@@ -90,7 +90,7 @@ function DemoHtmlTab({ lead, pushToast }: { lead: LeadDetail; pushToast: (t: str
           Open Demo
         </a>
         <a
-          href={`/builder?projectId=${lead.lead.demo_project_id}`}
+          href={`/agent?project=${lead.lead.demo_project_id}`}
           target="_blank"
           rel="noreferrer"
           className="flex items-center justify-center gap-1.5"
@@ -218,7 +218,7 @@ function ProductionTab({ lead }: { lead: LeadDetail }) {
       <div style={{ background: "#08080a", border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>
         <div className="field-label">Account</div>
         <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>
-          They now have a real GYSM account with their own credits -- they can sign in with{" "}
+          They now have a real GYSM account -- they can sign in with{" "}
           <span className="font-mono">{lead.lead.contact_email}</span> to manage the build, or you can keep managing renewals/upgrades from here.
         </div>
       </div>

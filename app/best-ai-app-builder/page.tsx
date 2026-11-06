@@ -18,7 +18,7 @@ export default function Page() {
   const faqs = [
     {
       q: "What is the best AI app builder?",
-      a: "It depends on what you need. For multi-file projects with an in-product code editor, products such as Lovable and Replit list those capabilities. For a fast route from a description to a published web page, with credits that do not expire, GYSM is built for that. Compare pricing and listed features before choosing.",
+      a: "It depends on what you need. For multi-file projects with an in-product code editor, products such as Lovable and Replit list those capabilities. For a fast route from a description to a published site on its own name.gysm.io address, GYSM is built for that. Compare pricing and listed features before choosing.",
     },
     {
       q: "Which AI app builders have a free plan?",

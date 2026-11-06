@@ -18,16 +18,16 @@ export default function BuildFailedEmail({
   errorMessage: string;
 }) {
   return (
-    <EmailLayout preview={`Your ${kind} generation failed -- credits refunded.`}>
+    <EmailLayout preview={`Your ${kind} generation failed -- it didn't count toward your usage.`}>
       <Text style={headingStyle}>{name ? `${name}, your` : "Your"} generation failed</Text>
       <Text style={textStyle}>
         Your {kind} generation didn&apos;t complete: <em>{errorMessage}</em>
       </Text>
       <Text style={textStyle}>
-        The credits it would have cost have already been refunded to your balance automatically --
-        nothing to do on your end. Feel free to try again.
+        It didn&apos;t count toward your plan&apos;s usage -- nothing to do on your end. Feel free to
+        try again.
       </Text>
-      <Button href="https://www.gysm.io/builder" style={buttonStyle}>
+      <Button href="https://www.gysm.io/agent" style={buttonStyle}>
         Back to GYSM
       </Button>
     </EmailLayout>

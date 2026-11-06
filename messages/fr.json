@@ -18,7 +18,7 @@
       "placeholder": "Décrivez l'application que vous voulez créer…",
       "cta": "Générer mon application",
       "ctaLoading": "Un instant…",
-      "helper": "Aperçu en direct en quelques secondes • crédits utilisés par génération",
+      "helper": "Aperçu en direct en quelques secondes • publiez sur votre propre name.gysm.io",
       "scroll": "Défiler"
     },
     "highlights": {
@@ -62,8 +62,8 @@
       "ctaSecondary": "Créer et publier la vôtre"
     },
     "pricing": {
-      "text": "Payez uniquement ce que vous créez",
-      "sub": "Packs de crédits à partir de 1,99 $, ou forfaits mensuels à partir de 4,99 $ — à vous de choisir",
+      "text": "Une seule formule. Tout compris.",
+      "sub": "20 €/mois, résiliable à tout moment",
       "cta": "Voir les tarifs →"
     },
     "footer": {

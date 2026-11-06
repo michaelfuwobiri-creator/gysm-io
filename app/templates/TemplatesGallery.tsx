@@ -69,7 +69,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
             </p>
           </div>
           <a
-            href="/builder"
+            href="/agent"
             className="px-4 py-2 bg-black text-white rounded-full text-sm font-bold hover:opacity-90 transition"
           >
             Start from scratch
@@ -139,7 +139,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
                     <div className="font-bold text-[15px] text-black line-clamp-1">{title}</div>
                     <div className="text-black/45 text-[13px] line-clamp-2 flex-1">{description}</div>
                     <a
-                      href={`/builder?template=${t.id}`}
+                      href={`/agent?template=${t.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="mt-2 text-center py-2 bg-black text-white rounded-lg text-[13px] font-bold hover:opacity-90 transition"
                     >
@@ -173,7 +173,7 @@ export default function TemplatesGallery({ templates }: { templates: TemplateCar
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <a
-                  href={`/builder?template=${open.id}`}
+                  href={`/agent?template=${open.id}`}
                   className="px-4 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-[#FF0080] to-[#FF0080] text-white hover:opacity-90 transition"
                 >
                   Use this template

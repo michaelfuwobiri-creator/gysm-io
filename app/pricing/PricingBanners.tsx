@@ -30,7 +30,7 @@ export default function PricingBanners() {
     <>
       {reason === "no_credits" && (
         <div className="max-w-2xl mx-auto mb-8 text-center rounded-2xl border border-black/10 bg-white shadow-sm p-4 text-sm">
-          You're out of credits — pick a plan below to keep building.
+          Subscribe below to keep building.
         </div>
       )}
       {canceled === "true" && (

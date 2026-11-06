@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCredits, PLAN_WINDOW_LIMIT_CREDITS, UNLIMITED_BALANCE } from "@/lib/credits-constants";
+import { PLAN_WINDOW_LIMIT_CREDITS, UNLIMITED_BALANCE } from "@/lib/credits-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
@@ -97,7 +97,19 @@ const TOOL_LABEL: Record<string, string> = {
 type ClientCall = { toolCallId: string; name: string; args: any; summary: string; write: boolean };
 type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?: boolean };
 
-export default function AgentClient({ initialCredits, onPlan = false, userKey, initialPrompt = "" }: { initialCredits: number; onPlan?: boolean; userKey: string; initialPrompt?: string }) {
+export default function AgentClient({
+  initialCredits,
+  onPlan = false,
+  userKey,
+  initialPrompt = "",
+  openBuild = null,
+}: {
+  initialCredits: number;
+  onPlan?: boolean;
+  userKey: string;
+  initialPrompt?: string;
+  openBuild?: { project?: string; template?: string } | null;
+}) {
   const storageKey = `gysm-agent:${userKey}`;
   const [items, setItems] = useState<Item[]>([]);
   const [messages, setMessages] = useState<unknown[]>([]);
@@ -177,6 +189,41 @@ export default function AgentClient({ initialCredits, onPlan = false, userKey, i
     }
   }, [storageKey]);
 
+  // Opening a saved build or template (dashboard, templates, BuildGuild):
+  // copy it into the workspace, show it in Preview, and prefill the box.
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (!openBuild || openedRef.current) return;
+    openedRef.current = true;
+    try {
+      window.history.replaceState(null, "", "/agent");
+    } catch {
+      /* ignore */
+    }
+    const noteId = `open-${Date.now()}`;
+    setItems((cur) => [...cur, { id: noteId, kind: "note", text: "Opening your build in the workspace…", tone: "muted" }]);
+    (async () => {
+      try {
+        const res = await fetch("/api/agent/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(openBuild),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j?.folder) throw new Error(j?.error || "Couldn't open that build.");
+        setItems((cur) => cur.map((i) => (i.id === noteId ? { ...i, text: `Opened it in your workspace as ${j.folder}. Tell me what to change, or publish it.` } : i)));
+        setLastProject(j.folder);
+        setPreviewKey((k) => k + 1);
+        setPreviewOpen(true);
+        setText((t) => t || `In the ${j.folder} folder: `);
+      } catch (e: any) {
+        setItems((cur) => cur.map((i) => (i.id === noteId ? { ...i, text: String(e?.message || "Couldn't open that build."), tone: "error" } : i)));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   useEffect(() => {
     try {
       const saved: Saved = { items: items.slice(-MAX_SAVED_ITEMS), messages };
@@ -212,7 +259,7 @@ export default function AgentClient({ initialCredits, onPlan = false, userKey, i
         });
         if (!res.ok || !res.body) {
           const j = await res.json().catch(() => ({}));
-          const msg = j?.code === "NO_CREDITS" ? "You're out of credits. Subscribe on the Pricing page to keep going." : j?.error || "Something went wrong.";
+          const msg = j?.code === "NO_CREDITS" ? "Subscribe to GYSM (€20/month) to keep building." : j?.error || "Something went wrong.";
           push({ id: uid(), kind: "note", text: msg, tone: "error" });
           return;
         }
@@ -491,11 +538,10 @@ export default function AgentClient({ initialCredits, onPlan = false, userKey, i
               {Math.max(0, Math.min(100, Math.floor((credits / PLAN_WINDOW_LIMIT_CREDITS) * 100)))}% left
             </a>
           ) : (
-            <span className="gb-pill" title="Your credit balance">{formatCredits(credits)} credits</span>
+            <a className="gb-pill" href="/pricing" title="See the GYSM plan">
+              Subscribe
+            </a>
           )}
-          <a className="gb-ghost" href="/builder?classic=1">
-            Classic builder
-          </a>
           <button className="gb-ghost" onClick={reset} disabled={busy}>
             New chat
           </button>
@@ -591,7 +637,7 @@ export default function AgentClient({ initialCredits, onPlan = false, userKey, i
                               className="gb-act"
                               onClick={() => rerunFrom(redoFrom as Extract<Item, { kind: "user" }>, (redoFrom as Extract<Item, { kind: "user" }>).text)}
                               aria-label="Rewrite reply"
-                              title="Ask again and get a new answer. Uses credits again."
+                              title="Ask again and get a new answer."
                             >
                               <IconRewrite />
                               <span>Rewrite</span>
@@ -695,7 +741,7 @@ export default function AgentClient({ initialCredits, onPlan = false, userKey, i
           <div className="gb-dock">
             {folderError && <div className="gb-note error" style={{ margin: "0 auto 6px", maxWidth: 720 }}>{folderError}</div>}
             {composer}
-            <div className="gb-foot">Commands cost 5 credits, deploys 25, lookups 1. GYSM can make mistakes, so check what it builds.</div>
+            <div className="gb-foot">GYSM can make mistakes, so check what it builds.</div>
           </div>
         </>
       )}

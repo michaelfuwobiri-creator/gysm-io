@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
   const user = await getUser();
   if (!user) {
-    return NextResponse.redirect(`${siteUrl}/sign-in?redirect_url=/builder`);
+    return NextResponse.redirect(`${siteUrl}/sign-in?redirect_url=/agent`);
   }
 
   if (!isBackendConnectConfigured()) {

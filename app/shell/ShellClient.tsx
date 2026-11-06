@@ -168,7 +168,7 @@ export default function ShellClient({ initialCredits, userKey }: { initialCredit
       try {
         const j = await res.json();
         if (j?.error) msg = j.error;
-        if (j?.code === "NO_CREDITS") msg = "You're out of credits. Top up on the Pricing page to keep going.";
+        if (j?.code === "NO_CREDITS") msg = "Subscribe to GYSM (€20/month) to keep going.";
       } catch {}
       add({ id: uid(), kind: "note", text: msg, tone: "error" });
     },
@@ -405,9 +405,6 @@ export default function ShellClient({ initialCredits, userKey }: { initialCredit
             </button>
           ))}
         </div>
-        <span className="text-[11px] font-bold text-black/40 tabular-nums" title="Credits">
-          {credits} cr
-        </span>
         <button onClick={newChat} disabled={busy} className="text-[12px] font-bold text-black/50 hover:text-black px-2 py-1.5 disabled:opacity-40">
           New chat
         </button>
@@ -442,7 +439,7 @@ export default function ShellClient({ initialCredits, userKey }: { initialCredit
             </div>
             <p className="text-[12px] text-black/40">
               <b>Guide me</b> asks before every command. <b>Do it for me</b> runs commands on its own and only asks before risky
-              ones. AI help is billed by usage; each command costs 5 credits.
+              ones. Everything here counts toward your plan's usage.
             </p>
           </div>
         )}

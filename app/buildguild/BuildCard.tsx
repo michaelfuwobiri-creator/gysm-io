@@ -44,7 +44,7 @@ export default function BuildCard({ app, timeAgo }: { app: BuildCardApp; timeAgo
         setCloning(false);
         return;
       }
-      router.push(`/builder?projectId=${data.id}`);
+      router.push(`/agent?project=${data.id}`);
     } catch {
       setError("Failed to clone.");
       setCloning(false);

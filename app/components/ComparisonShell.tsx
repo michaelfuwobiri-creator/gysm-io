@@ -1,16 +1,11 @@
 import type { ReactNode } from "react";
-import { PRICING_PLANS } from "@/lib/stripe";
+import { PRICING_PLANS, formatPlanPrice } from "@/lib/stripe";
 import { CHECKED_ON } from "@/lib/comparisons";
 
-/** Cheapest public pack and subscription, read from the same source as /pricing. */
+/** GYSM's public plan, read from the same source as /pricing. */
 export function gysmPriceSummary(): string {
-  const shown = PRICING_PLANS.filter((p) => !p.hidden);
-  const packs = shown.filter((p) => p.interval === "one_time").sort((a, b) => a.price - b.price);
-  const subs = shown.filter((p) => p.interval === "month").sort((a, b) => a.price - b.price);
-  const parts: string[] = [];
-  if (packs[0]) parts.push(`credit packs from $${packs[0].price.toFixed(2)} (no subscription, credits never expire)`);
-  if (subs[0]) parts.push(`subscriptions from $${subs[0].price.toFixed(2)}/month`);
-  return parts.join("; ");
+  const plan = PRICING_PLANS.filter((p) => !p.hidden && p.interval === "month").sort((a, b) => a.price - b.price)[0];
+  return plan ? `One plan: ${formatPlanPrice(plan)}/month, cancel anytime` : "See the pricing page";
 }
 
 export default function ComparisonShell({ children }: { children: ReactNode }) {
@@ -20,7 +15,7 @@ export default function ComparisonShell({ children }: { children: ReactNode }) {
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#FCFCF9]/80 border-b border-black/[0.05] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1000px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/" className="font-black tracking-tighter text-[16px]">GYSM</a>
-          <a href="/builder" className="text-[13px] font-bold bg-black text-white rounded-full px-4 py-2">Try GYSM free</a>
+          <a href="/agent" className="text-[13px] font-bold bg-black text-white rounded-full px-4 py-2">Try GYSM free</a>
         </div>
       </nav>
       <main className="max-w-[1000px] mx-auto px-5 md:px-8 py-12 md:py-16">{children}</main>

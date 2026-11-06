@@ -43,6 +43,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[media/inpaint] generation failed:", error.message);
     await markFailed(id, user, cost, "inpaint", error.message);
-    return Response.json({ error: "Inpainting failed. Your credits were refunded." }, { status: 502 });
+    return Response.json({ error: "Inpainting failed. It didn't count toward your usage." }, { status: 502 });
   }
 }

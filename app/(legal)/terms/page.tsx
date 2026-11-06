@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Terms of Service</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated October 7, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated November 6, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -16,7 +16,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-[18px] font-bold text-black mb-2">The service</h2>
-          <p>GYSM lets you describe an app and generates code and a live preview for it. You can keep iterating on a build in the builder, export the code, deploy it, or publish it to BuildGuild, our public showcase. Some features consume credits or require a paid plan.</p>
+          <p>GYSM lets you describe an app and generates code and a live preview for it. You can keep iterating on a build in the builder, export the code, deploy it, or publish it to BuildGuild, our public showcase. Building and publishing require a GYSM subscription.</p>
         </section>
 
         <section>
@@ -25,14 +25,15 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-[18px] font-bold text-black mb-2">Credits and payments</h2>
+          <h2 className="text-[18px] font-bold text-black mb-2">Subscription and payments</h2>
           <p>
-            Building with GYSM uses credits, purchased individually or through a subscription plan. All
-            payments are processed securely by Stripe. Prices and plans are shown at checkout and may
-            change going forward; purchases are generally non-refundable except where required by law.
-            No redemption for fiat at this time. Credits are for platform access only.
+            Building with GYSM requires a monthly subscription. Each plan includes a usage allowance that
+            refills every 5 hours, with a weekly limit, so the service stays fast and fair for everyone.
+            All payments are processed securely by Stripe. Prices and plans are shown at checkout and may
+            change going forward; payments are generally non-refundable except where required by law.
+            GYSM Credit (GSM) has no redemption for fiat at this time and is for platform access only.
             See our <a href="/refund" className="underline">Refund Policy</a> for how failed
-            generations, credit packs, and subscription cancellations are actually handled.
+            generations and cancellations are handled.
           </p>
         </section>
 

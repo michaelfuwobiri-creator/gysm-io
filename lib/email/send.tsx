@@ -31,7 +31,7 @@ export async function sendBuildFailedEmail(to: string, name: string | null, kind
     await resend.emails.send({
       from: FROM,
       to,
-      subject: `Your ${kind} generation failed -- credits refunded`,
+      subject: `Your ${kind} generation failed`,
       react: <BuildFailedEmail name={name} kind={kind} errorMessage={errorMessage} />,
     });
   } catch (error: any) {

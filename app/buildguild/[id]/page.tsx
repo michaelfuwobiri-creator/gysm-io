@@ -68,7 +68,7 @@ export default async function BuildGuildDetailPage({ params }: { params: { id: s
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#08080a]/80 border-b border-white/[0.06] h-[56px] md:h-[64px] flex items-center">
         <div className="max-w-[1280px] mx-auto px-5 w-full flex items-center justify-between">
           <a href="/buildguild" className="text-[13px] font-semibold text-white/60 hover:text-white">← BuildGuild</a>
-          <a href="/builder" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
+          <a href="/agent" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
             Build your own
           </a>
         </div>

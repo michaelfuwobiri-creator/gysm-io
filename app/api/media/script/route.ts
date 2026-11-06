@@ -38,6 +38,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[media/script] generation failed:", error.message);
     await markFailed(id, user, cost, "script", error.message);
-    return Response.json({ error: "Script generation failed. Your credits were refunded." }, { status: 502 });
+    return Response.json({ error: "Script generation failed. It didn't count toward your usage." }, { status: 502 });
   }
 }

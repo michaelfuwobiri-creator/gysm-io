@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Privacy Policy</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated September 4, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated November 6, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -19,8 +19,8 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-5 mt-2 space-y-1">
             <li>Account information — your name, email address, and authentication details, handled for us by our auth provider, Clerk.</li>
             <li>Build content — the prompts you type and the app code, previews, and project data GYSM generates for you, stored in our database so you can come back and keep editing.</li>
-            <li>Payment information — if you buy credits or a subscription, billing is handled entirely by Stripe. GYSM never sees or stores your full card number.</li>
-            <li>Usage data — credits used, build history, and basic product-usage events, so the builder works reliably and we can improve it.</li>
+            <li>Payment information — if you subscribe, billing is handled entirely by Stripe. GYSM never sees or stores your full card number.</li>
+            <li>Usage data — how much of your plan&apos;s allowance you&apos;ve used, build history, and basic product-usage events, so the builder works reliably and we can improve it.</li>
             <li>Standard web logs — IP address, browser type, and similar technical data collected automatically by our hosting provider for security and reliability, the same as almost any website you visit.</li>
             <li>Published-build view data — if you publish a build, each page load of that build's public link logs the referring page (where the visit came from) and a timestamp, so you can see traffic on your own dashboard. This is server-side log data, not a tracking cookie set on the visitor's device.</li>
           </ul>

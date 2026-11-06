@@ -34,7 +34,7 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
           return (
             <a
               key={t.id}
-              href={`/builder?template=${t.id}`}
+              href={`/agent?template=${t.id}`}
               className="group w-[220px] shrink-0 rounded-2xl border border-black/5 bg-white overflow-hidden flex flex-col shadow-sm transition hover:border-[#FF0080]/30 hover:shadow-md"
             >
               <div className="relative h-[120px] bg-white overflow-hidden pointer-events-none border-b border-black/5">

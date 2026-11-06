@@ -18,7 +18,7 @@
       "placeholder": "Describe the app you want to build…",
       "cta": "Generate my app",
       "ctaLoading": "One sec…",
-      "helper": "Live preview in seconds • credits used per build",
+      "helper": "Live preview in seconds • publish to your own name.gysm.io",
       "scroll": "Scroll"
     },
     "highlights": {
@@ -62,8 +62,8 @@
       "ctaSecondary": "Build & publish yours"
     },
     "pricing": {
-      "text": "Pay only for the builds you ship",
-      "sub": "Credit packs from $1.99, or monthly plans from $4.99 — your call",
+      "text": "One plan. Everything included.",
+      "sub": "€20/month, cancel anytime",
       "cta": "See Pricing →"
     },
     "footer": {

@@ -40,7 +40,7 @@ export default async function AppStoresPage({ params }: { params: { id: string }
           <p className="text-black/50 max-w-sm mx-auto">
             This link doesn't match a saved build. It may have been removed, or the link is wrong.
           </p>
-          <a href="/builder" className="mt-6 inline-block px-5 py-2 bg-black text-white rounded-full font-semibold text-sm hover:opacity-90 transition">
+          <a href="/agent" className="mt-6 inline-block px-5 py-2 bg-black text-white rounded-full font-semibold text-sm hover:opacity-90 transition">
             Go to builder
           </a>
         </div>

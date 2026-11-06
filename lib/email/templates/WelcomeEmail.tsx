@@ -9,7 +9,7 @@ export default function WelcomeEmail({ name }: { name: string | null }) {
         You&apos;re in. GYSM turns a plain-English description into a working web app with a live preview and a code view.
         Describe what you want, and we&apos;ll build it.
       </Text>
-      <Button href="https://www.gysm.io/builder" style={buttonStyle}>
+      <Button href="https://www.gysm.io/agent" style={buttonStyle}>
         Start building
       </Button>
       <Text style={{ ...textStyle, marginTop: 24, fontSize: 12, color: "#999" }}>

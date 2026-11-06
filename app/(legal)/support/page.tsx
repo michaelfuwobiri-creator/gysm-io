@@ -18,7 +18,7 @@ export default function SupportPage() {
           <ul className="list-disc pl-5 space-y-1">
             <li>Builder issues — a build failing, stuck, or not matching your prompt</li>
             <li>Account and sign-in — trouble logging in or accessing your builds</li>
-            <li>Billing and credits — questions about a charge, your plan, or credit balance</li>
+            <li>Billing and usage — questions about a charge, your plan, or your usage limits</li>
             <li>Publishing to BuildGuild — help publishing, editing, or removing a public build</li>
             <li>Exporting or deploying — getting your code out of GYSM or live on the web</li>
           </ul>

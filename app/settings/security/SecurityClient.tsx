@@ -64,7 +64,7 @@ export default function SecurityClient({ overview }: { overview: SecurityOvervie
         >
           {scanning ? "Scanning…" : "Scan all builds"}
         </button>
-        <span className="text-[12px] text-black/40">Scans your 50 most recent builds. Free: no credits used.</span>
+        <span className="text-[12px] text-black/40">Scans your 50 most recent builds. Free: doesn't count toward your usage.</span>
       </div>
       {error && <div className="text-red-600 text-[13px] mb-4">{error}</div>}
       {notice && <div className="text-emerald-700 text-[13px] mb-4">{notice}</div>}
@@ -105,7 +105,7 @@ export default function SecurityClient({ overview }: { overview: SecurityOvervie
                   </ul>
                 )}
                 <div className="mt-3 flex gap-4 text-[12px] font-bold">
-                  <a href={`/builder?projectId=${b.id}`} className="underline">Open in builder</a>
+                  <a href={`/agent?project=${b.id}`} className="underline">Open in builder</a>
                   <a href={`/publish/${b.id}`} className="underline" target="_blank" rel="noopener noreferrer">View page</a>
                 </div>
               </li>

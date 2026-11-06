@@ -18,7 +18,7 @@
       "placeholder": "Opiši aplikaciju koju želiš izgraditi…",
       "cta": "Generiraj moju aplikaciju",
       "ctaLoading": "Trenutak…",
-      "helper": "Pregled uživo za nekoliko sekundi • krediti se troše po izgradnji",
+      "helper": "Pregled uživo za nekoliko sekundi • objavi na vlastitoj name.gysm.io adresi",
       "scroll": "Skroluj"
     },
     "highlights": {
@@ -62,8 +62,8 @@
       "ctaSecondary": "Izgradi i objavi svoju"
     },
     "pricing": {
-      "text": "Plaćaš samo ono što izgradiš",
-      "sub": "Paketi kredita od 1,99 $, ili mjesečni planovi od 4,99 $ — biraš ti",
+      "text": "Jedan plan. Sve uključeno.",
+      "sub": "20 €/mjesečno, otkaži bilo kada",
       "cta": "Pogledaj cijene →"
     },
     "footer": {

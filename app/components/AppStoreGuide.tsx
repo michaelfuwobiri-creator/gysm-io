@@ -380,7 +380,7 @@ export default function AppStoreGuide({
   return (
     <div className="min-h-screen bg-[#FCFCF9] text-[#0A0A0A]">
       <div className="max-w-3xl mx-auto px-5 py-10">
-        <a href={`/builder?projectId=${projectId}`} className="text-[13px] text-black/40 hover:text-black/70">
+        <a href={`/agent?project=${projectId}`} className="text-[13px] text-black/40 hover:text-black/70">
           &larr; Back to builder
         </a>
 

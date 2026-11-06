@@ -29,6 +29,7 @@ const AGGREGATE_OFFER = {
   lowPrice: Math.min(...PUBLIC_PLAN_PRICES).toFixed(2),
   highPrice: Math.max(...PUBLIC_PLAN_PRICES).toFixed(2),
   offerCount: String(PUBLIC_PLAN_PRICES.length),
+  currency: (PRICING_PLANS.find((p) => !p.hidden)?.currency ?? "eur").toUpperCase(),
 };
 
 export default function Page() {
@@ -89,9 +90,9 @@ export default function Page() {
     const clerk = (window as any).Clerk;
     if (!clerk?.loaded) return;
     if (clerk.user) {
-      router.push("/builder");
+      router.push("/agent");
     } else {
-      router.push(`/sign-up?redirect_url=${encodeURIComponent("/builder")}`);
+      router.push(`/sign-up?redirect_url=${encodeURIComponent("/agent")}`);
     }
   }
 
@@ -133,7 +134,7 @@ export default function Page() {
               "@type": "AggregateOffer",
               lowPrice: AGGREGATE_OFFER.lowPrice,
               highPrice: AGGREGATE_OFFER.highPrice,
-              priceCurrency: "USD",
+              priceCurrency: AGGREGATE_OFFER.currency,
               offerCount: AGGREGATE_OFFER.offerCount,
             },
           }),
@@ -155,7 +156,7 @@ export default function Page() {
             <MobileNavMenu
               theme="light"
               links={[
-                { href: "/builder", label: "AI Builder", description: "Describe your app in plain English -- GYSM builds it." },
+                { href: "/agent", label: "AI Builder", description: "Describe your app in plain English -- GYSM builds it." },
                 { href: "/builder-blocks", label: "Lego Builder", badge: "Beta", description: "Drag and drop real blocks -- auth, payments, forms -- to build an app." },
                 { href: "/buildguild", label: "BuildGuild" },
                 { href: "/templates", label: t("nav.templates") },

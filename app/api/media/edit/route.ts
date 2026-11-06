@@ -64,6 +64,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[media/edit] generation failed:", error.message);
     await markFailed(id, user, cost, "edit", error.message);
-    return Response.json({ error: "Edit failed. Your credits were refunded." }, { status: 502 });
+    return Response.json({ error: "Edit failed. It didn't count toward your usage." }, { status: 502 });
   }
 }

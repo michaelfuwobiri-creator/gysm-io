@@ -192,7 +192,7 @@ export default async function DashboardPage() {
 
                 <div className="flex gap-2">
                   <a
-                    href={`/builder?projectId=${p.id}`}
+                    href={`/agent?project=${p.id}`}
                     className="flex-1 text-center px-3 py-2 rounded-lg bg-black text-white text-xs font-bold"
                   >
                     Open in builder

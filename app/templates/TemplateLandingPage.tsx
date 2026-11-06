@@ -43,7 +43,7 @@ export default async function TemplateLandingPage({ id, eyebrow, title, descript
         <h1 className="text-6xl font-black mt-6">{title}</h1>
         <p className="text-black/60 mt-4 text-xl max-w-2xl">{description}</p>
         <Link
-          href={html ? `/builder?template=${id}` : "/builder"}
+          href={html ? `/agent?template=${id}` : "/agent"}
           className="inline-block mt-8 bg-black text-white px-8 py-3 rounded-full font-bold hover:opacity-90 transition"
         >
           Open in Builder →

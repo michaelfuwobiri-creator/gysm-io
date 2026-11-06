@@ -202,7 +202,7 @@ export default function SubmitBuildModal({
             ) : projects.length === 0 ? (
               <div className="text-center py-6">
                 <p className="text-[13px] text-white/50">You don&#39;t have any builds yet.</p>
-                <a href="/builder" className="mt-3 inline-block px-4 py-2 rounded-full bg-[#FF0080] text-white text-[12px] font-bold">
+                <a href="/agent" className="mt-3 inline-block px-4 py-2 rounded-full bg-[#FF0080] text-white text-[12px] font-bold">
                   Start building
                 </a>
               </div>

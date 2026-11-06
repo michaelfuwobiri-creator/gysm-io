@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       client_reference_id: user.id,
       customer_email: user.email ?? undefined,
       metadata: { userId: user.id, planId: plan.id },
-      success_url: `${siteUrl}/builder?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${siteUrl}/agent?subscribed=1`,
       cancel_url: `${siteUrl}/pricing?canceled=true`,
     });
   }

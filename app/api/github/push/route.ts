@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     "",
     "Drag this folder onto https://vercel.com/new, or connect this repo directly from your Vercel dashboard.",
     "",
-    `Originally built at: ${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/builder`,
+    `Originally built at: ${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/agent`,
   ].join("\n");
 
   // Every file in the build; GYSM's own vercel.json and README.md are added

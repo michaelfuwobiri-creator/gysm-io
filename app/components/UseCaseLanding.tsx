@@ -44,9 +44,9 @@ export default function UseCaseLanding({
     const clerk = (window as any).Clerk;
     if (!clerk?.loaded) return;
     if (clerk.user) {
-      router.push("/builder");
+      router.push("/agent");
     } else {
-      router.push(`/sign-up?redirect_url=${encodeURIComponent("/builder")}`);
+      router.push(`/sign-up?redirect_url=${encodeURIComponent("/agent")}`);
     }
   }
 
@@ -72,7 +72,7 @@ export default function UseCaseLanding({
             <MobileNavMenu
               theme="light"
               links={[
-                { href: "/builder", label: "AI Builder" },
+                { href: "/agent", label: "AI Builder" },
                 { href: "/builder-blocks", label: "Lego Builder", badge: "Beta" },
                 { href: "/buildguild", label: "BuildGuild" },
                 { href: "/templates", label: "Templates" },
@@ -184,7 +184,7 @@ export default function UseCaseLanding({
               </h2>
               <p className="mx-auto mt-5 max-w-[460px] text-[14px] md:text-[16px] text-white/50 leading-[1.5]">{faqNote}</p>
               <button onClick={() => startBuilding(examplePrompt)} className="mt-8 inline-flex h-[48px] px-8 rounded-full bg-white text-black text-[14px] font-bold items-center justify-center">Start Building →</button>
-              <div className="mt-3 text-[11px] text-white/30">Credit packs from $1.99 • cancel monthly plans anytime</div>
+              <div className="mt-3 text-[11px] text-white/30">€20/month • cancel anytime</div>
             </div>
           </div>
           <div className="py-6 text-center text-[11px] text-black/30">© 2026 GYSM — built for founders who ship</div>

@@ -26,7 +26,7 @@ export default function MediaUsageSection({ usage }: { usage: MediaUsageSummary 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           { label: "Total generations", value: usage.totalGenerations.toLocaleString() },
-          { label: "Credits spent", value: usage.totalCreditsSpent.toLocaleString() },
+          { label: "Successful", value: (usage.totalGenerations - usage.totalFailed).toLocaleString() },
           { label: "Last 30 days", value: usage.last30DaysCount.toLocaleString() },
           { label: "Success rate", value: `${successRate}%` },
         ].map((s) => (
@@ -44,7 +44,7 @@ export default function MediaUsageSection({ usage }: { usage: MediaUsageSummary 
             <div key={k.kind} className="flex items-center justify-between text-[13px]">
               <span className="font-medium">{k.kind}</span>
               <span className="text-black/50">
-                {k.count.toLocaleString()} gens -- {k.credits.toLocaleString()} credits
+                {k.count.toLocaleString()} generations
               </span>
             </div>
           ))}

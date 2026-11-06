@@ -232,7 +232,7 @@ export default async function BuildGuildPage({
               theme="dark"
               links={[
                 { href: "/dashboard", label: "Dashboard" },
-                { href: "/builder", label: "AI Builder" },
+                { href: "/agent", label: "AI Builder" },
                 { href: "/builder-blocks", label: "Lego Builder", badge: "Beta" },
                 { href: "/templates", label: "Templates" },
                 { href: "/connectors", label: "Connectors" },
@@ -240,7 +240,7 @@ export default async function BuildGuildPage({
                 { href: "/pricing", label: "Pricing" },
               ]}
             />
-            <a href="/builder" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
+            <a href="/agent" className="h-8 md:h-9 px-5 rounded-full bg-[#FF0080] text-white text-[13px] font-semibold grid place-items-center hover:bg-[#FF0080]/90 transition-colors">
               Start Building
             </a>
           </div>
@@ -338,7 +338,7 @@ export default async function BuildGuildPage({
                     ? 'Be the first — finish a build, then hit "Share to BuildGuild" to put it here.'
                     : "Try a different search term or tag, or clear filters to see everything."}
                 </p>
-                <a href="/builder" className="mt-5 inline-block px-5 py-2 bg-[#FF0080] text-white rounded-full font-semibold text-[13px]">
+                <a href="/agent" className="mt-5 inline-block px-5 py-2 bg-[#FF0080] text-white rounded-full font-semibold text-[13px]">
                   Go to builder
                 </a>
               </div>

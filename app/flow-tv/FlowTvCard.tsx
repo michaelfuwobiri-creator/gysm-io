@@ -8,7 +8,7 @@ import type { FlowTvItem } from "@/lib/flowTv";
 // resolution, etc.) aren't surfaced here yet -- input jsonb has them,
 // this is a first pass at the prompt/remix part specifically.
 export default function FlowTvCard({ item }: { item: FlowTvItem }) {
-  const remixHref = `/builder?remixSkill=${encodeURIComponent(item.kind)}&remixPrompt=${encodeURIComponent(item.prompt || "")}`;
+  const remixHref = `/agent?prompt=${encodeURIComponent(item.prompt || "")}`;
 
   return (
     <div className="rounded-xl border border-white/10 overflow-hidden bg-white/[0.03] flex flex-col">

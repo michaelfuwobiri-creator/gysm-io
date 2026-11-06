@@ -16,7 +16,7 @@ export default function GangPage() {
       <div>
         <h1 className="text-2xl font-bold mb-2">Community feed isn't live yet</h1>
         <p className="text-black/50 max-w-sm mx-auto">This page is being rebuilt. Check back soon.</p>
-        <a href="/builder" className="mt-6 inline-block px-5 py-2 bg-black text-white rounded-full font-semibold text-sm hover:opacity-90 transition">
+        <a href="/agent" className="mt-6 inline-block px-5 py-2 bg-black text-white rounded-full font-semibold text-sm hover:opacity-90 transition">
           Go to builder
         </a>
       </div>

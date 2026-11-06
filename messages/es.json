@@ -18,7 +18,7 @@
       "placeholder": "Describe la aplicación que quieres crear…",
       "cta": "Generar mi aplicación",
       "ctaLoading": "Un momento…",
-      "helper": "Vista previa en vivo en segundos • se usan créditos por cada compilación",
+      "helper": "Vista previa en vivo en segundos • publica en tu propio name.gysm.io",
       "scroll": "Desplázate"
     },
     "highlights": {
@@ -62,8 +62,8 @@
       "ctaSecondary": "Crea y publica la tuya"
     },
     "pricing": {
-      "text": "Paga solo por lo que construyes",
-      "sub": "Paquetes de créditos desde $1.99, o planes mensuales desde $4.99 — tú decides",
+      "text": "Un solo plan. Todo incluido.",
+      "sub": "20 €/mes, cancela cuando quieras",
       "cta": "Ver precios →"
     },
     "footer": {

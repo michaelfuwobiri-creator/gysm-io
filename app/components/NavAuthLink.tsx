@@ -35,7 +35,7 @@ export default function NavAuthLink({ variant = "desktop" }: { variant?: "deskto
       ? "block text-[17px] font-medium"
       : "text-[13px] font-medium opacity-60 hidden md:block mr-2";
   return isSignedIn ? (
-    <a href="/builder" className={className}>Dashboard</a>
+    <a href="/agent" className={className}>Dashboard</a>
   ) : (
     <a href="/sign-in" className={className}>Log in</a>
   );

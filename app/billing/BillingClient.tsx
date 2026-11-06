@@ -28,7 +28,7 @@ export default function BillingClient({ hasSubscription }: { hasSubscription: bo
       }
       const { restorePurchasesNative } = await import("@/lib/iap-client");
       await restorePurchasesNative(clerkUser.id);
-      setRestoreMsg("Purchases restored. Your credits will update in a moment.");
+      setRestoreMsg("Purchases restored. Your plan will update in a moment.");
     } catch {
       setRestoreMsg("Couldn't restore purchases. Please try again.");
     } finally {
@@ -85,12 +85,11 @@ export default function BillingClient({ hasSubscription }: { hasSubscription: bo
     return (
       <div className="rounded-2xl border border-black/10 bg-white p-6">
         <p className="text-[14px] text-black/60">
-          You don't have an active monthly subscription to manage. Credit packs are one-time purchases with
-          nothing to manage here -- see{" "}
+          You don't have an active subscription.{" "}
           <a href="/pricing" className="font-semibold text-black underline">
-            pricing
+            Subscribe to GYSM
           </a>{" "}
-          if you'd like to subscribe to a monthly plan.
+          for €20/month to build and publish with the Agent.
         </p>
       </div>
     );

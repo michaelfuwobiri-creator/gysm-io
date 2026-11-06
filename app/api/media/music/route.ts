@@ -32,6 +32,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[media/music] generation failed:", error.message);
     await markFailed(id, user, cost, "music", error.message);
-    return Response.json({ error: "Music generation failed to start. Your credits were refunded." }, { status: 502 });
+    return Response.json({ error: "Music generation failed to start. It didn't count toward your usage." }, { status: 502 });
   }
 }

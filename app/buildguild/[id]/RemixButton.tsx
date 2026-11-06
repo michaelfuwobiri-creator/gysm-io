@@ -33,7 +33,7 @@ export default function RemixButton({ projectId }: Props) {
         setLoading(false);
         return;
       }
-      router.push(`/builder?projectId=${data.id}`);
+      router.push(`/agent?project=${data.id}`);
     } catch {
       setError("Failed to remix this app. Try again.");
       setLoading(false);

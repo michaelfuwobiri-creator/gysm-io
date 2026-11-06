@@ -36,11 +36,11 @@ function userHash(userId: string): string {
   return createHash("sha256").update(userId).digest("hex");
 }
 
-function quote(s: string): string {
+export function quote(s: string): string {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
-async function workspaceRoot(userId: string): Promise<string> {
+export async function workspaceRoot(userId: string): Promise<string> {
   const r = await runInSandbox(userId, `mkdir -p "$HOME/${WORKSPACE_SUBDIR}" && printf '%s' "$HOME/${WORKSPACE_SUBDIR}"`);
   const root = r.output.trim().split("\n").pop() || "";
   if (r.exitCode !== 0 || !root.startsWith("/")) throw new Error("Couldn't prepare the workspace.");

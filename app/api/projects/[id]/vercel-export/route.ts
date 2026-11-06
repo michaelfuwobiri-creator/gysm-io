@@ -74,7 +74,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         "",
         "Vercel deploys it straight to your own account -- GYSM never sees your Vercel login.",
         "",
-        `Originally built at: ${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/builder`,
+        `Originally built at: ${process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io"}/agent`,
       ].join("\n")
     );
 

@@ -18,7 +18,7 @@
       "placeholder": "Beschreibe die App, die du bauen willst…",
       "cta": "Meine App generieren",
       "ctaLoading": "Einen Moment…",
-      "helper": "Live-Vorschau in Sekunden • Credits pro Build",
+      "helper": "Live-Vorschau in Sekunden • veröffentliche auf deiner eigenen name.gysm.io",
       "scroll": "Scrollen"
     },
     "highlights": {
@@ -62,8 +62,8 @@
       "ctaSecondary": "Bauen & veröffentlichen"
     },
     "pricing": {
-      "text": "Zahle nur für das, was du baust",
-      "sub": "Credit-Pakete ab 1,99 $ oder Monatspläne ab 4,99 $ — du entscheidest",
+      "text": "Ein Plan. Alles inklusive.",
+      "sub": "20 €/Monat, jederzeit kündbar",
       "cta": "Preise ansehen →"
     },
     "footer": {

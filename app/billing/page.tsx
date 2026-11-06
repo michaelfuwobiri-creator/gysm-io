@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { getCreditBalance } from "@/lib/credits";
 import { getPlanById } from "@/lib/stripe";
 import { getPlanUsage, hasMonthlyPlan, untilText, type PlanUsage } from "@/lib/planUsage";
 import { PLAN_WINDOW_HOURS } from "@/lib/credits-constants";
+import { isUnlimitedUser } from "@/lib/unlimited";
 import AppShell from "@/app/components/AppShell";
 import BillingClient from "./BillingClient";
 
@@ -17,38 +17,33 @@ export default async function BillingPage() {
     redirect("/sign-in?redirect_url=/billing");
   }
 
-  const [credits, subRows] = await Promise.all([
-    getCreditBalance(user.id),
-    sql`select plan, status, current_period_end from subscriptions where user_id = ${user.id} limit 1`,
-  ]);
+  const subRows = await sql`select plan, status, current_period_end from subscriptions where user_id = ${user.id} limit 1`;
   const sub = subRows[0] as { plan: string; status: string; current_period_end: string | null } | undefined;
   const planInfo = sub?.plan ? getPlanById(sub.plan) : undefined;
   const isActive = sub?.status === "active";
   const onPlan = await hasMonthlyPlan(user.id);
+  const unlimited = await isUnlimitedUser(user.id);
   const usage: PlanUsage | null = onPlan ? await getPlanUsage(user.id) : null;
 
   return (
     <AppShell active="billing">
       <div className="max-w-2xl mx-auto p-6 md:p-10">
         <h1 className="text-2xl font-black tracking-tight mb-1">Billing</h1>
-        <p className="text-[13px] text-black/40 mb-8">Your plan, credit balance, and subscription management.</p>
+        <p className="text-[13px] text-black/40 mb-8">Your plan, usage and subscription.</p>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="rounded-2xl border border-black/10 bg-white p-5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">{onPlan ? "Credits from before" : "Credit balance"}</div>
-            <div className="text-3xl font-black">{onPlan && usage ? Math.max(0, credits - usage.remaining) : credits}</div>
-          </div>
-          <div className="rounded-2xl border border-black/10 bg-white p-5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">Current plan</div>
-            <div className="text-3xl font-black">
-              {isActive && planInfo ? planInfo.name : "Pay as you go"}
-            </div>
-            {isActive && sub?.current_period_end && (
-              <p className="text-[11px] text-black/40 mt-1">
-                Renews {new Date(sub.current_period_end).toLocaleDateString("en-US", { timeZone: "UTC" })}
-              </p>
-            )}
-          </div>
+        <div className="rounded-2xl border border-black/10 bg-white p-5 mb-6">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-black/40 mb-1">Current plan</div>
+          <div className="text-3xl font-black">{unlimited ? "Unlimited" : isActive && planInfo ? planInfo.name : "No plan"}</div>
+          {isActive && sub?.current_period_end && (
+            <p className="text-[11px] text-black/40 mt-1">
+              Renews {new Date(sub.current_period_end).toLocaleDateString("en-GB", { timeZone: "UTC" })}
+            </p>
+          )}
+          {!isActive && !unlimited && (
+            <a href="/pricing" className="mt-3 inline-block px-4 py-2 rounded-full bg-black text-white text-[12px] font-bold">
+              Subscribe for €20/month
+            </a>
+          )}
         </div>
 
         {usage && (

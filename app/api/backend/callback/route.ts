@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   cookieStore.delete("sb_oauth_pending");
 
   const fail = (message: string, projectId?: string) => {
-    const url = new URL(`${siteUrl}/builder`);
+    const url = new URL(`${siteUrl}/agent`);
     if (projectId) url.searchParams.set("projectId", projectId);
     url.searchParams.set("backendError", message);
     return NextResponse.redirect(url.toString());
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       dbPassword,
     });
 
-    const url = new URL(`${siteUrl}/builder`);
+    const url = new URL(`${siteUrl}/agent`);
     url.searchParams.set("projectId", pending.projectId);
     url.searchParams.set("backendConnecting", "true");
     return NextResponse.redirect(url.toString());
