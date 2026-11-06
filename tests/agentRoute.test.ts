@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/auth", () => ({ getUser: vi.fn() }));
 vi.mock("@/lib/credits", () => ({ getCreditBalance: vi.fn(), chargeCredits: vi.fn() }));
 vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
+vi.mock("@/lib/agentMemory", () => ({ loadMemoryBlock: vi.fn(async () => "") }));
 vi.mock("@/lib/agent", () => ({
   runAgentTurn: vi.fn(async (o: any) => {
     o.emit({ type: "text", text: "hello" });

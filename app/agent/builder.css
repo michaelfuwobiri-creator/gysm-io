@@ -213,3 +213,9 @@
 
 .gb-ask { margin: 10px 0; padding: 12px; border: 1px solid #FF0080; border-radius: 12px; display: grid; gap: 8px; }
 .gb-ask-q { font-weight: 600; }
+
+.gb-mem { margin: 0 auto 8px; max-width: 720px; padding: 10px 12px; border: 1px solid rgba(127,127,127,.25); border-radius: 12px; font-size: 14px; }
+.gb-mem-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.gb-mem ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 180px; overflow: auto; }
+.gb-mem li { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.gb-mem-empty { margin-top: 6px; opacity: .7; }

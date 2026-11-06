@@ -4,6 +4,7 @@ import { getCreditBalance } from "@/lib/credits";
 import { AGENT_MIN_BALANCE } from "@/lib/credits-constants";
 import { cleanLocalFolderName, sanitizeHistory } from "@/lib/agentCore";
 import { runAgentTurn, type AgentEvent } from "@/lib/agent";
+import { loadMemoryBlock } from "@/lib/agentMemory";
 
 // GYSM Agent turn. Streams NDJSON AgentEvents (see lib/agent.ts).
 export const maxDuration = 300;
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
   }
 
   const history = sanitizeHistory(body?.messages);
+  const memory = await loadMemoryBlock(user.id);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
         }
       };
       try {
-        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, signal: req.signal, emit });
+        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, memory, signal: req.signal, emit });
       } catch (error: any) {
         console.error("[agent] turn failed:", error?.message || error);
         emit({ type: "error", error: "Couldn't reach your workspace. Please try again in a moment." });

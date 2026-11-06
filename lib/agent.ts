@@ -67,6 +67,8 @@ export async function runAgentTurn(opts: {
   localFolder?: string | null;
   /** The browser's result for a pending local_* tool call. */
   clientResult?: { toolCallId: string; ok: boolean; output: string; declined?: boolean };
+  /** The "what you remember" prompt section, loaded by the route. */
+  memory?: string;
   /** Aborted when the user presses Stop (the browser drops the request). */
   signal?: AbortSignal;
   emit: (e: AgentEvent) => void;
@@ -146,7 +148,7 @@ export async function runAgentTurn(opts: {
       }
       const response = await openai.chat.completions.create({
         model: AGENT_MODEL,
-        messages: [{ role: "system", content: systemPrompt(opts.localFolder) }, ...(messages as any[])],
+        messages: [{ role: "system", content: systemPrompt(opts.localFolder, opts.memory) }, ...(messages as any[])],
         tools: agentToolsFor(!!opts.localFolder) as any,
         parallel_tool_calls: false,
         max_completion_tokens: 8000,

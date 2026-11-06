@@ -21,6 +21,7 @@ import {
   validateDdl,
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
+import { addMemory, forgetMemory } from "@/lib/agentMemory";
 import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql, analyzeHtml, extractSameOriginLinks } from "@/lib/agentGuards";
 
 // The six GYSM Agent tools. Every one acts only on the calling user's own
@@ -576,6 +577,12 @@ export async function executeTool(userId: string, name: string, args: any, secre
   let result: ToolResult;
   try {
     switch (name) {
+      case "remember":
+        result = await addMemory(userId, args?.text);
+        break;
+      case "forget":
+        result = await forgetMemory(userId, args?.id);
+        break;
       case "write_file":
         result = await toolWriteFile(userId, args);
         break;

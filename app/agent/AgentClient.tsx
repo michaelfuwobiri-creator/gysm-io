@@ -90,6 +90,8 @@ const TOOL_LABEL: Record<string, string> = {
   suggest_next: "Suggestions",
   update_plan: "Plan",
   ask_user: "Question",
+  remember: "Memory",
+  forget: "Memory",
   local_list: "Your folder",
   local_read: "Read (your computer)",
   local_write: "Write (your computer)",
@@ -120,6 +122,9 @@ export default function AgentClient({
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   // The agent's live checklist for a bigger job (update_plan). Not saved.
+  // What the agent remembers about the user (remember/forget tools); shown in a small panel.
+  const [memOpen, setMemOpen] = useState(false);
+  const [memories, setMemories] = useState<{ id: number; text: string }[]>([]);
   // A multiple-choice question from the agent (ask_user); the pick is sent as the next message.
   const [question, setQuestion] = useState<{ question: string; options: string[] } | null>(null);
   const [plan, setPlan] = useState<{ title: string; status: "pending" | "doing" | "done" }[]>([]);
@@ -393,6 +398,35 @@ export default function AgentClient({
     return () => window.removeEventListener("keydown", onKey);
   }, [busy, stop]);
 
+  const toggleMemory = async () => {
+    const next = !memOpen;
+    setMemOpen(next);
+    if (!next) return;
+    try {
+      const r = await fetch("/api/agent/memory");
+      const j = await r.json();
+      setMemories(Array.isArray(j?.memories) ? j.memories : []);
+    } catch {
+      setMemories([]);
+    }
+  };
+  const forgetMemory = async (id: number) => {
+    setMemories((prev) => prev.filter((m) => m.id !== id));
+    try {
+      await fetch(`/api/agent/memory?id=${id}`, { method: "DELETE" });
+    } catch {
+      /* the list refreshes next time it is opened */
+    }
+  };
+  const forgetAllMemories = async () => {
+    setMemories([]);
+    try {
+      await fetch("/api/agent/memory?all=1", { method: "DELETE" });
+    } catch {
+      /* the list refreshes next time it is opened */
+    }
+  };
+
   const submit = (t: string) => {
     const v = t.trim();
     if (!v || busy) return;
@@ -507,6 +541,32 @@ export default function AgentClient({
 
   const composer = (
     <div className="gb-composer-wrap">
+      {memOpen && (
+        <div className="gb-mem" role="region" aria-label="Memory">
+          <div className="gb-mem-head">
+            <b>What GYSM remembers</b>
+            {memories.length > 0 && (
+              <button type="button" className="gb-ghost" onClick={forgetAllMemories}>
+                Forget all
+              </button>
+            )}
+          </div>
+          {memories.length === 0 ? (
+            <div className="gb-mem-empty">Nothing yet. Tell GYSM about your brand, style or audience and it will keep it for next time.</div>
+          ) : (
+            <ul>
+              {memories.map((m) => (
+                <li key={m.id}>
+                  <span>{m.text}</span>
+                  <button type="button" className="gb-ghost" onClick={() => forgetMemory(m.id)} aria-label={`Forget: ${m.text}`}>
+                    Forget
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <form
         className="gb-composer"
         onSubmit={(e) => {
@@ -546,6 +606,9 @@ export default function AgentClient({
                   + Folder
                 </button>
               ))}
+            <button type="button" className="gb-ghost" onClick={toggleMemory} aria-expanded={memOpen} title="What GYSM remembers about you between chats">
+              Memory
+            </button>
           </div>
           <button
             type={busy ? "button" : "submit"}

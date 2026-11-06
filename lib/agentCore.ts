@@ -26,6 +26,8 @@ export type ToolName =
   | "suggest_next"
   | "update_plan"
   | "ask_user"
+  | "remember"
+  | "forget"
   | "local_list"
   | "local_read"
   | "local_write"
@@ -301,6 +303,30 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "remember",
+      description: "Save ONE short fact about the user that will help in future chats (their brand name, business, style or colors they like, audience, language, a preference they stated). Only things the user told you or clearly wants kept. Never save passwords, keys or other secrets. Do not announce it.",
+      parameters: {
+        type: "object",
+        properties: { text: { type: "string", description: "One short fact, under 250 characters." } },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "forget",
+      description: "Delete one saved memory by its id (shown in brackets in your memory list), for example when it is outdated or the user asks you to forget it.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer", description: "Memory id." } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_next",
       description: "Show the user 2-4 clickable next-step suggestions. Call it LAST, after you have written your summary in the same message. Each suggestion has a short title and the exact instruction you would carry out if the user clicks it. Suggestions only propose work; nothing happens until the user clicks.",
       parameters: {
@@ -452,8 +478,8 @@ export function checkLocalCall(name: string, args: any): string | null {
 
 export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "set_env"];
 
-export function systemPrompt(localFolder?: string | null): string {
-  return systemPromptBase() + (localFolder ? localFolderPrompt(localFolder) : "");
+export function systemPrompt(localFolder?: string | null, memory?: string): string {
+  return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "");
 }
 
 function localFolderPrompt(folder: string): string {
@@ -479,6 +505,7 @@ How you work:
 - Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. Never ask for a secret in chat, and never put one in a site's files: published files are public.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
+- Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -757,6 +784,10 @@ export function describeCall(tool: string, args: any): string {
       return `Update the plan`;
     case "ask_user":
       return `Ask you a question`;
+    case "remember":
+      return `Remember: ${String(args?.text ?? "").slice(0, 100)}`;
+    case "forget":
+      return `Forget memory ${String(args?.id ?? "?")}`;
     case "local_list":
       return `List ${String(args?.path || "your folder")} on your computer`;
     case "local_read":
