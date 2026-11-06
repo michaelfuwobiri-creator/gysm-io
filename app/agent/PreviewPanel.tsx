@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bundlePreview, resolveRef, type PreviewFile } from "@/lib/previewBundle";
+import { cleanSlug } from "@/lib/previewSlug";
 
 // Preview panel: shows the site the agent built, from the user's workspace,
 // before anything is deployed. The page runs in a sandboxed iframe with no
@@ -32,6 +33,8 @@ export default function PreviewPanel({
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [copied, setCopied] = useState(false);
+  // The name in <name>.gysm.io. Empty = let the server pick one from the project name.
+  const [name, setName] = useState("");
 
   const makeLink = useCallback(async () => {
     setLinking(true);
@@ -40,17 +43,20 @@ export default function PreviewPanel({
       const res = await fetch("/api/agent/preview/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ project, slug: name.trim() || undefined }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.url) setLinkError(j?.error || "Couldn't create the link.");
-      else setLink({ url: j.url, skipped: Array.isArray(j.skipped) ? j.skipped : [] });
+      else {
+        setLink({ url: j.url, skipped: Array.isArray(j.skipped) ? j.skipped : [] });
+        if (typeof j.slug === "string") setName(j.slug);
+      }
     } catch {
       setLinkError("Couldn't create the link. Check your connection.");
     } finally {
       setLinking(false);
     }
-  }, [project]);
+  }, [project, name]);
 
   const copyLink = async () => {
     if (!link) return;
@@ -86,6 +92,7 @@ export default function PreviewPanel({
     setFiles(null);
     setLink(null);
     setLinkError("");
+    setName("");
   }, [project]);
   useEffect(() => {
     void load();
@@ -133,6 +140,18 @@ export default function PreviewPanel({
               Phone
             </button>
           </div>
+          <label className="gb-pv-name" title="The name for your link. Letters, numbers and hyphens.">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-/, "").slice(0, 32))}
+              placeholder={cleanSlug(project) || "my-site"}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              aria-label="Link name"
+            />
+            <span>.gysm.io</span>
+          </label>
           <button type="button" className="gb-ghost" onClick={makeLink} disabled={linking} title="Host this preview at a gysm.io link you can open or share. Anyone with the link can see it.">
             {linking ? "Creating…" : link ? "Update gysm.io link" : "Get gysm.io link"}
           </button>

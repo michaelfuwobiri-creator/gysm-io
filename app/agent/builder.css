@@ -197,3 +197,7 @@
 .gb-pv-link a:hover { text-decoration: underline; }
 .gb-pv-small { color: var(--gb-muted); font-size: 12px; flex-basis: 100%; }
 .gb-pv-err { color: var(--gb-danger); }
+.gb-pv-name { display: inline-flex; align-items: center; border: 1px solid var(--gb-line); border-radius: 8px; background: var(--gb-surface, #fff); padding: 0 8px; height: 30px; font-size: 13px; }
+.gb-pv-name:focus-within { border-color: var(--gb-fuchsia); box-shadow: 0 0 0 3px var(--gb-fuchsia-soft); }
+.gb-pv-name input { border: 0; outline: 0; background: transparent; width: 110px; font: inherit; color: inherit; padding: 0; text-align: right; }
+.gb-pv-name span { color: var(--gb-muted); }

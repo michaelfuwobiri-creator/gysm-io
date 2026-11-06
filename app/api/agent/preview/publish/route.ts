@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { readProjectFiles } from "@/lib/agentTools";
-import { saveAgentPreview, selectHostableFiles } from "@/lib/agentProjects";
+import { saveAgentPreview, selectHostableFiles, setPreviewSlug } from "@/lib/agentProjects";
+import { previewLinkFor } from "@/lib/previewSlug";
 import { appFrameUrl } from "@/lib/userContent";
 
 // "Get a gysm.io link": hosts a copy of the project's workspace files at
@@ -24,8 +25,14 @@ export async function POST(req: Request) {
     const picked = selectHostableFiles(r.files);
     if (picked.error) return Response.json({ error: picked.error }, { status: 422 });
     const id = await saveAgentPreview({ userId: user.id, project: String(body.project), files: picked.files });
-    const base = appFrameUrl(id, "index.html") ?? `${new URL(req.url).origin}/a/${id}/index.html`;
-    return Response.json({ url: base, id, skipped: picked.skipped }, { headers: { "Cache-Control": "no-store" } });
+    const named = await setPreviewSlug({ id, userId: user.id, wanted: body?.slug, fallbackFrom: String(body.project) });
+    const origin = new URL(req.url).origin;
+    // Files are saved either way; a bad or taken name is reported so the user can pick another.
+    if (named.error && body?.slug) {
+      return Response.json({ error: named.error, taken: !!named.taken, id, skipped: picked.skipped }, { status: named.taken ? 409 : 422 });
+    }
+    const url = named.slug ? previewLinkFor(named.slug, origin) : appFrameUrl(id, "index.html") ?? `${origin}/a/${id}/index.html`;
+    return Response.json({ url, id, slug: named.slug, skipped: picked.skipped }, { headers: { "Cache-Control": "no-store" } });
   } catch (error: any) {
     console.error("[agent] preview publish failed:", error?.message || error);
     const msg = String(error?.message || "");

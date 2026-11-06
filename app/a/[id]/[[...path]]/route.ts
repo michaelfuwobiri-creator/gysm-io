@@ -1,8 +1,5 @@
 import { NextRequest } from "next/server";
-import { sql } from "@/lib/db";
-import { injectAiGeneratedMeta } from "@/lib/aiDisclosure";
-import { ENTRY_PATH, contentTypeFor, normalizePath } from "@/lib/projectFilesCore";
-import { getProjectFile } from "@/lib/projectFiles";
+import { serveBuildFile } from "@/lib/serveBuild";
 import { isUserContentHost, userContentOrigin } from "@/lib/userContent";
 
 // Serves a build's files at real URLs (/a/<project id>/<path>) so relative
@@ -30,33 +27,5 @@ export async function GET(req: NextRequest, { params }: { params: { id: string; 
 
   if (!UUID_RE.test(params.id)) return notFound();
 
-  const requested = params.path && params.path.length ? params.path.join("/") : ENTRY_PATH;
-  const path = normalizePath(requested);
-  if (!path) return notFound();
-
-  let file;
-  try {
-    file = await getProjectFile(params.id, path);
-  } catch (error: any) {
-    console.error("[a] failed to load file:", error.message);
-    return new Response("Server error", { status: 500 });
-  }
-  if (!file) return notFound();
-
-  if (path === ENTRY_PATH) {
-    // Count a view only for the entry page, same as /publish/[id].
-    sql`update projects set views = views + 1 where id = ${params.id}`.catch(() => {});
-  }
-
-  const body = path.endsWith(".html") ? injectAiGeneratedMeta(file.content) : file.content;
-  const headers: Record<string, string> = {
-    "Content-Type": contentTypeFor(path),
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "no-referrer",
-    "Cache-Control": "public, max-age=0, must-revalidate",
-  };
-  if (!isolated) {
-    headers["Content-Security-Policy"] = "sandbox allow-scripts allow-forms allow-popups allow-modals";
-  }
-  return new Response(body, { headers });
+  return serveBuildFile(params.id, params.path, { sandbox: !isolated });
 }

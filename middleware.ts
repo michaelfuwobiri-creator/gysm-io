@@ -5,6 +5,7 @@ import createIntlMiddleware from 'next-intl/middleware'
 import { routing } from './i18n/routing'
 import { checkRateLimit } from './lib/rateLimit'
 import { isUserContentHost } from './lib/userContent'
+import { slugFromHost } from './lib/previewSlug'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
 const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/gysmlink(.*)', '/shield(.*)', '/admin(.*)', '/shell(.*)', '/agent(.*)'])
@@ -93,6 +94,15 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
     return new NextResponse('Not found', { status: 404 })
   }
 
+  // <name>.gysm.io (hosted Agent previews, PREVIEW_SUBDOMAINS=1): every path on
+  // that host is served from /s/<name>/..., straight past Clerk and the APIs.
+  const previewName = slugFromHost(host)
+  if (previewName) {
+    const url = req.nextUrl.clone()
+    url.pathname = `/s/${previewName}${req.nextUrl.pathname === '/' ? '/' : req.nextUrl.pathname}`
+    return NextResponse.rewrite(url)
+  }
+
   // Rate limiting runs before everything else below (custom-domain
   // lookup, Clerk auth, i18n) so an abusive caller gets rejected as
   // cheaply as possible -- no DB round-trip, no auth check.
@@ -139,5 +149,11 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
 }
 
 export const config = {
-  matcher: ['/((?!.*\\.).*)', '/(api|trpc)(.*)'],
+  matcher: [
+    '/((?!.*\\.).*)',
+    '/(api|trpc)(.*)',
+    // <name>.gysm.io needs files with dots (styles.css, app.js) too. www is
+    // excluded so normal site assets still skip the middleware.
+    { source: '/:path*', has: [{ type: 'host', value: '(?<previewname>(?!www$)[a-z0-9-]+)\\.gysm\\.io' }] },
+  ],
 }

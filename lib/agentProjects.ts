@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { cleanSlug, slugProblem } from "@/lib/previewSlug";
 import { ENTRY_PATH, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, normalizePath, replaceProjectFiles, type ProjectFile } from "@/lib/projectFiles";
 
 // Saves a site the Agent deployed as a normal project, so it shows up on the
@@ -119,4 +120,71 @@ export async function saveAgentPreview(opts: { userId: string; project: string; 
   if (!id) throw new Error("Couldn't create the preview.");
   await replaceProjectFiles(id, files);
   return id;
+}
+
+// ---- Friendly names (src.gysm.io) ------------------------------------------
+
+/** The project a hosted-preview name points at, or null. Null too when migration 0035 is not applied. */
+export async function projectIdForSlug(slug: string): Promise<string | null> {
+  try {
+    const rows = (await sql`select id from projects where preview_slug = ${slug} limit 1`) as any[];
+    return rows[0]?.id ?? null;
+  } catch (e: any) {
+    if (e?.code === "42703") return null; // column missing: migration not run yet
+    throw e;
+  }
+}
+
+export type SlugResult = { slug: string | null; error?: string; taken?: boolean };
+
+function pgCode(e: any): string | undefined {
+  return e?.code || e?.sourceError?.code;
+}
+
+/**
+ * Gives a project's hosted preview its friendly name. With a name asked for,
+ * that exact name is used or an error says why not. Without one, the project
+ * keeps the name it has, or gets one made from the project name (-2, -3 … when
+ * taken). slug is null when migration 0035 has not been applied: the caller
+ * then falls back to the plain /a/<id> link.
+ */
+export async function setPreviewSlug(opts: { id: string; userId: string; wanted?: string; fallbackFrom: string }): Promise<SlugResult> {
+  const { id, userId } = opts;
+  try {
+    const cur = (await sql`select preview_slug from projects where id = ${id} and user_id = ${userId} limit 1`) as any[];
+    const current: string | null = cur[0]?.preview_slug ?? null;
+    const asked = opts.wanted !== undefined && opts.wanted !== null && String(opts.wanted).trim() !== "";
+
+    if (asked) {
+      const want = cleanSlug(opts.wanted);
+      const problem = slugProblem(want);
+      if (problem) return { slug: current, error: problem };
+      if (want === current) return { slug: current };
+      try {
+        await sql`update projects set preview_slug = ${want} where id = ${id} and user_id = ${userId}`;
+        return { slug: want };
+      } catch (e: any) {
+        if (pgCode(e) === "23505") return { slug: current, error: `${want}.gysm.io is already taken. Try another name.`, taken: true };
+        throw e;
+      }
+    }
+
+    if (current) return { slug: current };
+    let base = cleanSlug(opts.fallbackFrom);
+    if (slugProblem(base)) base = `site-${id.slice(0, 6)}`;
+    for (let i = 1; i <= 8; i++) {
+      const candidate = i === 1 ? base : `${base.slice(0, 28)}-${i}`;
+      if (slugProblem(candidate)) continue;
+      try {
+        await sql`update projects set preview_slug = ${candidate} where id = ${id} and user_id = ${userId}`;
+        return { slug: candidate };
+      } catch (e: any) {
+        if (pgCode(e) !== "23505") throw e;
+      }
+    }
+    return { slug: null, error: "Couldn't find a free name. Type one and try again." };
+  } catch (e: any) {
+    if (pgCode(e) === "42703") return { slug: null }; // migration 0035 not applied
+    throw e;
+  }
 }

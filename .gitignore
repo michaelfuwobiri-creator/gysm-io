@@ -7,3 +7,10 @@ dist
 /build
 *.log
 tsconfig.tsbuildinfo
+
+# Local working files that must never be committed
+Claude outputs/
+*.patch
+*.bundle
+*.tgz
+lawyer-consultation-checklist.md
