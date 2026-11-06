@@ -653,6 +653,17 @@ export function pendingToolCall(messages: ChatMessage[]): { id: string; name: st
   return { id: t.id, name: t.function.name, args };
 }
 
+/** The project folder a tool call is about, so the UI can offer a Preview. */
+export function projectOf(tool: string, args: any): string | null {
+  if (tool === "deploy" || tool === "set_env") return cleanProjectName(args?.project);
+  if (tool === "write_file" || tool === "edit_file" || tool === "read_file") {
+    const rel = cleanRelPath(args?.path);
+    if (!rel || !rel.includes("/")) return null;
+    return cleanProjectName(rel.split("/")[0]);
+  }
+  return null;
+}
+
 /** One-line human summary of a tool call for the UI / approval card. */
 export function describeCall(tool: string, args: any): string {
   switch (tool) {

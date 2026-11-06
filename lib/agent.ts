@@ -16,6 +16,7 @@ import {
   describeCall,
   isLocalTool,
   isLocalWriteTool,
+  projectOf,
   isRiskyCommand,
   needsApproval,
   pendingToolCall,
@@ -33,9 +34,9 @@ import { cleanSuggestions, type Suggestion } from "@/lib/agentGuards";
 
 export type AgentEvent =
   | { type: "text"; text: string }
-  | { type: "tool"; toolCallId: string; name: string; summary: string }
+  | { type: "tool"; toolCallId: string; name: string; summary: string; project?: string }
   | { type: "tool_result"; toolCallId: string; name: string; ok: boolean; output: string }
-  | { type: "proposal"; toolCallId: string; name: string; summary: string; detail: string; risky: boolean; secretInput?: { label: string } }
+  | { type: "proposal"; toolCallId: string; name: string; summary: string; detail: string; risky: boolean; secretInput?: { label: string }; project?: string }
   | { type: "declined"; toolCallId: string; name: string }
   // A local_* tool the browser must run against the user's connected folder.
   | { type: "client_tool"; toolCallId: string; name: string; args: any; summary: string; write: boolean }
@@ -77,7 +78,8 @@ export async function runAgentTurn(opts: {
   };
 
   const run = async (id: string, name: string, args: any, secret?: string): Promise<string> => {
-    emit({ type: "tool", toolCallId: id, name, summary: describeCall(name, args) });
+    const project = projectOf(name, args);
+    emit({ type: "tool", toolCallId: id, name, summary: describeCall(name, args), ...(project ? { project } : {}) });
     const result = await executeTool(userId, name, args, secret);
     if (result.creditsKind === "command") await charge(AGENT_CREDITS_PER_COMMAND);
     if (result.creditsKind === "deploy") await charge(AGENT_CREDITS_PER_DEPLOY);
@@ -179,6 +181,7 @@ export async function runAgentTurn(opts: {
           detail: proposalDetail(name, args),
           risky: name === "run_command" ? isRiskyCommand(String(args?.cmd ?? ""), args?.risky === true) : true,
           ...(name === "set_env" ? { secretInput: { label: String(args?.key ?? "Value") } } : {}),
+          ...(projectOf(name, args) ? { project: projectOf(name, args) as string } : {}),
         });
         break; // wait for the user's decision
       }

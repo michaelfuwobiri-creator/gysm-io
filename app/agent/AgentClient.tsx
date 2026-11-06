@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import GysmMark from "./GysmMark";
+import PreviewPanel from "./PreviewPanel";
+import { itemsBefore, messagesBeforeUser, userItemBefore, userPositionFromEnd } from "@/lib/agentHistory";
+import "./builder.css";
 import { folderAccessSupported, localFileExists, runLocalTool, type DirHandleLike } from "@/lib/localFolder";
 
 // GYSM Agent UI: one timeline of chat text, tool activity and approval
@@ -20,6 +24,7 @@ type Item =
       detail: string;
       risky: boolean;
       secretLabel?: string;
+      project?: string;
       /** A change to the user's own computer, run by this browser after approval. */
       local?: boolean;
       resolved?: "approved" | "declined";
@@ -32,12 +37,35 @@ const PINK = "#FF0080";
 const MAX_SAVED_ITEMS = 150;
 
 const STARTERS = [
-  "Build a one-page site for my bakery and deploy it",
-  "Make a tiny to-do web app, check it works, then deploy it",
-  "Create a database table for customer sign-ups",
-  "Show me what's in my workspace",
-  "Review my website for SEO, speed and mobile problems: https://",
+  { label: "Build and deploy a site", prompt: "Build a one-page site for my bakery and deploy it" },
+  { label: "Make a small web app", prompt: "Make a tiny to-do web app, check it works, then deploy it" },
+  { label: "Set up a database table", prompt: "Create a database table for customer sign-ups" },
+  { label: "Look through my workspace", prompt: "Show me what's in my workspace" },
+  { label: "Review my website", prompt: "Review my website for SEO, speed and mobile problems: https://" },
 ];
+
+const iconProps = { width: 15, height: 15, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+const IconCopy = () => (
+  <svg {...iconProps}>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.8" />
+    <path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
+  </svg>
+);
+const IconCheck = () => (
+  <svg {...iconProps}>
+    <path d="m3.5 8.5 3 3 6-7" />
+  </svg>
+);
+const IconEdit = () => (
+  <svg {...iconProps}>
+    <path d="M10.5 3.5 12.5 5.5M3 13l.6-2.6L11 3a1.4 1.4 0 0 1 2 2l-7.4 7.4L3 13Z" />
+  </svg>
+);
+const IconRewrite = () => (
+  <svg {...iconProps}>
+    <path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v2.8h-2.8" />
+  </svg>
+);
 
 let idCounter = 0;
 const uid = () => `${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -77,6 +105,17 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   const [credits, setCredits] = useState(initialCredits);
+  // What the agent is doing right now, shown beside the working GYSM mark.
+  const [activity, setActivity] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  // Edit / Rewrite / Copy on messages.
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Preview: the project folder the agent is working on, and whether the side panel is open.
+  const [lastProject, setLastProject] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Secret values live only in this in-memory map: never saved, never added to the chat history.
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -147,6 +186,13 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
   }, [items, messages, storageKey]);
 
   useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [text]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [items, busy]);
 
@@ -174,15 +220,24 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
         let buf = "";
         const handle = (e: any) => {
           if (e.type === "text") push({ id: uid(), kind: "ai", text: e.text });
-          else if (e.type === "tool")
+          else if (e.type === "tool") {
+            setActivity(e.summary);
+            if (e.project) setLastProject(e.project);
             push({ id: uid(), kind: "tool", callId: e.toolCallId, name: e.name, summary: e.summary, running: true });
-          else if (e.type === "tool_result")
+          } else if (e.type === "tool_result") {
+            // Files changed: refresh the preview if it is open.
+            if (e.ok && (e.name === "write_file" || e.name === "edit_file")) setPreviewKey((k) => k + 1);
             setItems((prev) =>
               prev.map((i) => (i.kind === "tool" && i.callId === e.toolCallId ? { ...i, running: false, ok: e.ok, output: e.output } : i))
             );
-          else if (e.type === "proposal")
-            push({ id: uid(), kind: "proposal", callId: e.toolCallId, name: e.name, summary: e.summary, detail: e.detail, risky: e.risky, secretLabel: e.secretInput?.label });
-          else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
+          } else if (e.type === "proposal") {
+            push({ id: uid(), kind: "proposal", callId: e.toolCallId, name: e.name, summary: e.summary, detail: e.detail, risky: e.risky, secretLabel: e.secretInput?.label, project: e.project });
+            // Show the site before the user is asked to approve a deploy.
+            if (e.name === "deploy" && e.project) {
+              setLastProject(e.project);
+              setPreviewOpen(true);
+            }
+          } else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
             if (e.balance || e.spent) setCredits(e.balance);
@@ -215,6 +270,7 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
         push({ id: uid(), kind: "note", text: "Connection lost. Please try again.", tone: "error" });
       } finally {
         setBusy(false);
+        setActivity("");
       }
     },
     [push]
@@ -285,168 +341,365 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
     void send({ decision: { toolCallId: item.callId, approve, secret } });
   };
 
+  const copyText = async (id: string, value: string) => {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(value);
+      ok = true;
+    } catch {
+      // Older browsers: fall back to selecting a hidden textarea.
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) return;
+    setCopiedId(id);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopiedId(null), 1600);
+  };
+
+  // Edit and Rewrite both go back to just before a user message and send
+  // text again. Anything the agent already did (files, deploys) stays done.
+  const rerunFrom = (userItem: Extract<Item, { kind: "user" }>, newText: string) => {
+    const t = newText.trim();
+    if (!t || busy) return;
+    const pos = userPositionFromEnd(items, userItem.id);
+    const cut = pos === -1 ? null : messagesBeforeUser(messagesRef.current as { role: string }[], pos);
+    if (!cut) {
+      push({ id: uid(), kind: "note", text: "That message is too far back to redo. Start a new chat or send a new message.", tone: "error" });
+      return;
+    }
+    messagesRef.current = cut;
+    setMessages(cut);
+    setItems((prev) => [...itemsBefore(prev, userItem.id), { id: uid(), kind: "user", text: t }]);
+    pendingLocalRef.current = {};
+    setEditing(null);
+    void send({ text: t });
+  };
+
+  const canRedo = (userItem: Extract<Item, { kind: "user" }>) => {
+    const pos = userPositionFromEnd(items, userItem.id);
+    return pos !== -1 && messagesBeforeUser(messagesRef.current as { role: string }[], pos) !== null;
+  };
+
+  const lastAiId = (() => {
+    for (let i = items.length - 1; i >= 0; i--) if (items[i].kind === "ai") return items[i].id;
+    return null;
+  })();
+
   const reset = () => {
     if (busy) return;
     setItems([]);
     setMessages([]);
+    setEditing(null);
+    setPreviewOpen(false);
+    setLastProject(null);
   };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 24px)", maxWidth: 820, margin: "0 auto", padding: "0 12px" }}>
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>GYSM Builder</h1>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Describe what you want. The agent builds it, checks it, and deploys it. Deploys and database changes ask you first.</div>
+  const canSend = !busy && !!text.trim();
+  const fillStarter = (prompt: string) => {
+    setText(prompt);
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
+  const composer = (
+    <div className="gb-composer-wrap">
+      <form
+        className="gb-composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(text);
+        }}
+      >
+        <textarea
+          ref={taRef}
+          id="gb-input"
+          aria-label="Message GYSM Builder"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit(text);
+            }
+          }}
+          placeholder={items.length ? "Reply to GYSM Builder…" : "Describe what you want to build…"}
+          rows={1}
+        />
+        <div className="gb-comp-row">
+          <div className="left">
+            {folderSupported &&
+              (folderName ? (
+                <>
+                  <span className="gb-tag" title={`Connected folder: ${folderName}`}>
+                    {folderName}
+                  </span>
+                  <button type="button" className="gb-ghost" onClick={disconnectFolder} disabled={busy} aria-label="Disconnect folder">
+                    Disconnect
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="gb-ghost" onClick={connectFolder} disabled={busy} title="Let the agent work in a folder on your computer. You approve every change.">
+                  + Folder
+                </button>
+              ))}
+          </div>
+          <button type="submit" className={`gb-send${busy ? " working" : ""}`} disabled={!canSend} aria-label={busy ? "GYSM is working" : "Send"}>
+            {busy ? (
+              <GysmMark size={22} working onFuchsia />
+            ) : (
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" />
+              </svg>
+            )}
+          </button>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, border: `1px solid ${PINK}`, borderRadius: 999, padding: "2px 10px" }}>{credits} cr</span>
-          {folderSupported && (
-            <button
-              onClick={folderName ? disconnectFolder : connectFolder}
-              disabled={busy}
-              title={folderName ? "Disconnect this folder" : "Let the agent work in a folder on your computer. You approve every change."}
-              style={{ fontSize: 12, background: "none", border: `1px solid ${folderName ? PINK : "#8884"}`, borderRadius: 8, padding: "4px 8px", color: "inherit" }}
-            >
-              {folderName ? `Folder: ${folderName} ✕` : "Connect folder"}
+      </form>
+    </div>
+  );
+
+  return (
+    <div className="gb">
+      <div className="gb-main">
+      <header className="gb-top">
+        <div className="gb-brand">
+          <GysmMark size={24} working={busy} title="GYSM" />
+          <span>Builder</span>
+          <small>by GYSM</small>
+        </div>
+        <div className="gb-actions">
+          {lastProject && (
+            <button className="gb-ghost" aria-pressed={previewOpen} onClick={() => setPreviewOpen((o) => !o)} title={`Preview ${lastProject} before it goes live`}>
+              Preview
             </button>
           )}
-          <a href="/builder?classic=1" style={{ fontSize: 12, opacity: 0.7, textDecoration: "underline", color: "inherit" }}>
+          <span className="gb-pill" title="Your credit balance">{credits} credits</span>
+          <a className="gb-ghost" href="/builder?classic=1">
             Classic builder
           </a>
-          <button onClick={reset} disabled={busy} style={{ fontSize: 12, background: "none", border: "1px solid #8884", borderRadius: 8, padding: "4px 8px", color: "inherit" }}>
+          <button className="gb-ghost" onClick={reset} disabled={busy}>
             New chat
           </button>
         </div>
       </header>
 
-      {folderError && <div style={{ fontSize: 12, color: "#d33", paddingBottom: 6 }}>{folderError}</div>}
-      {folderName && (
-        <div style={{ fontSize: 12, opacity: 0.75, paddingBottom: 6 }}>
-          The agent can read and list "{folderName}" and asks before it changes anything. It can't see .env files or keys.
-        </div>
-      )}
-
-      <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
-        {items.length === 0 && (
-          <div style={{ display: "grid", gap: 8, marginTop: 24 }}>
-            <div style={{ opacity: 0.8, fontSize: 14 }}>Tell the agent what to build. For example:</div>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                onClick={() => submit(s)}
-                style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid #8884", background: "none", color: "inherit", fontSize: 14 }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {items.map((item) => {
-          if (item.kind === "user")
-            return (
-              <div key={item.id} style={{ display: "flex", justifyContent: "flex-end", margin: "8px 0" }}>
-                <div style={{ background: PINK, color: "#fff", padding: "8px 12px", borderRadius: 14, maxWidth: "85%", whiteSpace: "pre-wrap" }}>{item.text}</div>
-              </div>
-            );
-          if (item.kind === "ai")
-            return (
-              <div key={item.id} style={{ margin: "8px 0", whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.5 }}>
-                {item.text}
-              </div>
-            );
-          if (item.kind === "tool")
-            return (
-              <details key={item.id} style={{ margin: "6px 0", border: "1px solid #8883", borderRadius: 10, padding: "6px 10px", fontSize: 13 }}>
-                <summary style={{ cursor: "pointer" }}>
-                  {item.running ? "… " : item.ok ? "✓ " : "✗ "}
-                  <strong>{TOOL_LABEL[item.name] || item.name}</strong> <span style={{ opacity: 0.75 }}>{item.summary}</span>
-                </summary>
-                {item.output && <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, margin: "6px 0 0", maxHeight: 260, overflow: "auto" }}>{item.output}</pre>}
-              </details>
-            );
-          if (item.kind === "proposal")
-            return (
-              <div key={item.id} style={{ margin: "10px 0", border: `1px solid ${item.risky ? "#d33" : PINK}`, borderRadius: 12, padding: 12 }}>
-                <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{item.risky ? "Needs your approval" : "Approval"}</div>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>{item.summary}</div>
-                {item.detail && <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 12, maxHeight: 220, overflow: "auto", margin: "0 0 8px" }}>{item.detail}</pre>}
-                {item.secretLabel && !item.resolved && (
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    placeholder={`${item.secretLabel} (only you can see this)`}
-                    value={secrets[item.id] ?? ""}
-                    onChange={(e) => setSecrets((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                    style={{ width: "100%", boxSizing: "border-box", marginBottom: 8, padding: 8, borderRadius: 8, border: "1px solid #8886", background: "none", color: "inherit" }}
-                  />
-                )}
-                {item.resolved ? (
-                  <div style={{ fontSize: 13, opacity: 0.8 }}>{item.resolved === "approved" ? "Approved" : "Declined"}</div>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => decide(item, true)} disabled={busy} style={{ background: PINK, color: "#fff", border: 0, borderRadius: 8, padding: "8px 14px", fontWeight: 600 }}>
-                      Approve
-                    </button>
-                    <button onClick={() => decide(item, false)} disabled={busy} style={{ background: "none", color: "inherit", border: "1px solid #8886", borderRadius: 8, padding: "8px 14px" }}>
-                      Decline
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          return (
-            <div key={item.id} style={{ margin: "8px 0", fontSize: 13, color: item.tone === "error" ? "#d33" : undefined, opacity: item.tone === "muted" ? 0.7 : 1 }}>
-              {item.text}
+      {items.length === 0 ? (
+        <div className="gb-scroll">
+          <div className="gb-empty">
+            <div className="gb-hero">
+              <GysmMark size={44} working={busy} />
+              <h1>What shall we build?</h1>
+              <p>Describe it. GYSM writes it, checks it, and shows you before anything goes live.</p>
             </div>
-          );
-        })}
-        {busy && <div style={{ fontSize: 13, opacity: 0.7, margin: "8px 0" }}>Working…</div>}
-        {!busy && suggestions.length > 0 && (
-          <div style={{ margin: "12px 0" }}>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Suggested next steps (nothing runs until you tap one)</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {suggestions.map((sg) => (
-                <button
-                  key={sg.title}
-                  onClick={() => submit(sg.prompt)}
-                  title={sg.prompt}
-                  style={{ textAlign: "left", padding: "8px 12px", borderRadius: 999, border: `1px solid ${PINK}`, background: "none", color: "inherit", fontSize: 13, cursor: "pointer" }}
-                >
-                  {sg.title}
+            {composer}
+            {folderError && <div className="gb-note error" style={{ marginLeft: 0 }}>{folderError}</div>}
+            <div className="gb-chips">
+              {STARTERS.map((st) => (
+                <button key={st.label} className="gb-chip" onClick={() => fillStarter(st.prompt)} title={st.prompt}>
+                  {st.label}
                 </button>
               ))}
             </div>
           </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+        </div>
+      ) : (
+        <>
+          <div className="gb-scroll">
+            <div className="gb-col">
+              {items.map((item) => {
+                if (item.kind === "user")
+                  return (
+                    <div key={item.id} className="gb-user gb-msg">
+                      {editing?.id === item.id ? (
+                        <div className="gb-edit">
+                          <textarea
+                            id={`edit-${item.id}`}
+                            aria-label="Edit your message"
+                            autoFocus
+                            rows={3}
+                            value={editing.text}
+                            onChange={(e) => setEditing({ id: item.id, text: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setEditing(null);
+                              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) rerunFrom(item, editing.text);
+                            }}
+                          />
+                          <div className="gb-edit-note">Sends from here. Steps the agent already took, like files written or sites deployed, are not undone.</div>
+                          <div className="gb-btns">
+                            <button className="gb-secondary" onClick={() => setEditing(null)}>
+                              Cancel
+                            </button>
+                            <button className="gb-primary" onClick={() => rerunFrom(item, editing.text)} disabled={busy || !editing.text.trim()}>
+                              Save and send
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="gb-bubble">{item.text}</div>
+                          <div className="gb-msg-actions">
+                            <button className="gb-act" onClick={() => copyText(item.id, item.text)} aria-label="Copy message">
+                              {copiedId === item.id ? <IconCheck /> : <IconCopy />}
+                              <span>{copiedId === item.id ? "Copied" : "Copy"}</span>
+                            </button>
+                            {!busy && canRedo(item) && (
+                              <button className="gb-act" onClick={() => setEditing({ id: item.id, text: item.text })} aria-label="Edit message">
+                                <IconEdit />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                if (item.kind === "ai") {
+                  const redoFrom = !busy && item.id === lastAiId ? userItemBefore(items, item.id) : null;
+                  return (
+                    <div key={item.id} className="gb-ai gb-msg">
+                      <div className="gb-ai-mark">
+                        <GysmMark size={22} />
+                      </div>
+                      <div className="gb-ai-body">
+                        <div className="gb-ai-text">{item.text}</div>
+                        <div className="gb-msg-actions">
+                          <button className="gb-act" onClick={() => copyText(item.id, item.text)} aria-label="Copy reply">
+                            {copiedId === item.id ? <IconCheck /> : <IconCopy />}
+                            <span>{copiedId === item.id ? "Copied" : "Copy"}</span>
+                          </button>
+                          {redoFrom && redoFrom.kind === "user" && canRedo(redoFrom as Extract<Item, { kind: "user" }>) && (
+                            <button
+                              className="gb-act"
+                              onClick={() => rerunFrom(redoFrom as Extract<Item, { kind: "user" }>, (redoFrom as Extract<Item, { kind: "user" }>).text)}
+                              aria-label="Rewrite reply"
+                              title="Ask again and get a new answer. Uses credits again."
+                            >
+                              <IconRewrite />
+                              <span>Rewrite</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                if (item.kind === "tool")
+                  return (
+                    <details key={item.id} className="gb-tool">
+                      <summary>
+                        <span className="gb-dot">
+                          {item.running ? (
+                            <span className="gb-spinner" />
+                          ) : item.ok ? (
+                            <svg className="gb-ok" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Done"><path d="m3.5 8.5 3 3 6-7" /></svg>
+                          ) : (
+                            <svg className="gb-bad" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-label="Failed"><path d="m4 4 8 8M12 4l-8 8" /></svg>
+                          )}
+                        </span>
+                        <b>{TOOL_LABEL[item.name] || item.name}</b>
+                        <span className="gb-sum">{item.summary}</span>
+                      </summary>
+                      {item.output && <pre>{item.output}</pre>}
+                    </details>
+                  );
+                if (item.kind === "proposal")
+                  return (
+                    <div key={item.id} className="gb-approve">
+                      <div className={`gb-eyebrow${item.risky ? " risky" : ""}`}>{item.risky ? "Needs your approval · be careful" : "Needs your approval"}</div>
+                      <h3>{item.summary}</h3>
+                      {item.detail && <pre>{item.detail}</pre>}
+                      {item.secretLabel && !item.resolved && (
+                        <input
+                          type="password"
+                          id={`secret-${item.id}`}
+                          aria-label={item.secretLabel}
+                          autoComplete="off"
+                          placeholder={`${item.secretLabel} (only you can see this)`}
+                          value={secrets[item.id] ?? ""}
+                          onChange={(e) => setSecrets((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                        />
+                      )}
+                      {item.resolved ? (
+                        <div className="gb-resolved">{item.resolved === "approved" ? "Approved" : "Declined"}</div>
+                      ) : (
+                        <div className="gb-btns">
+                          <button className="gb-primary" onClick={() => decide(item, true)} disabled={busy}>
+                            Approve
+                          </button>
+                          <button className="gb-secondary" onClick={() => decide(item, false)} disabled={busy}>
+                            Decline
+                          </button>
+                          {item.name === "deploy" && item.project && (
+                            <button
+                              className="gb-ghost"
+                              onClick={() => {
+                                setLastProject(item.project as string);
+                                setPreviewOpen(true);
+                              }}
+                            >
+                              Preview first
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                return (
+                  <div key={item.id} className={`gb-note${item.tone === "error" ? " error" : ""}`}>
+                    {item.text}
+                  </div>
+                );
+              })}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit(text);
-        }}
-        style={{ display: "flex", gap: 8, padding: "8px 0 12px" }}
-      >
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit(text);
-            }
-          }}
-          placeholder="What do you want to build?"
-          rows={2}
-          style={{ flex: 1, borderRadius: 12, border: "1px solid #8886", padding: 10, background: "none", color: "inherit", resize: "none", font: "inherit" }}
+              {busy && (
+                <div className="gb-status" role="status" aria-live="polite">
+                  <GysmMark size={22} working />
+                  <span className="gb-shimmer">{activity || "Thinking…"}</span>
+                </div>
+              )}
+
+              {!busy && suggestions.length > 0 && (
+                <>
+                  <div className="gb-sug-label">Suggested next steps. Nothing runs until you pick one.</div>
+                  <div className="gb-sug">
+                    {suggestions.map((sg) => (
+                      <button key={sg.title} className="gb-chip" onClick={() => submit(sg.prompt)} title={sg.prompt}>
+                        {sg.title}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div ref={bottomRef} />
+            </div>
+          </div>
+          <div className="gb-dock">
+            {folderError && <div className="gb-note error" style={{ margin: "0 auto 6px", maxWidth: 720 }}>{folderError}</div>}
+            {composer}
+            <div className="gb-foot">Commands cost 5 credits, deploys 25, lookups 1. GYSM can make mistakes, so check what it builds.</div>
+          </div>
+        </>
+      )}
+      </div>
+      {previewOpen && lastProject && (
+        <PreviewPanel
+          project={lastProject}
+          refreshKey={previewKey}
+          canDeploy={!busy && !items.some((i) => i.kind === "proposal" && i.name === "deploy" && !i.resolved)}
+          onDeploy={() => submit(`Deploy ${lastProject} now`)}
+          onClose={() => setPreviewOpen(false)}
         />
-        <button type="submit" disabled={busy || !text.trim()} style={{ background: PINK, color: "#fff", border: 0, borderRadius: 12, padding: "0 18px", fontWeight: 600, opacity: busy || !text.trim() ? 0.5 : 1 }}>
-          Send
-        </button>
-      </form>
-      <div style={{ fontSize: 11, opacity: 0.6, paddingBottom: 8 }}>AI usage is billed in credits; each command costs 5, each deploy 25, lookups 1.</div>
+      )}
     </div>
   );
 }

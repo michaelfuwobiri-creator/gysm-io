@@ -568,6 +568,43 @@ export async function toolReviewSite(_userId: string, args: any): Promise<ToolRe
   return { ok: true, creditsKind: "light", output: `${head}\n${findings.length} finding(s):\n${lines.join("\n")}` };
 }
 
+// -- preview ---------------------------------------------------------------
+
+const PREVIEW_MAX_FILES = 300;
+const PREVIEW_MAX_BYTES = 3 * 1024 * 1024;
+const PREVIEW_TEXT_EXT = /\.(html?|css|m?js|json|svg|txt|md|xml)$/i;
+
+/** Reads a project's files from the user's workspace for the Preview panel. */
+export async function readProjectFiles(userId: string, rawProject: unknown): Promise<{ ok: true; files: { path: string; text?: string; base64?: string }[] } | { ok: false; error: string }> {
+  const project = cleanProjectName(rawProject);
+  if (!project) return { ok: false, error: "Invalid project name." };
+  const root = await workspaceRoot(userId);
+  const dir = `${root}/${project}`;
+  const list = await runInSandbox(userId, `cd -- ${quote(dir)} 2>/dev/null && find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -printf '%P\\t%s\\n' | head -1000`, root);
+  if (list.exitCode !== 0) return { ok: false, error: `Project folder not found: ${project}` };
+  const entries = list.output
+    .split("\n")
+    .map((l) => l.split("\t"))
+    .filter((p) => p.length === 2 && p[0] && !shouldSkipDeployPath(p[0]) && !p[0].includes("\0"))
+    .map(([path, size]) => ({ path, size: Number(size) || 0 }));
+  if (entries.length === 0) return { ok: false, error: "The project folder is empty." };
+  if (entries.length > PREVIEW_MAX_FILES) return { ok: false, error: `Too many files to preview (${entries.length}).` };
+  if (entries.reduce((n, e) => n + e.size, 0) > PREVIEW_MAX_BYTES) return { ok: false, error: "This project is too large to preview here." };
+
+  const sandbox = await getUserSandbox(userId);
+  const files: { path: string; text?: string; base64?: string }[] = [];
+  for (let i = 0; i < entries.length; i += 10) {
+    const batch = entries.slice(i, i + 10);
+    const bufs = await Promise.all(batch.map((e) => sandbox.readFileToBuffer({ path: `${dir}/${e.path}` })));
+    batch.forEach((e, j) => {
+      const b = bufs[j];
+      if (!b) return;
+      files.push(PREVIEW_TEXT_EXT.test(e.path) ? { path: e.path, text: b.toString("utf8") } : { path: e.path, base64: b.toString("base64") });
+    });
+  }
+  return { ok: true, files };
+}
+
 export async function logActivity(userId: string, tool: string, ok: boolean, summary: string): Promise<void> {
   try {
     await sql`insert into agent_logs (user_id, tool, ok, summary) values (${userId}, ${tool}, ${ok}, ${summary.slice(0, 500)})`;
