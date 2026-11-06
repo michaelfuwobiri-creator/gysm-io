@@ -1,7 +1,8 @@
 import { getUser } from "@/lib/auth";
 import { readProjectFiles } from "@/lib/agentTools";
 import { saveAgentPreview, selectHostableFiles, setPreviewSlug } from "@/lib/agentProjects";
-import { previewLinkFor } from "@/lib/previewSlug";
+import { previewHostsFor, previewLinkFor, subdomainsEnabled } from "@/lib/previewSlug";
+import { ensureProjectDomain, removeDomainFromProject } from "@/lib/vercelDomains";
 import { appFrameUrl } from "@/lib/userContent";
 
 // "Get a gysm.io link": hosts a copy of the project's workspace files at
@@ -31,8 +32,27 @@ export async function POST(req: Request) {
     if (named.error && body?.slug) {
       return Response.json({ error: named.error, taken: !!named.taken, id, skipped: picked.skipped }, { status: named.taken ? 409 : 422 });
     }
-    const url = named.slug ? previewLinkFor(named.slug, origin) : appFrameUrl(id, "index.html") ?? `${origin}/a/${id}/index.html`;
-    return Response.json({ url, id, slug: named.slug, skipped: picked.skipped }, { headers: { "Cache-Control": "no-store" } });
+    let url = named.slug ? previewLinkFor(named.slug, origin) : appFrameUrl(id, "index.html") ?? `${origin}/a/${id}/index.html`;
+    let note: string | undefined;
+    if (named.slug && subdomainsEnabled()) {
+      // Register www.<name>.gysm.io (and <name>.gysm.io -> www) on the Vercel
+      // project so each gets a certificate. Already-registered hosts are fine.
+      const hosts = previewHostsFor(named.slug);
+      try {
+        await ensureProjectDomain(hosts.main);
+        await ensureProjectDomain(hosts.bare, hosts.main);
+        note = "A new name can take a minute to start working while its certificate is issued.";
+      } catch (e: any) {
+        console.error("[agent] couldn't register preview domain:", e?.message || e);
+        url = `${origin}/s/${named.slug}`;
+        note = "The www link isn't ready yet, so here is the gysm.io/s/ link. Try Update again in a minute.";
+      }
+      if (named.previous && named.previous !== named.slug) {
+        const old = previewHostsFor(named.previous);
+        await Promise.allSettled([removeDomainFromProject(old.bare), removeDomainFromProject(old.main)]);
+      }
+    }
+    return Response.json({ url, id, slug: named.slug, skipped: picked.skipped, note }, { headers: { "Cache-Control": "no-store" } });
   } catch (error: any) {
     console.error("[agent] preview publish failed:", error?.message || error);
     const msg = String(error?.message || "");

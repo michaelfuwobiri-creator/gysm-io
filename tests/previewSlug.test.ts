@@ -31,14 +31,18 @@ describe("links and hosts", () => {
   it("uses a path link until subdomains are on", () => {
     expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://www.gysm.io/s/src");
     vi.stubEnv("PREVIEW_SUBDOMAINS", "1");
-    expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://src.gysm.io");
+    expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://www.src.gysm.io");
   });
   it("reads the name from a host only when enabled", () => {
     expect(slugFromHost("src.gysm.io")).toBeNull();
     vi.stubEnv("PREVIEW_SUBDOMAINS", "1");
     expect(slugFromHost("src.gysm.io")).toBe("src");
     expect(slugFromHost("SRC.gysm.io:443")).toBe("src");
+    expect(slugFromHost("www.galaxy-school.gysm.io")).toBe("galaxy-school");
+    expect(slugFromHost("galaxy-school.gysm.io.")).toBe("galaxy-school");
     expect(slugFromHost("www.gysm.io")).toBeNull();
+    expect(slugFromHost("www.www.gysm.io")).toBeNull();
+    expect(slugFromHost("x.www.src.gysm.io")).toBeNull();
     expect(slugFromHost("gysm.io")).toBeNull();
     expect(slugFromHost("a.b.gysm.io")).toBeNull();
     expect(slugFromHost("src.example.com")).toBeNull();
@@ -69,7 +73,7 @@ describe("setPreviewSlug / projectIdForSlug", () => {
   });
   it("saves a free asked-for name", async () => {
     (sql as any).mockResolvedValueOnce([{ preview_slug: null }]).mockResolvedValueOnce([]);
-    expect(await setPreviewSlug({ id: "i", userId: "u", wanted: "My Site", fallbackFrom: "x" })).toEqual({ slug: "my-site" });
+    expect(await setPreviewSlug({ id: "i", userId: "u", wanted: "My Site", fallbackFrom: "x" })).toEqual({ slug: "my-site", previous: null });
   });
   it("falls back to no name when migration 0035 is missing", async () => {
     (sql as any).mockRejectedValueOnce(missing);

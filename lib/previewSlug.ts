@@ -41,19 +41,26 @@ export function subdomainsEnabled(): boolean {
   return process.env.PREVIEW_SUBDOMAINS === "1";
 }
 
+/** The two hosts a name is served on: www.<name>.gysm.io (main) and <name>.gysm.io (redirects to www). */
+export function previewHostsFor(slug: string): { main: string; bare: string } {
+  const base = previewBaseDomain();
+  return { main: `www.${slug}.${base}`, bare: `${slug}.${base}` };
+}
+
 /** The address to show for a hosted preview. */
 export function previewLinkFor(slug: string, origin: string): string {
-  if (subdomainsEnabled()) return `https://${slug}.${previewBaseDomain()}`;
+  if (subdomainsEnabled()) return `https://${previewHostsFor(slug).main}`;
   return `${origin.replace(/\/$/, "")}/s/${slug}`;
 }
 
-/** The name in a request host such as src.gysm.io, or null for any other host. */
+/** The name in a request host such as www.src.gysm.io or src.gysm.io, or null for any other host. */
 export function slugFromHost(host: string | null | undefined): string | null {
   if (!subdomainsEnabled() || !host) return null;
-  const bare = host.split(":")[0].toLowerCase();
+  const bare = host.split(":")[0].toLowerCase().replace(/\.$/, "");
   const suffix = `.${previewBaseDomain()}`;
   if (!bare.endsWith(suffix)) return null;
-  const label = bare.slice(0, -suffix.length);
+  let label = bare.slice(0, -suffix.length);
+  if (label.startsWith("www.")) label = label.slice(4);
   if (!label || label.includes(".")) return null;
   return slugProblem(label) ? null : label;
 }

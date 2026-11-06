@@ -94,7 +94,7 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
     return new NextResponse('Not found', { status: 404 })
   }
 
-  // <name>.gysm.io (hosted Agent previews, PREVIEW_SUBDOMAINS=1): every path on
+  // www.<name>.gysm.io / <name>.gysm.io (hosted Agent previews, PREVIEW_SUBDOMAINS=1): every path on
   // that host is served from /s/<name>/..., straight past Clerk and the APIs.
   const previewName = slugFromHost(host)
   if (previewName) {
@@ -152,8 +152,9 @@ export const config = {
   matcher: [
     '/((?!.*\\.).*)',
     '/(api|trpc)(.*)',
-    // <name>.gysm.io needs files with dots (styles.css, app.js) too. www is
-    // excluded so normal site assets still skip the middleware.
-    { source: '/:path*', has: [{ type: 'host', value: '(?<previewname>(?!www$)[a-z0-9-]+)\\.gysm\\.io' }] },
+    // <name>.gysm.io and www.<name>.gysm.io need files with dots (styles.css,
+    // app.js) too. www.gysm.io itself is excluded so the site's own assets
+    // still skip the middleware.
+    { source: '/:path*', has: [{ type: 'host', value: '^(?:www\\.)?(?!www\\.)[a-z0-9-]+\\.gysm\\.io$' }] },
   ],
 }

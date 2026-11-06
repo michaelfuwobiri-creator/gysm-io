@@ -66,3 +66,21 @@ export async function removeDomainFromProject(domain: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+/**
+ * Registers a gysm.io preview host on the project. Safe to call again: a host
+ * that is already on the project counts as success. Optional redirect sends
+ * the host to another one (used for <name>.gysm.io -> www.<name>.gysm.io).
+ */
+export async function ensureProjectDomain(domain: string, redirect?: string): Promise<void> {
+  try {
+    await vercelFetch(`/v10/projects/${VERCEL_PROJECT_ID}/domains`, {
+      method: "POST",
+      body: JSON.stringify(redirect ? { name: domain, redirect, redirectStatusCode: 308 } : { name: domain }),
+    });
+  } catch (e: any) {
+    const msg = String(e?.message || "");
+    if (/already (in use|exists|assigned|added)|domain_already/i.test(msg)) return;
+    throw e;
+  }
+}

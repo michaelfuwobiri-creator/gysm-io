@@ -135,7 +135,7 @@ export async function projectIdForSlug(slug: string): Promise<string | null> {
   }
 }
 
-export type SlugResult = { slug: string | null; error?: string; taken?: boolean };
+export type SlugResult = { slug: string | null; error?: string; taken?: boolean; previous?: string | null };
 
 function pgCode(e: any): string | undefined {
   return e?.code || e?.sourceError?.code;
@@ -162,7 +162,7 @@ export async function setPreviewSlug(opts: { id: string; userId: string; wanted?
       if (want === current) return { slug: current };
       try {
         await sql`update projects set preview_slug = ${want} where id = ${id} and user_id = ${userId}`;
-        return { slug: want };
+        return { slug: want, previous: current };
       } catch (e: any) {
         if (pgCode(e) === "23505") return { slug: current, error: `${want}.gysm.io is already taken. Try another name.`, taken: true };
         throw e;

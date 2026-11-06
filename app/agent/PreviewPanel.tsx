@@ -29,7 +29,7 @@ export default function PreviewPanel({
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [tick, setTick] = useState(0);
   // The hosted gysm.io copy of this preview.
-  const [link, setLink] = useState<{ url: string; skipped: string[] } | null>(null);
+  const [link, setLink] = useState<{ url: string; skipped: string[]; note?: string } | null>(null);
   const [linking, setLinking] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -48,7 +48,7 @@ export default function PreviewPanel({
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j?.url) setLinkError(j?.error || "Couldn't create the link.");
       else {
-        setLink({ url: j.url, skipped: Array.isArray(j.skipped) ? j.skipped : [] });
+        setLink({ url: j.url, skipped: Array.isArray(j.skipped) ? j.skipped : [], note: typeof j.note === "string" ? j.note : undefined });
         if (typeof j.slug === "string") setName(j.slug);
       }
     } catch {
@@ -190,7 +190,7 @@ export default function PreviewPanel({
               <button type="button" className="gb-ghost" onClick={copyLink}>
                 {copied ? "Copied" : "Copy"}
               </button>
-              <span className="gb-pv-small">Anyone with this link can see it.{link.skipped.length ? ` Not included (images and other files can't be hosted yet): ${link.skipped.slice(0, 4).join(", ")}${link.skipped.length > 4 ? "…" : ""}.` : ""}</span>
+              <span className="gb-pv-small">Anyone with this link can see it.{link.note ? ` ${link.note}` : ""}{link.skipped.length ? ` Not included (images and other files can't be hosted yet): ${link.skipped.slice(0, 4).join(", ")}${link.skipped.length > 4 ? "…" : ""}.` : ""}</span>
             </>
           ) : null}
         </div>
