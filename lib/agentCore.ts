@@ -21,7 +21,9 @@ export type ToolName =
   | "list_tables"
   | "set_env"
   | "web_search"
-  | "fetch_url";
+  | "fetch_url"
+  | "review_site"
+  | "suggest_next";
 
 // OpenAI-format tool definitions. Names and parameters match the spec the
 // product was designed around.
@@ -233,6 +235,44 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "review_site",
+      description: "Audit a live public web page: SEO, mobile, accessibility, speed, security headers, broken links, robots.txt and sitemap. Returns findings ranked by severity. Use after deploying to verify the live site, or when the user asks you to review a site. Read-only.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "Public http(s) URL of the page to review." } },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suggest_next",
+      description: "Show the user 2-4 clickable next-step suggestions. Call it LAST, after you have written your summary in the same message. Each suggestion has a short title and the exact instruction you would carry out if the user clicks it. Suggestions only propose work; nothing happens until the user clicks.",
+      parameters: {
+        type: "object",
+        properties: {
+          suggestions: {
+            type: "array",
+            minItems: 1,
+            maxItems: 4,
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Short label, under 60 characters." },
+                prompt: { type: "string", description: "Full instruction to run if chosen, written as the user would say it." },
+              },
+              required: ["title", "prompt"],
+            },
+          },
+        },
+        required: ["suggestions"],
+      },
+    },
+  },
 ] as const;
 
 export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "set_env"];
@@ -248,7 +288,9 @@ How you work:
 - Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. For API keys call set_env: the user types the value privately and you never see it; never ask for a secret in chat.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
-- When done, give a short summary: what you built, where it is, and the next step. Keep messages short; the user may be on a phone.`;
+- Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves), then call review_site on the live URL and fix real problems you find before reporting back.
+- review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
+- When done, write a short summary (what you built or found, where it is), then in that same message call suggest_next with 2-4 concrete next steps (for example fixing a finding, improving the design, adding a feature, or connecting a database). Suggestions only propose work; the user decides. Keep messages short; the user may be on a phone.`;
 }
 
 /** Resolves a user/model-supplied relative path. Returns null if it escapes the workspace. */
@@ -504,6 +546,10 @@ export function describeCall(tool: string, args: any): string {
       return `Search the web: ${String(args?.query ?? "").slice(0, 100)}`;
     case "fetch_url":
       return `Fetch ${String(args?.url ?? "").slice(0, 150)}`;
+    case "review_site":
+      return `Review ${String(args?.url ?? "").slice(0, 150)}`;
+    case "suggest_next":
+      return `Suggest next steps`;
     default:
       return tool;
   }

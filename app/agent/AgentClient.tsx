@@ -33,6 +33,7 @@ const STARTERS = [
   "Make a tiny to-do web app, check it works, then deploy it",
   "Create a database table for customer sign-ups",
   "Show me what's in my workspace",
+  "Review my website for SEO, speed and mobile problems: https://",
 ];
 
 let idCounter = 0;
@@ -53,6 +54,8 @@ const TOOL_LABEL: Record<string, string> = {
   set_env: "Secret",
   web_search: "Web search",
   fetch_url: "Fetch page",
+  review_site: "Site review",
+  suggest_next: "Suggestions",
 };
 
 export default function AgentClient({ initialCredits, userKey }: { initialCredits: number; userKey: string }) {
@@ -61,6 +64,8 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
   const [messages, setMessages] = useState<unknown[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  // Clickable next steps from the agent; cleared as soon as anything new is sent.
+  const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   const [credits, setCredits] = useState(initialCredits);
   // Secret values live only in this in-memory map: never saved, never added to the chat history.
   const [secrets, setSecrets] = useState<Record<string, string>>({});
@@ -99,6 +104,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
   const send = useCallback(
     async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string } }) => {
       setBusy(true);
+      setSuggestions([]);
       try {
         const res = await fetch("/api/agent", {
           method: "POST",
@@ -124,6 +130,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
             );
           else if (e.type === "proposal")
             push({ id: uid(), kind: "proposal", callId: e.toolCallId, name: e.name, summary: e.summary, detail: e.detail, risky: e.risky, secretLabel: e.secretInput?.label });
+          else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
             if (e.balance || e.spent) setCredits(e.balance);
@@ -272,6 +279,23 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
           );
         })}
         {busy && <div style={{ fontSize: 13, opacity: 0.7, margin: "8px 0" }}>Working…</div>}
+        {!busy && suggestions.length > 0 && (
+          <div style={{ margin: "12px 0" }}>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 6 }}>Suggested next steps (nothing runs until you tap one)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {suggestions.map((sg) => (
+                <button
+                  key={sg.title}
+                  onClick={() => submit(sg.prompt)}
+                  title={sg.prompt}
+                  style={{ textAlign: "left", padding: "8px 12px", borderRadius: 999, border: `1px solid ${PINK}`, background: "none", color: "inherit", fontSize: 13, cursor: "pointer" }}
+                >
+                  {sg.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

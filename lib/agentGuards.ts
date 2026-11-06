@@ -139,3 +139,102 @@ export function applyEdit(content: string, find: unknown, replace: unknown, all:
   const out = all ? content.split(find).join(replace) : content.replace(find, () => replace);
   return { ok: true, content: out, count };
 }
+
+
+// ---------------------------------------------------------------------------
+// Site review helpers (pure, so they can be unit tested).
+
+export type Finding = { severity: "high" | "medium" | "low"; area: string; message: string };
+
+function attr(tag: string, name: string): string | null {
+  const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return m ? (m[1] ?? m[2] ?? m[3] ?? "") : null;
+}
+
+/** Static checks on a page's HTML: SEO, accessibility, mobile and weight. */
+export function analyzeHtml(html: string): Finding[] {
+  const out: Finding[] = [];
+  const add = (severity: Finding["severity"], area: string, message: string) => out.push({ severity, area, message });
+  const head = html.slice(0, 200_000);
+
+  const title = head.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() ?? "";
+  if (!title) add("high", "SEO", "The page has no <title>. Add a short, specific title (about 30-60 characters).");
+  else if (title.length > 65) add("low", "SEO", `The title is ${title.length} characters; search results cut it off around 60.`);
+  else if (title.length < 10) add("low", "SEO", "The title is very short; make it describe the page.");
+
+  const metas = head.match(/<meta\b[^>]*>/gi) ?? [];
+  const metaNamed = (n: string) => metas.find((m) => (attr(m, "name") || attr(m, "property") || "").toLowerCase() === n);
+  const desc = metaNamed("description");
+  const descText = desc ? attr(desc, "content") ?? "" : "";
+  if (!descText.trim()) add("medium", "SEO", "No meta description. Add one (about 120-160 characters) so search results show a good summary.");
+  else if (descText.length > 170) add("low", "SEO", "The meta description is over 170 characters and will be cut off.");
+
+  if (!metaNamed("viewport")) add("high", "Mobile", "No viewport meta tag, so the page won't scale properly on phones. Add <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">.");
+  if (!/<html\b[^>]*\blang\s*=/i.test(head)) add("medium", "Accessibility", "The <html> tag has no lang attribute. Add lang=\"en\" (or the right language).");
+  if (!metaNamed("og:title") || !metaNamed("og:image")) add("low", "SEO", "Missing Open Graph tags (og:title / og:image), so shared links look plain on social apps.");
+  if (!/<link\b[^>]*rel\s*=\s*["']?canonical/i.test(head)) add("low", "SEO", "No canonical link tag.");
+
+  const h1s = (html.match(/<h1\b/gi) ?? []).length;
+  if (h1s === 0) add("medium", "SEO", "No <h1> heading. Each page should have exactly one main heading.");
+  else if (h1s > 1) add("low", "SEO", `${h1s} <h1> headings found; use one per page.`);
+
+  const imgs = html.match(/<img\b[^>]*>/gi) ?? [];
+  const noAlt = imgs.filter((t) => attr(t, "alt") === null).length;
+  if (noAlt > 0) add("medium", "Accessibility", `${noAlt} of ${imgs.length} images have no alt attribute. Add descriptive alt text (alt="" for decorative images).`);
+  const noSize = imgs.filter((t) => attr(t, "width") === null && attr(t, "height") === null && !/aspect-ratio|style=/i.test(t)).length;
+  if (noSize > 2) add("low", "Performance", `${noSize} images have no width/height, which causes layout jumps while loading.`);
+
+  const inputs = (html.match(/<(input|textarea|select)\b[^>]*>/gi) ?? []).filter((t) => !/type\s*=\s*["']?(hidden|submit|button)/i.test(t));
+  const unlabeled = inputs.filter((t) => !attr(t, "aria-label") && !attr(t, "aria-labelledby") && !attr(t, "placeholder") && !attr(t, "id")).length;
+  if (unlabeled > 0) add("medium", "Accessibility", `${unlabeled} form field(s) have no label, id or aria-label.`);
+
+  if (Buffer.byteLength(html, "utf8") > 300_000) add("medium", "Performance", "The HTML itself is over 300 KB. Move large inline scripts, styles or data into separate files.");
+  const blocking = (head.match(/<script\b(?![^>]*\b(async|defer|type\s*=\s*["']module)\b)[^>]*\bsrc=/gi) ?? []).length;
+  if (blocking > 2) add("low", "Performance", `${blocking} scripts block rendering; add defer or async.`);
+  return out;
+}
+
+/** Same-origin links on a page, absolute, de-duplicated, capped. */
+export function extractSameOriginLinks(html: string, base: string, max: number): string[] {
+  let origin: string;
+  try {
+    origin = new URL(base).origin;
+  } catch {
+    return [];
+  }
+  const seen = new Set<string>();
+  for (const m of Array.from(html.matchAll(/<a\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/gi))) {
+    const href = (m[1] ?? m[2] ?? "").trim();
+    if (!href || href.startsWith("#") || /^(mailto|tel|javascript|sms):/i.test(href)) continue;
+    try {
+      const u = new URL(href, base);
+      if (u.origin !== origin) continue;
+      u.hash = "";
+      seen.add(u.toString());
+      if (seen.size >= max) break;
+    } catch {
+      /* ignore bad href */
+    }
+  }
+  return Array.from(seen);
+}
+
+export type Suggestion = { title: string; prompt: string };
+
+/** Validates model-supplied suggestions: 1-4 items, short title, usable prompt. */
+export function cleanSuggestions(raw: unknown): Suggestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Suggestion[] = [];
+  const seen = new Set<string>();
+  for (const r of raw) {
+    const title = typeof r?.title === "string" ? r.title.replace(/\s+/g, " ").trim().slice(0, 70) : "";
+    const prompt = typeof r?.prompt === "string" ? r.prompt.replace(/\s+/g, " ").trim().slice(0, 400) : "";
+    if (!title || prompt.length < 8) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, prompt });
+    if (out.length === 4) break;
+  }
+  return out;
+}

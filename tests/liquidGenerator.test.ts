@@ -20,7 +20,7 @@ describe("generateLiquid", () => {
   it("only references settings that exist in the schema", () => {
     const out = generateLiquid(blocks, "Demo");
     const ids = new Set(schemaOf(out).blocks.flatMap((b: any) => b.settings.map((s: any) => s.id)));
-    const used = [...out.matchAll(/block\.settings\.([a-z_]+)/g)].map((m) => m[1]);
+    const used = Array.from(out.matchAll(/block\.settings\.([a-z_]+)/g)).map((m) => m[1]);
     for (const u of used) expect(ids.has(u)).toBe(true);
   });
 

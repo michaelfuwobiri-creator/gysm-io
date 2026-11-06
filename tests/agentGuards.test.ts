@@ -89,3 +89,59 @@ describe("applyEdit", () => {
     expect(applyEdit("abc", "", "x", false).ok).toBe(false);
   });
 });
+
+import { analyzeHtml, extractSameOriginLinks, cleanSuggestions } from "@/lib/agentGuards";
+
+describe("analyzeHtml", () => {
+  const good = `<!doctype html><html lang="en"><head><title>Sunrise Bakery - fresh bread daily</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Fresh bread and pastries baked every morning in the heart of town, with free delivery nearby.">
+    <meta property="og:title" content="x"><meta property="og:image" content="y"><link rel="canonical" href="https://a.com/"></head>
+    <body><h1>Sunrise Bakery</h1><img src="a.png" alt="Loaf" width="10" height="10"></body></html>`;
+  it("finds nothing wrong on a healthy page", () => {
+    expect(analyzeHtml(good)).toEqual([]);
+  });
+  it("flags the basics on a bare page", () => {
+    const f = analyzeHtml("<html><body><img src=a.png><img src=b.png></body></html>");
+    const msgs = f.map((x) => x.area + ":" + x.severity);
+    expect(msgs).toContain("SEO:high");
+    expect(msgs).toContain("Mobile:high");
+    expect(f.some((x) => /alt attribute/.test(x.message))).toBe(true);
+    expect(f.some((x) => /lang/.test(x.message))).toBe(true);
+  });
+  it("counts multiple h1s", () => {
+    expect(analyzeHtml(good.replace("<h1>Sunrise Bakery</h1>", "<h1>A</h1><h1>B</h1>")).some((x) => /2 <h1>/.test(x.message))).toBe(true);
+  });
+});
+
+describe("extractSameOriginLinks", () => {
+  it("keeps same-origin links only, absolute and de-duplicated", () => {
+    const html = `<a href="/a">1</a><a href="/a#x">2</a><a href="https://other.com/b">3</a><a href="mailto:x@y.z">4</a><a href="#top">5</a><a href='page2.html'>6</a>`;
+    expect(extractSameOriginLinks(html, "https://site.com/dir/", 10)).toEqual(["https://site.com/a", "https://site.com/dir/page2.html"]);
+  });
+  it("caps the count", () => {
+    const html = Array.from({ length: 20 }, (_, i) => `<a href="/p${i}">x</a>`).join("");
+    expect(extractSameOriginLinks(html, "https://s.com", 5)).toHaveLength(5);
+  });
+});
+
+describe("cleanSuggestions", () => {
+  it("keeps up to four valid, unique suggestions", () => {
+    const raw = [
+      { title: "Fix alt text", prompt: "Add alt text to every image on my site" },
+      { title: "fix alt text", prompt: "duplicate title should be dropped" },
+      { title: "", prompt: "no title is dropped entirely" },
+      { title: "Short", prompt: "x" },
+      { title: "Add a contact form", prompt: "Add a contact form to my site" },
+      { title: "Add analytics", prompt: "Add privacy-friendly analytics" },
+      { title: "Dark mode", prompt: "Add a dark mode toggle" },
+      { title: "Fifth", prompt: "This one is over the cap" },
+    ];
+    const out = cleanSuggestions(raw);
+    expect(out.map((s) => s.title)).toEqual(["Fix alt text", "Add a contact form", "Add analytics", "Dark mode"]);
+  });
+  it("returns nothing for junk", () => {
+    expect(cleanSuggestions(null)).toEqual([]);
+    expect(cleanSuggestions("x")).toEqual([]);
+  });
+});

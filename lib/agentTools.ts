@@ -20,7 +20,7 @@ import {
   validateDdl,
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
-import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql } from "@/lib/agentGuards";
+import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql, analyzeHtml, extractSameOriginLinks } from "@/lib/agentGuards";
 
 // The six GYSM Agent tools. Every one acts only on the calling user's own
 // sandbox, database connection and deployments. Each returns plain text for
@@ -484,6 +484,82 @@ export async function toolFetchUrl(_userId: string, args: any): Promise<ToolResu
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// review_site: read-only audit of a public page. Uses the same SSRF-safe
+// fetching as fetch_url, so it can only reach public addresses.
+
+type Fetched = { status: number; headers: http.IncomingHttpHeaders; body: Buffer; finalUrl: URL; ms: number };
+
+async function fetchFollow(start: URL, maxHops = 4): Promise<Fetched | { error: string }> {
+  let url = start;
+  const t0 = Date.now();
+  try {
+    for (let hop = 0; hop < maxHops; hop++) {
+      const r = await getOnce(url);
+      if (r.status >= 300 && r.status < 400 && r.headers.location) {
+        const next = parseFetchUrl(new URL(String(r.headers.location), url).toString());
+        if (next.ok === false) return { error: `redirects somewhere not allowed (${next.error})` };
+        url = next.url;
+        continue;
+      }
+      return { status: r.status, headers: r.headers, body: r.body, finalUrl: url, ms: Date.now() - t0 };
+    }
+    return { error: "too many redirects" };
+  } catch (e: any) {
+    const m = String(e?.message || e);
+    return { error: m.includes("BLOCKED_ADDRESS") ? "not a public website" : m.slice(0, 100) };
+  }
+}
+
+export async function toolReviewSite(_userId: string, args: any): Promise<ToolResult> {
+  const check = parseFetchUrl(args?.url);
+  if (check.ok === false) return { ok: false, output: check.error };
+  const page = await fetchFollow(check.url);
+  if ("error" in page) return { ok: false, creditsKind: "light", output: `Couldn't load the page: ${page.error}.` };
+  if (page.status >= 400) return { ok: false, creditsKind: "light", output: `The page answered ${page.status}, so the site is not reachable for visitors.` };
+
+  const type = String(page.headers["content-type"] || "").toLowerCase();
+  if (type && !/html/.test(type)) return { ok: false, creditsKind: "light", output: `That URL is not an HTML page (${type.split(";")[0]}).` };
+
+  const html = page.body.toString("utf8");
+  const findings = analyzeHtml(html);
+  const add = (severity: "high" | "medium" | "low", area: string, message: string) => findings.push({ severity, area, message });
+
+  // Transport, speed and headers.
+  const h = page.headers;
+  if (page.finalUrl.protocol !== "https:") add("high", "Security", "The site is served over plain http. Use https.");
+  else if (!h["strict-transport-security"]) add("low", "Security", "No Strict-Transport-Security header.");
+  if (!h["x-content-type-options"]) add("low", "Security", "No X-Content-Type-Options: nosniff header.");
+  if (!h["content-security-policy"] && !h["x-frame-options"]) add("low", "Security", "No clickjacking protection (X-Frame-Options or a CSP frame-ancestors rule).");
+  if (page.ms > 3000) add("high", "Performance", `The page took ${(page.ms / 1000).toFixed(1)}s to answer.`);
+  else if (page.ms > 1200) add("medium", "Performance", `The page took ${(page.ms / 1000).toFixed(1)}s to answer.`);
+
+  // Broken same-site links (up to 8) plus robots.txt and sitemap.xml.
+  const base = page.finalUrl.toString();
+  const links = extractSameOriginLinks(html, base, 8);
+  const probe = async (u: string) => {
+    const parsed = parseFetchUrl(u);
+    if (parsed.ok === false) return { u, status: 0 };
+    const r = await fetchFollow(parsed.url, 3);
+    return { u, status: "error" in r ? 0 : r.status };
+  };
+  const results = await Promise.all(links.map(probe));
+  const broken = results.filter((r) => r.status === 0 || r.status >= 400);
+  for (const b of broken) add("high", "Links", `Broken link: ${b.u} (${b.status || "no response"}).`);
+  const [robots, sitemap] = await Promise.all([probe(new URL("/robots.txt", base).toString()), probe(new URL("/sitemap.xml", base).toString())]);
+  if (robots.status !== 200) add("low", "SEO", "No robots.txt.");
+  if (sitemap.status !== 200) add("low", "SEO", "No sitemap.xml, which helps search engines find your pages.");
+
+  const order = { high: 0, medium: 1, low: 2 } as const;
+  findings.sort((a, b) => order[a.severity] - order[b.severity]);
+  const kb = Math.round(page.body.length / 1024);
+  const head = `Reviewed ${base}: status ${page.status}, ${(page.ms / 1000).toFixed(1)}s, ${kb} KB HTML, ${links.length} links checked.`;
+  if (findings.length === 0) return { ok: true, creditsKind: "light", output: `${head}\nNo issues found by these checks.` };
+  const lines = findings.map((f) => `[${f.severity.toUpperCase()}] ${f.area}: ${f.message}`);
+  return { ok: true, creditsKind: "light", output: `${head}\n${findings.length} finding(s):\n${lines.join("\n")}` };
+}
+
 export async function logActivity(userId: string, tool: string, ok: boolean, summary: string): Promise<void> {
   try {
     await sql`insert into agent_logs (user_id, tool, ok, summary) values (${userId}, ${tool}, ${ok}, ${summary.slice(0, 500)})`;
@@ -537,6 +613,9 @@ export async function executeTool(userId: string, name: string, args: any, secre
         break;
       case "fetch_url":
         result = await toolFetchUrl(userId, args);
+        break;
+      case "review_site":
+        result = await toolReviewSite(userId, args);
         break;
       default:
         result = { ok: false, output: `Unknown tool: ${name}` };

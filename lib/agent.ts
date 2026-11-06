@@ -18,6 +18,7 @@ import {
   type ChatMessage,
 } from "@/lib/agentCore";
 import { executeTool } from "@/lib/agentTools";
+import { cleanSuggestions, type Suggestion } from "@/lib/agentGuards";
 
 // GYSM Agent loop. The conversation (OpenAI chat format) lives in the
 // browser and is sent back each turn. Tools that change something outside
@@ -30,6 +31,7 @@ export type AgentEvent =
   | { type: "tool_result"; toolCallId: string; name: string; ok: boolean; output: string }
   | { type: "proposal"; toolCallId: string; name: string; summary: string; detail: string; risky: boolean; secretInput?: { label: string } }
   | { type: "declined"; toolCallId: string; name: string }
+  | { type: "suggestions"; suggestions: Suggestion[] }
   | { type: "credits"; spent: number; balance: number }
   | { type: "state"; messages: ChatMessage[] }
   | { type: "error"; error: string; code?: string };
@@ -137,6 +139,15 @@ export async function runAgentTurn(opts: {
           ...(name === "set_env" ? { secretInput: { label: String(args?.key ?? "Value") } } : {}),
         });
         break; // wait for the user's decision
+      }
+
+      // suggest_next only shows clickable ideas to the user; it runs nothing
+      // and ends the turn, so the model cannot act on its own suggestions.
+      if (name === "suggest_next") {
+        const suggestions = cleanSuggestions(args?.suggestions);
+        if (suggestions.length > 0) emit({ type: "suggestions", suggestions });
+        messages.push({ role: "tool", tool_call_id: call.id, content: suggestions.length ? "Suggestions shown to the user. Stop now." : "No valid suggestions. Stop now." });
+        break;
       }
 
       const out = await run(call.id, name, args);
