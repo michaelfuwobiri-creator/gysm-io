@@ -43,3 +43,9 @@ then just fetch the existing cert instead of creating new ones each time).
   "default"
 - Vercel env vars: `NEXT_PUBLIC_REVENUECAT_IOS_API_KEY` and
   `REVENUECAT_WEBHOOK_SECRET`
+
+## Simplest route (no match repo, no Codemagic)
+`.github/workflows/ios-testflight-simple.yml` lets Xcode sign automatically with the same
+three secrets (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT`). The API key needs the
+**Admin** role for the first run so Apple can create the distribution certificate.
+Run it from the Actions tab: "iOS TestFlight (automatic signing)" -> Run workflow.
