@@ -49,6 +49,20 @@ describe("runAgentTurn", () => {
     ]);
   });
 
+  it("does not let plan updates use up the step budget", async () => {
+    const plan = (i: number) => reply({ content: null, tool_calls: [toolCall(`p${i}`, "update_plan", { steps: [{ title: "Work", status: "doing" }] })] });
+    const write = (i: number) => reply({ content: null, tool_calls: [toolCall(`w${i}`, "write_file", { path: `a${i}.txt`, content: "x" })] });
+    // 5 plan updates + 11 real steps would exceed 12 calls if plans counted.
+    for (let i = 0; i < 5; i++) create.mockResolvedValueOnce(plan(i));
+    for (let i = 0; i < 11; i++) create.mockResolvedValueOnce(write(i));
+    create.mockResolvedValue(reply({ content: "Done." }));
+    (executeTool as any).mockResolvedValue({ ok: true, output: "Wrote" });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "big job", emit: (e) => events.push(e) });
+    expect(events.some((e) => e.type === "text" && /Paused after/.test(e.text))).toBe(false);
+    expect((executeTool as any).mock.calls.length).toBe(11);
+  });
+
   it("asks one question with ask_user and ends the turn", async () => {
     create.mockResolvedValueOnce(
       reply({ content: "Quick check.", tool_calls: [toolCall("q1", "ask_user", { question: "Which style?", options: ["Minimal", "Bold", "Minimal", "Playful"] })] })

@@ -106,11 +106,19 @@ type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?
 
 const MAX_IMAGE_SIDE = 1400;
 
-function downloadFile(name: string, mime: string, base64: string) {
+async function downloadFile(name: string, mime: string, base64: string) {
   try {
     const bin = atob(base64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // iPhone and iPad (including the GYSM app) can't save a blob link, so open the share sheet instead.
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && typeof File !== "undefined" && typeof navigator.canShare === "function") {
+      const file = new File([bytes], name, { type: mime });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name }).catch(() => {});
+        return;
+      }
+    }
     const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
     const a = document.createElement("a");
     a.href = url;
@@ -893,7 +901,7 @@ export default function AgentClient({
                     <div key={item.id} className="gb-file">
                       <span className="gb-file-name">{item.name}</span>
                       {item.data ? (
-                        <button type="button" className="gb-secondary" onClick={() => downloadFile(item.name, item.mime, item.data as string)}>
+                        <button type="button" className="gb-secondary" onClick={() => void downloadFile(item.name, item.mime, item.data as string)}>
                           Download
                         </button>
                       ) : (

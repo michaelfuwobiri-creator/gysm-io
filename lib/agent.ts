@@ -160,6 +160,8 @@ export async function runAgentTurn(opts: {
   // 2. Agent loop.
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 120_000, maxRetries: 1 });
   try {
+    // Plan updates only redraw a checklist, so a few of them don't use up the step budget.
+    let freePlanCalls = 6;
     for (let step = 0; step < MAX_STEPS_PER_TURN; step++) {
       // Stop pressed: don't start another model call or tool run.
       if (opts.signal?.aborted) break;
@@ -238,6 +240,7 @@ export async function runAgentTurn(opts: {
         const steps = cleanPlan(args?.steps);
         if (steps.length > 0) emit({ type: "plan", steps });
         messages.push({ role: "tool", tool_call_id: call.id, content: steps.length ? "Plan shown to the user. Continue with the work." : "No valid steps. Continue with the work." });
+        if (freePlanCalls-- > 0) step--;
         continue;
       }
 
