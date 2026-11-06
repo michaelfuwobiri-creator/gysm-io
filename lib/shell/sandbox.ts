@@ -53,21 +53,45 @@ export function sandboxNameFor(userId: string): string {
   return "gysm-shell-" + createHash("sha256").update(userId).digest("hex").slice(0, 24);
 }
 
+/** The sandbox exists but its saved state is gone (410, "no snapshot available"). */
+export function isSnapshotGone(error: any): boolean {
+  const status = error?.response?.status ?? error?.status;
+  return status === 410 || /no snapshot available|snapshot_not_found/i.test(String(error?.message || ""));
+}
+
 export async function getUserSandbox(userId: string): Promise<Sandbox> {
-  return Sandbox.getOrCreate({
-    name: sandboxNameFor(userId),
+  const name = sandboxNameFor(userId);
+  const params = {
+    name,
     persistent: true,
     timeout: SANDBOX_TIMEOUT_MS,
     resources: { vcpus: SANDBOX_VCPUS },
     tags: { app: "gysm-shell" },
-    onCreate: async (sbx) => {
+    onCreate: async (sbx: Sandbox) => {
       await sbx.writeFiles([{ path: "/tmp/gysm-welcome.txt", content: WELCOME }]);
       await sbx.runCommand("bash", [
         "-lc",
         'mkdir -p "$HOME/workspace" && mv /tmp/gysm-welcome.txt "$HOME/workspace/WELCOME.txt"',
       ]);
     },
-  });
+  };
+  try {
+    // resume: true wakes the sandbox now, so a missing snapshot fails here
+    // (where it can be repaired) instead of on the first file write.
+    return await Sandbox.getOrCreate({ ...params, resume: true });
+  } catch (error: any) {
+    if (!isSnapshotGone(error)) throw error;
+    // A stopped sandbox whose snapshot expired can never be resumed. Drop
+    // the empty shell and start a fresh workspace under the same name.
+    console.error("[sandbox] stale sandbox with no snapshot, recreating:", error?.message || error);
+    try {
+      const stale = await Sandbox.get({ name, resume: false });
+      await stale.delete();
+    } catch (deleteError: any) {
+      if (deleteError?.response?.status !== 404) console.error("[sandbox] couldn't delete stale sandbox:", deleteError?.message || deleteError);
+    }
+    return Sandbox.getOrCreate({ ...params, resume: true });
+  }
 }
 
 // eslint-disable-next-line no-control-regex
