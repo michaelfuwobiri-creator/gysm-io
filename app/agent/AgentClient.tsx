@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCredits, UNLIMITED_BALANCE } from "@/lib/credits-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
@@ -483,7 +484,7 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
               Preview
             </button>
           )}
-          <span className="gb-pill" title="Your credit balance">{credits} credits</span>
+          <span className="gb-pill" title="Your credit balance">{formatCredits(credits)}{credits >= UNLIMITED_BALANCE ? "" : " credits"}</span>
           <a className="gb-ghost" href="/builder?classic=1">
             Classic builder
           </a>

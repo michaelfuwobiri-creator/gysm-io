@@ -1,3 +1,4 @@
+import { formatCredits } from "@/lib/credits-constants";
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
@@ -288,7 +289,7 @@ export default async function AppShell({
           <div className="rounded-xl border border-black/10 bg-black/[0.02] p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Credits</span>
-              <span className="text-[13px] font-black">{credits}</span>
+              <span className="text-[13px] font-black">{formatCredits(credits)}</span>
             </div>
             <a
               href="/pricing"

@@ -202,3 +202,11 @@ export const AGENT_MIN_BALANCE = SHELL_MIN_BALANCE_FOR_AI;
 export const AGENT_DEPLOYS_PER_DAY = 5;
 // Small flat charge for read-only lookups (database reads, web search/fetch).
 export const AGENT_CREDITS_LIGHT = 1;
+
+// Admin accounts (lib/isAdmin.ts) build without spending credits. Their
+// balance is reported as this number, and the UI shows it as "Unlimited".
+export const UNLIMITED_BALANCE = 1_000_000_000;
+
+export function formatCredits(balance: number): string {
+  return balance >= UNLIMITED_BALANCE ? "Unlimited" : String(balance);
+}

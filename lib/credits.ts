@@ -3,10 +3,12 @@ import { sql } from "@/lib/db";
 // here (for local use below) and re-exported so existing `@/lib/credits`
 // importers keep working -- see that file for why the split exists
 // (client-bundle DB leak fix).
-import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, BUILDS_PER_PLAN, CREDITS_PER_PLAN, FLAT_PROFIT_USD, BUILD_COST_USD } from "@/lib/credits-constants";
+import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, BUILDS_PER_PLAN, CREDITS_PER_PLAN, FLAT_PROFIT_USD, BUILD_COST_USD, UNLIMITED_BALANCE } from "@/lib/credits-constants";
+import { isUnlimitedUser } from "@/lib/unlimited";
 export { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, BUILDS_PER_PLAN, CREDITS_PER_PLAN, FLAT_PROFIT_USD, BUILD_COST_USD };
 
 export async function getCreditBalance(userId: string): Promise<number> {
+  if (await isUnlimitedUser(userId)) return UNLIMITED_BALANCE;
   try {
     const rows = await sql`select balance from credits where user_id = ${userId}`;
     return (rows[0] as any)?.balance ?? 0;
@@ -44,6 +46,7 @@ export async function deductCredit(
   userId: string,
   amount: number = CREDIT_COST_PER_BUILD
 ): Promise<boolean> {
+  if (await isUnlimitedUser(userId)) return true;
   try {
     const rows = await sql`
       update credits
@@ -81,6 +84,7 @@ export async function addCredits(userId: string, amount: number): Promise<void> 
 // already happened, so it takes what's left and floors at 0. Callers gate
 // on a minimum balance BEFORE starting work (see SHELL_MIN_BALANCE_FOR_AI).
 export async function chargeCredits(userId: string, amount: number): Promise<number> {
+  if (await isUnlimitedUser(userId)) return UNLIMITED_BALANCE;
   try {
     const rows = await sql`
       update credits

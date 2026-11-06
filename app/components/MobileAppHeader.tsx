@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCredits } from "@/lib/credits-constants";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -130,7 +131,7 @@ export default function MobileAppHeader({ groups, displayName, initial, credits,
             <div className="rounded-xl border border-black/10 bg-black/[0.02] p-3 flex flex-col gap-2 mt-2 mb-4">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Credits</span>
-                <span className="text-[13px] font-black">{credits}</span>
+                <span className="text-[13px] font-black">{formatCredits(credits)}</span>
               </div>
               <a
                 href="/pricing"
