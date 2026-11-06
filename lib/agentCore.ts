@@ -25,6 +25,7 @@ export type ToolName =
   | "review_site"
   | "suggest_next"
   | "update_plan"
+  | "ask_user"
   | "local_list"
   | "local_read"
   | "local_write"
@@ -285,6 +286,21 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "ask_user",
+      description: "Ask the user ONE multiple-choice question when something essential is unclear and a wrong guess would waste real work (for example which style, which pages, or which of two very different approaches). Do not ask about things you can reasonably decide yourself. The turn ends and the user's pick arrives as their next message.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "One short question." },
+          options: { type: "array", minItems: 2, maxItems: 4, items: { type: "string", description: "A short answer, under 60 characters." } },
+        },
+        required: ["question", "options"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_next",
       description: "Show the user 2-4 clickable next-step suggestions. Call it LAST, after you have written your summary in the same message. Each suggestion has a short title and the exact instruction you would carry out if the user clicks it. Suggestions only propose work; nothing happens until the user clicks.",
       parameters: {
@@ -463,6 +479,7 @@ How you work:
 - Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. Never ask for a secret in chat, and never put one in a site's files: published files are public.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
+- Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
 - When done, write a short summary (what you built or found, where it is), then in that same message call suggest_next with 2-4 concrete next steps (for example fixing a finding, improving the design, adding a feature, or connecting a database). Suggestions only propose work; the user decides. Keep messages short; the user may be on a phone.`;
@@ -738,6 +755,8 @@ export function describeCall(tool: string, args: any): string {
       return `Suggest next steps`;
     case "update_plan":
       return `Update the plan`;
+    case "ask_user":
+      return `Ask you a question`;
     case "local_list":
       return `List ${String(args?.path || "your folder")} on your computer`;
     case "local_read":

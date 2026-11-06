@@ -26,7 +26,7 @@ import {
   type ChatMessage,
 } from "@/lib/agentCore";
 import { executeTool } from "@/lib/agentTools";
-import { cleanPlan, cleanSuggestions, type PlanStep, type Suggestion } from "@/lib/agentGuards";
+import { cleanPlan, cleanQuestion, cleanSuggestions, type AgentQuestion, type PlanStep, type Suggestion } from "@/lib/agentGuards";
 
 // GYSM Agent loop. The conversation (OpenAI chat format) lives in the
 // browser and is sent back each turn. Tools that change something outside
@@ -43,6 +43,7 @@ export type AgentEvent =
   | { type: "client_tool"; toolCallId: string; name: string; args: any; summary: string; write: boolean }
   | { type: "suggestions"; suggestions: Suggestion[] }
   | { type: "plan"; steps: PlanStep[] }
+  | ({ type: "question" } & AgentQuestion)
   | { type: "credits"; spent: number; balance: number }
   | { type: "state"; messages: ChatMessage[] }
   | { type: "error"; error: string; code?: string };
@@ -212,6 +213,19 @@ export async function runAgentTurn(opts: {
         const steps = cleanPlan(args?.steps);
         if (steps.length > 0) emit({ type: "plan", steps });
         messages.push({ role: "tool", tool_call_id: call.id, content: steps.length ? "Plan shown to the user. Continue with the work." : "No valid steps. Continue with the work." });
+        continue;
+      }
+
+      // ask_user shows one multiple-choice question and ends the turn; the
+      // user's pick comes back as their next message.
+      if (name === "ask_user") {
+        const q = cleanQuestion(args);
+        if (q) {
+          emit({ type: "question", ...q });
+          messages.push({ role: "tool", tool_call_id: call.id, content: "Question shown to the user. Stop now and wait for their answer." });
+          break;
+        }
+        messages.push({ role: "tool", tool_call_id: call.id, content: "Invalid question: give a question and 2-4 distinct options. Decide yourself or try again." });
         continue;
       }
 

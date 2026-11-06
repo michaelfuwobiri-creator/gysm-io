@@ -89,6 +89,7 @@ const TOOL_LABEL: Record<string, string> = {
   review_site: "Site review",
   suggest_next: "Suggestions",
   update_plan: "Plan",
+  ask_user: "Question",
   local_list: "Your folder",
   local_read: "Read (your computer)",
   local_write: "Write (your computer)",
@@ -119,6 +120,8 @@ export default function AgentClient({
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   // The agent's live checklist for a bigger job (update_plan). Not saved.
+  // A multiple-choice question from the agent (ask_user); the pick is sent as the next message.
+  const [question, setQuestion] = useState<{ question: string; options: string[] } | null>(null);
   const [plan, setPlan] = useState<{ title: string; status: "pending" | "doing" | "done" }[]>([]);
   const [credits, setCredits] = useState(initialCredits);
   // What the agent is doing right now, shown beside the working GYSM mark.
@@ -265,6 +268,7 @@ export default function AgentClient({
       abortRef.current = ctrl;
       setBusy(true);
       setSuggestions([]);
+      setQuestion(null);
       if (body.text) setPlan([]);
       let clientCall: ClientCall | null = null;
       try {
@@ -303,6 +307,7 @@ export default function AgentClient({
               setPreviewOpen(true);
             }
           } else if (e.type === "plan") setPlan(Array.isArray(e.steps) ? e.steps : []);
+          else if (e.type === "question") setQuestion({ question: String(e.question ?? ""), options: Array.isArray(e.options) ? e.options.map(String) : [] });
           else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
@@ -780,6 +785,20 @@ export default function AgentClient({
                 <div className="gb-status" role="status" aria-live="polite">
                   <GysmMark size={22} working />
                   <span className="gb-shimmer">{activity || "Thinking…"}</span>
+                </div>
+              )}
+
+              {!busy && question && (
+                <div className="gb-ask" role="group" aria-label="Question from the agent">
+                  <div className="gb-ask-q">{question.question}</div>
+                  <div className="gb-sug">
+                    {question.options.map((opt) => (
+                      <button key={opt} className="gb-chip" onClick={() => submit(opt)}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="gb-sug-label">Or type your own answer below.</div>
                 </div>
               )}
 

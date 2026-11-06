@@ -262,3 +262,25 @@ export function cleanPlan(raw: unknown): PlanStep[] {
   }
   return out;
 }
+
+
+// -- clarifying question (ask_user) -------------------------------------------
+
+export type AgentQuestion = { question: string; options: string[] };
+
+/** Validates a model-supplied question: text plus 2-4 short, distinct options. */
+export function cleanQuestion(raw: unknown): AgentQuestion | null {
+  const r = raw as any;
+  const question = typeof r?.question === "string" ? r.question.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+  if (!question || !Array.isArray(r?.options)) return null;
+  const options: string[] = [];
+  const seen = new Set<string>();
+  for (const o of r.options) {
+    const v = typeof o === "string" ? o.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    if (!v || seen.has(v.toLowerCase())) continue;
+    seen.add(v.toLowerCase());
+    options.push(v);
+    if (options.length === 4) break;
+  }
+  return options.length >= 2 ? { question, options } : null;
+}

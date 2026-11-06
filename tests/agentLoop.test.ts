@@ -49,6 +49,27 @@ describe("runAgentTurn", () => {
     ]);
   });
 
+  it("asks one question with ask_user and ends the turn", async () => {
+    create.mockResolvedValueOnce(
+      reply({ content: "Quick check.", tool_calls: [toolCall("q1", "ask_user", { question: "Which style?", options: ["Minimal", "Bold", "Minimal", "Playful"] })] })
+    );
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "build me a site", emit: (e) => events.push(e) });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(events.find((e) => e.type === "question")).toEqual({ type: "question", question: "Which style?", options: ["Minimal", "Bold", "Playful"] });
+  });
+
+  it("does not end the turn on an invalid ask_user", async () => {
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("q1", "ask_user", { question: "Which?", options: ["Only one"] })] }))
+      .mockResolvedValueOnce(reply({ content: "I picked a style myself." }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "build", emit: (e) => events.push(e) });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(events.some((e) => e.type === "question")).toBe(false);
+  });
+
   it("runs an auto tool, then finishes with text", async () => {
     create
       .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }))

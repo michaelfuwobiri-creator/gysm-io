@@ -169,3 +169,14 @@ describe("cleanPlan", () => {
     expect(cleanPlan("nope")).toEqual([]);
   });
 });
+
+import { cleanQuestion } from "@/lib/agentGuards";
+
+describe("cleanQuestion", () => {
+  it("needs a question and at least two distinct options, max four", () => {
+    expect(cleanQuestion({ question: "Style?", options: ["A", "a", "B", "C", "D", "E"] })).toEqual({ question: "Style?", options: ["A", "B", "C", "D"] });
+    expect(cleanQuestion({ question: "Style?", options: ["A"] })).toBeNull();
+    expect(cleanQuestion({ question: "", options: ["A", "B"] })).toBeNull();
+    expect(cleanQuestion(null)).toBeNull();
+  });
+});
