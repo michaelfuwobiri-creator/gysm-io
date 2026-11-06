@@ -26,6 +26,7 @@ export type ToolName =
   | "suggest_next"
   | "update_plan"
   | "ask_user"
+  | "send_file"
   | "remember"
   | "forget"
   | "local_list"
@@ -303,6 +304,21 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "send_file",
+      description: "Give the user a file from your workspace as a download button in the chat, for example a PDF, CSV, ZIP, document or image you created (build it with write_file or run_command first). Max 1.5 MB. Use it when the user asks for a file; do not use it for the website itself (use deploy for that).",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Relative path of the file in the workspace, e.g. 'out/menu.pdf'." },
+          name: { type: "string", description: "Optional file name for the download." },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "remember",
       description: "Save ONE short fact about the user that will help in future chats (their brand name, business, style or colors they like, audience, language, a preference they stated). Only things the user told you or clearly wants kept. Never save passwords, keys or other secrets. Do not announce it.",
       parameters: {
@@ -505,6 +521,7 @@ How you work:
 - Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. Never ask for a secret in chat, and never put one in a site's files: published files are public.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
+- When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
@@ -784,6 +801,8 @@ export function describeCall(tool: string, args: any): string {
       return `Update the plan`;
     case "ask_user":
       return `Ask you a question`;
+    case "send_file":
+      return `Send ${String(args?.path ?? "?")} to you as a download`;
     case "remember":
       return `Remember: ${String(args?.text ?? "").slice(0, 100)}`;
     case "forget":

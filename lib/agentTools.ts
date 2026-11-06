@@ -18,11 +18,13 @@ import {
   deployNameFor,
   shouldSkipDeployPath,
   truncate,
+  localPathBlock,
   validateDdl,
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
 import { addMemory, forgetMemory } from "@/lib/agentMemory";
 import type { CleanAttachment } from "@/lib/agentAttachCore";
+import { MAX_SEND_FILE_BYTES, downloadName, mimeForFile } from "@/lib/agentFileCore";
 import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql, analyzeHtml, extractSameOriginLinks } from "@/lib/agentGuards";
 
 // The six GYSM Agent tools. Every one acts only on the calling user's own
@@ -30,7 +32,13 @@ import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validat
 // the model plus an ok flag; the loop in lib/agent.ts handles approvals,
 // credits and logging.
 
-export type ToolResult = { ok: boolean; output: string; creditsKind?: "command" | "deploy" | "db" | "light" };
+export type ToolResult = {
+  ok: boolean;
+  output: string;
+  creditsKind?: "command" | "deploy" | "db" | "light";
+  /** A file for the user to download (send_file). Sent to the browser, never to the model. */
+  file?: { name: string; mime: string; data: string };
+};
 
 const TOOL_OUTPUT_MAX = 12_000;
 
@@ -94,6 +102,20 @@ export async function toolRunCommand(userId: string, args: any): Promise<ToolRes
     creditsKind: "command",
     output: `exit code: ${r.exitCode}${r.truncated ? " (output truncated)" : ""}\n${r.output || "(no output)"}`,
   };
+}
+
+export async function toolSendFile(userId: string, args: any): Promise<ToolResult> {
+  const rel = cleanRelPath(args?.path);
+  if (!rel) return { ok: false, output: "Invalid path. Use a relative path inside the workspace, like 'out/report.pdf'." };
+  const block = localPathBlock(rel, "read");
+  if (block) return { ok: false, output: `Not allowed: ${block}.` };
+  const root = await workspaceRoot(userId);
+  const sandbox = await getUserSandbox(userId);
+  const data = await sandbox.readFileToBuffer({ path: `${root}/${rel}` });
+  if (!data) return { ok: false, output: `File not found: ${rel}` };
+  if (data.length > MAX_SEND_FILE_BYTES) return { ok: false, output: `File is too large to send (${data.length} bytes, max ${MAX_SEND_FILE_BYTES}). Make it smaller or zip it.` };
+  const name = downloadName(rel, args?.name);
+  return { ok: true, output: `Sent ${name} (${data.length} bytes) to the user as a download.`, file: { name, mime: mimeForFile(name), data: data.toString("base64") } };
 }
 
 /** Saves attached files into the workspace under uploads/. Returns an error text, or null on success. */
@@ -593,6 +615,9 @@ export async function executeTool(userId: string, name: string, args: any, secre
   let result: ToolResult;
   try {
     switch (name) {
+      case "send_file":
+        result = await toolSendFile(userId, args);
+        break;
       case "remember":
         result = await addMemory(userId, args?.text);
         break;

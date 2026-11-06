@@ -91,6 +91,17 @@ describe("runAgentTurn", () => {
     expect(state.messages[0].content).not.toContain("base64,aGk");
   });
 
+  it("sends a file to the browser without putting its bytes in the history", async () => {
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("f1", "send_file", { path: "out/menu.pdf" })] }))
+      .mockResolvedValueOnce(reply({ content: "Here is your menu." }));
+    (executeTool as any).mockResolvedValue({ ok: true, output: "Sent menu.pdf (5 bytes) to the user as a download.", file: { name: "menu.pdf", mime: "application/pdf", data: "SGVsbG8=" } });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "make a menu pdf", emit: (e) => events.push(e) });
+    expect(events.find((e) => e.type === "file")).toEqual({ type: "file", name: "menu.pdf", mime: "application/pdf", data: "SGVsbG8=" });
+    expect(JSON.stringify(events.find((e) => e.type === "state"))).not.toContain("SGVsbG8=");
+  });
+
   it("runs an auto tool, then finishes with text", async () => {
     create
       .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }))

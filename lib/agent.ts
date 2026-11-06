@@ -44,6 +44,7 @@ export type AgentEvent =
   | { type: "client_tool"; toolCallId: string; name: string; args: any; summary: string; write: boolean }
   | { type: "suggestions"; suggestions: Suggestion[] }
   | { type: "plan"; steps: PlanStep[] }
+  | { type: "file"; name: string; mime: string; data: string }
   | ({ type: "question" } & AgentQuestion)
   | { type: "credits"; spent: number; balance: number }
   | { type: "state"; messages: ChatMessage[] }
@@ -108,6 +109,7 @@ export async function runAgentTurn(opts: {
     if (result.creditsKind === "db") await charge(AGENT_CREDITS_PER_COMMAND);
     if (result.creditsKind === "light") await charge(AGENT_CREDITS_LIGHT);
     emit({ type: "tool_result", toolCallId: id, name, ok: result.ok, output: result.output.slice(0, RESULT_UI_MAX) });
+    if (result.ok && result.file) emit({ type: "file", ...result.file });
     return result.output;
   };
 

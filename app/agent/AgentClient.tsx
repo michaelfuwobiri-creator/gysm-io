@@ -30,7 +30,9 @@ type Item =
       local?: boolean;
       resolved?: "approved" | "declined";
     }
-  | { id: string; kind: "note"; text: string; tone?: "error" | "muted" };
+  | { id: string; kind: "note"; text: string; tone?: "error" | "muted" }
+  /** A file the agent made for the user. `data` (base64) is kept in memory only, never saved. */
+  | { id: string; kind: "file"; name: string; mime: string; data?: string };
 
 type Saved = { items: Item[]; messages: unknown[] };
 
@@ -90,6 +92,7 @@ const TOOL_LABEL: Record<string, string> = {
   suggest_next: "Suggestions",
   update_plan: "Plan",
   ask_user: "Question",
+  send_file: "Send file",
   remember: "Memory",
   forget: "Memory",
   local_list: "Your folder",
@@ -102,6 +105,24 @@ type ClientCall = { toolCallId: string; name: string; args: any; summary: string
 type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?: boolean };
 
 const MAX_IMAGE_SIDE = 1400;
+
+function downloadFile(name: string, mime: string, base64: string) {
+  try {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } catch {
+    /* the browser refused the download */
+  }
+}
 
 function fileToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -274,7 +295,7 @@ export default function AgentClient({
 
   useEffect(() => {
     try {
-      const saved: Saved = { items: items.slice(-MAX_SAVED_ITEMS), messages };
+      const saved: Saved = { items: items.slice(-MAX_SAVED_ITEMS).map((i) => (i.kind === "file" ? { ...i, data: undefined } : i)), messages };
       localStorage.setItem(storageKey, JSON.stringify(saved));
     } catch {
       /* ignore */
@@ -348,6 +369,7 @@ export default function AgentClient({
             }
           } else if (e.type === "plan") setPlan(Array.isArray(e.steps) ? e.steps : []);
           else if (e.type === "question") setQuestion({ question: String(e.question ?? ""), options: Array.isArray(e.options) ? e.options.map(String) : [] });
+          else if (e.type === "file") push({ id: uid(), kind: "file", name: String(e.name), mime: String(e.mime), data: String(e.data) });
           else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
@@ -865,6 +887,19 @@ export default function AgentClient({
                       </summary>
                       {item.output && <pre>{item.output}</pre>}
                     </details>
+                  );
+                if (item.kind === "file")
+                  return (
+                    <div key={item.id} className="gb-file">
+                      <span className="gb-file-name">{item.name}</span>
+                      {item.data ? (
+                        <button type="button" className="gb-secondary" onClick={() => downloadFile(item.name, item.mime, item.data as string)}>
+                          Download
+                        </button>
+                      ) : (
+                        <span className="gb-file-gone">No longer available. Ask the agent to send it again.</span>
+                      )}
+                    </div>
                   );
                 if (item.kind === "proposal")
                   return (

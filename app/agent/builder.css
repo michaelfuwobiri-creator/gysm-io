@@ -222,3 +222,7 @@
 
 .gb-attached { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 4px 0; }
 .gb-attach-err { color: #c0392b; font-size: 13px; }
+
+.gb-file { margin: 8px 0; padding: 10px 12px; border: 1px solid rgba(127,127,127,.25); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.gb-file-name { font-weight: 600; word-break: break-all; }
+.gb-file-gone { font-size: 13px; opacity: .7; }
