@@ -25,6 +25,7 @@ import {
   truncate,
   type ChatMessage,
 } from "@/lib/agentCore";
+import { MEDIA_CREDIT_COST } from "@/lib/mediaCreditsConstants";
 import { executeTool, saveAttachments } from "@/lib/agentTools";
 import { attachmentNote, contentWithImages, type CleanAttachment } from "@/lib/agentAttachCore";
 import { cleanPlan, cleanQuestion, cleanSuggestions, type AgentQuestion, type PlanStep, type Suggestion } from "@/lib/agentGuards";
@@ -108,6 +109,7 @@ export async function runAgentTurn(opts: {
     if (result.creditsKind === "deploy") await charge(AGENT_CREDITS_PER_DEPLOY);
     if (result.creditsKind === "db") await charge(AGENT_CREDITS_PER_COMMAND);
     if (result.creditsKind === "light") await charge(AGENT_CREDITS_LIGHT);
+    if (result.creditsKind === "image") await charge(MEDIA_CREDIT_COST.image);
     emit({ type: "tool_result", toolCallId: id, name, ok: result.ok, output: result.output.slice(0, RESULT_UI_MAX) });
     if (result.ok && result.file) emit({ type: "file", ...result.file });
     return result.output;

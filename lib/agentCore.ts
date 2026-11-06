@@ -26,6 +26,7 @@ export type ToolName =
   | "suggest_next"
   | "update_plan"
   | "ask_user"
+  | "generate_image"
   | "send_file"
   | "remember"
   | "forget"
@@ -304,6 +305,22 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "generate_image",
+      description: "Create an image from a text description and save it in the workspace as a .webp file (a hero photo, illustration, background or product shot for a site). It costs the user extra allowance, so use it only when the site needs a real picture and none was attached; one or two images per site is usually plenty. Describe the subject, style and mood, and say that it must contain no text.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "What the image shows, its style and mood." },
+          path: { type: "string", description: "Where to save it, ending in .webp, e.g. 'my-site/images/hero.webp'." },
+          shape: { type: "string", enum: ["landscape", "square", "portrait"], description: "Defaults to landscape." },
+        },
+        required: ["prompt", "path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "send_file",
       description: "Give the user a file from your workspace as a download button in the chat, for example a PDF, CSV, ZIP, document or image you created (build it with write_file or run_command first). Max 1.5 MB. Use it when the user asks for a file; do not use it for the website itself (use deploy for that).",
       parameters: {
@@ -521,6 +538,7 @@ How you work:
 - Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. Never ask for a secret in chat, and never put one in a site's files: published files are public.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
+- Use generate_image sparingly for real pictures a site needs (hero, banner, product); if the user attached their own images, use those first. Prefer CSS, gradients and SVG for decoration.
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
@@ -801,6 +819,8 @@ export function describeCall(tool: string, args: any): string {
       return `Update the plan`;
     case "ask_user":
       return `Ask you a question`;
+    case "generate_image":
+      return `Create an image for ${String(args?.path ?? "?")}`;
     case "send_file":
       return `Send ${String(args?.path ?? "?")} to you as a download`;
     case "remember":

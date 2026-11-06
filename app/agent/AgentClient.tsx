@@ -92,6 +92,7 @@ const TOOL_LABEL: Record<string, string> = {
   suggest_next: "Suggestions",
   update_plan: "Plan",
   ask_user: "Question",
+  generate_image: "Image",
   send_file: "Send file",
   remember: "Memory",
   forget: "Memory",

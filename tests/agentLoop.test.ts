@@ -116,6 +116,16 @@ describe("runAgentTurn", () => {
     expect(JSON.stringify(events.find((e) => e.type === "state"))).not.toContain("SGVsbG8=");
   });
 
+  it("charges the image price for generate_image", async () => {
+    const { chargeCredits } = await import("@/lib/credits");
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("i1", "generate_image", { prompt: "bakery", path: "s/hero.webp" })] }))
+      .mockResolvedValueOnce(reply({ content: "Added a hero image." }));
+    (executeTool as any).mockResolvedValue({ ok: true, output: "Saved the image", creditsKind: "image" });
+    await runAgentTurn({ userId: "u", history: [], userText: "make a hero image", emit: () => {} });
+    expect((chargeCredits as any).mock.calls.some((c: any[]) => c[1] === 75)).toBe(true);
+  });
+
   it("runs an auto tool, then finishes with text", async () => {
     create
       .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }))

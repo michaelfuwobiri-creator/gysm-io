@@ -24,6 +24,7 @@ import {
 } from "@/lib/agentCore";
 import { addMemory, forgetMemory } from "@/lib/agentMemory";
 import type { CleanAttachment } from "@/lib/agentAttachCore";
+import { MAX_GENERATED_BYTES, checkImageArgs, generateAgentImage } from "@/lib/agentImage";
 import { MAX_SEND_FILE_BYTES, downloadName, mimeForFile } from "@/lib/agentFileCore";
 import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql, analyzeHtml, extractSameOriginLinks } from "@/lib/agentGuards";
 
@@ -35,7 +36,7 @@ import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validat
 export type ToolResult = {
   ok: boolean;
   output: string;
-  creditsKind?: "command" | "deploy" | "db" | "light";
+  creditsKind?: "command" | "deploy" | "db" | "light" | "image";
   /** A file for the user to download (send_file). Sent to the browser, never to the model. */
   file?: { name: string; mime: string; data: string };
 };
@@ -102,6 +103,25 @@ export async function toolRunCommand(userId: string, args: any): Promise<ToolRes
     creditsKind: "command",
     output: `exit code: ${r.exitCode}${r.truncated ? " (output truncated)" : ""}\n${r.output || "(no output)"}`,
   };
+}
+
+export async function toolGenerateImage(userId: string, args: any): Promise<ToolResult> {
+  const c = checkImageArgs(args);
+  if (c.ok === false) return { ok: false, output: c.error };
+  let bytes: Buffer;
+  try {
+    bytes = await generateAgentImage(c.prompt, c.shape);
+  } catch (e: any) {
+    return { ok: false, output: String(e?.message || "Image generation failed.").slice(0, 400) };
+  }
+  if (bytes.length > MAX_GENERATED_BYTES) return { ok: false, output: "The generated image is too large to publish. Try a simpler prompt or a smaller shape." };
+  const root = await workspaceRoot(userId);
+  const abs = `${root}/${c.path}`;
+  const mk = await runInSandbox(userId, `mkdir -p -- ${quote(abs.slice(0, abs.lastIndexOf("/")))}`, root);
+  if (mk.exitCode !== 0) return { ok: false, output: `Couldn't create the folder: ${mk.output}` };
+  const sandbox = await getUserSandbox(userId);
+  await sandbox.writeFiles([{ path: abs, content: bytes }]);
+  return { ok: true, creditsKind: "image", output: `Saved the image to ${c.path} (${Math.round(bytes.length / 1000)} KB, ${c.shape}). Use it in the page with a relative path, for example <img src="images/${c.path.split("/").pop()}" alt="...">.` };
 }
 
 export async function toolSendFile(userId: string, args: any): Promise<ToolResult> {
@@ -617,6 +637,9 @@ export async function executeTool(userId: string, name: string, args: any, secre
     switch (name) {
       case "send_file":
         result = await toolSendFile(userId, args);
+        break;
+      case "generate_image":
+        result = await toolGenerateImage(userId, args);
         break;
       case "remember":
         result = await addMemory(userId, args?.text);
