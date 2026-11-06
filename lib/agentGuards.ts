@@ -238,3 +238,27 @@ export function cleanSuggestions(raw: unknown): Suggestion[] {
   }
   return out;
 }
+
+
+// -- visible task plan (update_plan) -------------------------------------------
+
+export type PlanStep = { title: string; status: "pending" | "doing" | "done" };
+
+/** Validates a model-supplied plan: 1-12 short steps, known statuses, at most one "doing". */
+export function cleanPlan(raw: unknown): PlanStep[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PlanStep[] = [];
+  let doing = false;
+  for (const r of raw) {
+    const title = typeof r?.title === "string" ? r.title.replace(/\s+/g, " ").trim().slice(0, 100) : "";
+    if (!title) continue;
+    let status: PlanStep["status"] = r?.status === "done" ? "done" : r?.status === "doing" ? "doing" : "pending";
+    if (status === "doing") {
+      if (doing) status = "pending";
+      doing = true;
+    }
+    out.push({ title, status });
+    if (out.length === 12) break;
+  }
+  return out;
+}

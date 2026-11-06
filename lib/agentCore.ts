@@ -24,6 +24,7 @@ export type ToolName =
   | "fetch_url"
   | "review_site"
   | "suggest_next"
+  | "update_plan"
   | "local_list"
   | "local_read"
   | "local_write"
@@ -258,6 +259,32 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "update_plan",
+      description: "Show the user a short checklist of the steps for a bigger job (3 or more steps) and keep it current. Call it first with the steps, then again as steps start and finish (mark exactly one step 'doing'). It only displays progress; it does not run anything and does not end your turn.",
+      parameters: {
+        type: "object",
+        properties: {
+          steps: {
+            type: "array",
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Short step, under 80 characters." },
+                status: { type: "string", enum: ["pending", "doing", "done"] },
+              },
+              required: ["title", "status"],
+            },
+          },
+        },
+        required: ["steps"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_next",
       description: "Show the user 2-4 clickable next-step suggestions. Call it LAST, after you have written your summary in the same message. Each suggestion has a short title and the exact instruction you would carry out if the user clicks it. Suggestions only propose work; nothing happens until the user clicks.",
       parameters: {
@@ -427,7 +454,7 @@ function systemPromptBase(): string {
   return `You are GYSM Agent, the autonomous builder built into gysm.io. You turn a goal into a working website by writing files, running commands and publishing it live at <name>.gysm.io, all inside the user's own private workspace. If asked who or what you are, say you are GYSM Agent; do not name or guess any underlying AI model or vendor.
 
 How you work:
-- Plan briefly, then act with your tools. Check each result before the next step; fix errors yourself instead of handing them back.
+- Plan briefly, then act with your tools. For a job with 3 or more steps, call update_plan first with the steps, then update it as you go (one step 'doing' at a time, finished ones 'done') so the user can follow along. Check each result before the next step; fix errors yourself instead of handing them back.
 - Put each project in its own folder in the workspace (e.g. my-site/). Prefer simple, dependency-light stacks; static HTML/CSS/JS is best.
 - Sites are published on gysm.io as static files (HTML, CSS, JS, images, fonts; up to 150 files, 2 MB each, 15 MB in total). There is no server: no API routes, server-side code or secrets. With a framework, use a static export (Vite build, Next.js output: 'export') and deploy its output folder with the folder argument. If the user needs a backend, say it isn't supported on gysm.io yet.
 - Create and change files with write_file and edit_file, one file per call, never with cat/echo heredocs in run_command (commands are limited to 8000 characters). Split a big page into index.html, styles.css and script.js.
@@ -709,6 +736,8 @@ export function describeCall(tool: string, args: any): string {
       return `Review ${String(args?.url ?? "").slice(0, 150)}`;
     case "suggest_next":
       return `Suggest next steps`;
+    case "update_plan":
+      return `Update the plan`;
     case "local_list":
       return `List ${String(args?.path || "your folder")} on your computer`;
     case "local_read":

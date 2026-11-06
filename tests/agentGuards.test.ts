@@ -145,3 +145,27 @@ describe("cleanSuggestions", () => {
     expect(cleanSuggestions("x")).toEqual([]);
   });
 });
+
+
+import { cleanPlan } from "@/lib/agentGuards";
+
+describe("cleanPlan", () => {
+  it("keeps valid steps, drops empty ones and allows only one 'doing'", () => {
+    expect(
+      cleanPlan([
+        { title: "A", status: "doing" },
+        { title: "B", status: "doing" },
+        { title: "  ", status: "done" },
+        { title: "C", status: "weird" },
+      ])
+    ).toEqual([
+      { title: "A", status: "doing" },
+      { title: "B", status: "pending" },
+      { title: "C", status: "pending" },
+    ]);
+  });
+  it("caps at 12 steps and rejects non-arrays", () => {
+    expect(cleanPlan(Array.from({ length: 20 }, (_, i) => ({ title: `s${i}`, status: "pending" })))).toHaveLength(12);
+    expect(cleanPlan("nope")).toEqual([]);
+  });
+});

@@ -35,6 +35,20 @@ describe("runAgentTurn", () => {
     expect(events.find((e) => e.type === "suggestions").suggestions).toEqual([{ title: "Add a contact form", prompt: "Add a contact form to my site" }]);
   });
 
+  it("shows a plan from update_plan and keeps going", async () => {
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("p1", "update_plan", { steps: [{ title: "Write the page", status: "doing" }, { title: "Deploy", status: "pending" }, { title: "", status: "done" }] })] }))
+      .mockResolvedValueOnce(reply({ content: "On it." }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "build a site", emit: (e) => events.push(e) });
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(events.find((e) => e.type === "plan").steps).toEqual([
+      { title: "Write the page", status: "doing" },
+      { title: "Deploy", status: "pending" },
+    ]);
+  });
+
   it("runs an auto tool, then finishes with text", async () => {
     create
       .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }))

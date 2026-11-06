@@ -26,7 +26,7 @@ import {
   type ChatMessage,
 } from "@/lib/agentCore";
 import { executeTool } from "@/lib/agentTools";
-import { cleanSuggestions, type Suggestion } from "@/lib/agentGuards";
+import { cleanPlan, cleanSuggestions, type PlanStep, type Suggestion } from "@/lib/agentGuards";
 
 // GYSM Agent loop. The conversation (OpenAI chat format) lives in the
 // browser and is sent back each turn. Tools that change something outside
@@ -42,6 +42,7 @@ export type AgentEvent =
   // A local_* tool the browser must run against the user's connected folder.
   | { type: "client_tool"; toolCallId: string; name: string; args: any; summary: string; write: boolean }
   | { type: "suggestions"; suggestions: Suggestion[] }
+  | { type: "plan"; steps: PlanStep[] }
   | { type: "credits"; spent: number; balance: number }
   | { type: "state"; messages: ChatMessage[] }
   | { type: "error"; error: string; code?: string };
@@ -203,6 +204,15 @@ export async function runAgentTurn(opts: {
           ...(projectOf(name, args) ? { project: projectOf(name, args) as string } : {}),
         });
         break; // wait for the user's decision
+      }
+
+      // update_plan only draws a checklist for the user; it runs nothing and
+      // the turn goes on.
+      if (name === "update_plan") {
+        const steps = cleanPlan(args?.steps);
+        if (steps.length > 0) emit({ type: "plan", steps });
+        messages.push({ role: "tool", tool_call_id: call.id, content: steps.length ? "Plan shown to the user. Continue with the work." : "No valid steps. Continue with the work." });
+        continue;
       }
 
       // suggest_next only shows clickable ideas to the user; it runs nothing

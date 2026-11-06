@@ -88,6 +88,7 @@ const TOOL_LABEL: Record<string, string> = {
   fetch_url: "Fetch page",
   review_site: "Site review",
   suggest_next: "Suggestions",
+  update_plan: "Plan",
   local_list: "Your folder",
   local_read: "Read (your computer)",
   local_write: "Write (your computer)",
@@ -117,6 +118,8 @@ export default function AgentClient({
   const [busy, setBusy] = useState(false);
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
+  // The agent's live checklist for a bigger job (update_plan). Not saved.
+  const [plan, setPlan] = useState<{ title: string; status: "pending" | "doing" | "done" }[]>([]);
   const [credits, setCredits] = useState(initialCredits);
   // What the agent is doing right now, shown beside the working GYSM mark.
   const [activity, setActivity] = useState("");
@@ -262,6 +265,7 @@ export default function AgentClient({
       abortRef.current = ctrl;
       setBusy(true);
       setSuggestions([]);
+      if (body.text) setPlan([]);
       let clientCall: ClientCall | null = null;
       try {
         const res = await fetch("/api/agent", {
@@ -298,7 +302,8 @@ export default function AgentClient({
               setLastProject(e.project);
               setPreviewOpen(true);
             }
-          } else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
+          } else if (e.type === "plan") setPlan(Array.isArray(e.steps) ? e.steps : []);
+          else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
             if (e.balance || e.spent) setCredits(e.balance);
@@ -759,6 +764,17 @@ export default function AgentClient({
                   </div>
                 );
               })}
+
+              {plan.length > 0 && (
+                <div className="gb-plan" role="list" aria-label="Plan">
+                  {plan.map((st, i) => (
+                    <div key={`${i}-${st.title}`} role="listitem" className={`gb-plan-step ${st.status}`}>
+                      <span className="gb-plan-dot" aria-hidden="true">{st.status === "done" ? "✓" : st.status === "doing" ? "•" : ""}</span>
+                      <span>{st.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {busy && (
                 <div className="gb-status" role="status" aria-live="polite">
