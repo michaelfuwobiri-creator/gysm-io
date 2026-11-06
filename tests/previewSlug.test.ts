@@ -31,7 +31,7 @@ describe("links and hosts", () => {
   it("uses a path link until subdomains are on", () => {
     expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://www.gysm.io/s/src");
     vi.stubEnv("PREVIEW_SUBDOMAINS", "1");
-    expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://www.src.gysm.io");
+    expect(previewLinkFor("src", "https://www.gysm.io")).toBe("https://src.gysm.io");
   });
   it("reads the name from a host only when enabled", () => {
     expect(slugFromHost("src.gysm.io")).toBeNull();

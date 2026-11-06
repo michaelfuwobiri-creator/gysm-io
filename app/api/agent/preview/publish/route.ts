@@ -35,21 +35,21 @@ export async function POST(req: Request) {
     let url = named.slug ? previewLinkFor(named.slug, origin) : appFrameUrl(id, "index.html") ?? `${origin}/a/${id}/index.html`;
     let note: string | undefined;
     if (named.slug && subdomainsEnabled()) {
-      // Register www.<name>.gysm.io (and <name>.gysm.io -> www) on the Vercel
+      // Register <name>.gysm.io (and www.<name>.gysm.io -> it) on the Vercel
       // project so each gets a certificate. Already-registered hosts are fine.
       const hosts = previewHostsFor(named.slug);
       try {
         await ensureProjectDomain(hosts.main);
-        await ensureProjectDomain(hosts.bare, hosts.main);
+        await ensureProjectDomain(hosts.alias, hosts.main);
         note = "A new name can take a minute to start working while its certificate is issued.";
       } catch (e: any) {
         console.error("[agent] couldn't register preview domain:", e?.message || e);
         url = `${origin}/s/${named.slug}`;
-        note = "The www link isn't ready yet, so here is the gysm.io/s/ link. Try Update again in a minute.";
+        note = "The gysm.io name isn't ready yet, so here is the gysm.io/s/ link. Try Update again in a minute.";
       }
       if (named.previous && named.previous !== named.slug) {
         const old = previewHostsFor(named.previous);
-        await Promise.allSettled([removeDomainFromProject(old.bare), removeDomainFromProject(old.main)]);
+        await Promise.allSettled([removeDomainFromProject(old.alias), removeDomainFromProject(old.main)]);
       }
     }
     return Response.json({ url, id, slug: named.slug, skipped: picked.skipped, note }, { headers: { "Cache-Control": "no-store" } });

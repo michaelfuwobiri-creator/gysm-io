@@ -41,10 +41,10 @@ export function subdomainsEnabled(): boolean {
   return process.env.PREVIEW_SUBDOMAINS === "1";
 }
 
-/** The two hosts a name is served on: www.<name>.gysm.io (main) and <name>.gysm.io (redirects to www). */
-export function previewHostsFor(slug: string): { main: string; bare: string } {
+/** The two hosts a name is served on: <name>.gysm.io (main) and www.<name>.gysm.io (redirects to it). */
+export function previewHostsFor(slug: string): { main: string; alias: string } {
   const base = previewBaseDomain();
-  return { main: `www.${slug}.${base}`, bare: `${slug}.${base}` };
+  return { main: `${slug}.${base}`, alias: `www.${slug}.${base}` };
 }
 
 /** The address to show for a hosted preview. */
