@@ -184,6 +184,10 @@ export const SHELL_MIN_BALANCE_FOR_AI = 100;
 // GYSM Agent (app/agent, app/api/agent, lib/agent*.ts). Metered per model
 // call from the provider's own usage numbers, same conversion as Shell.
 export const AGENT_MODEL = process.env.GYSM_AGENT_MODEL || "gpt-5.6-terra";
+// This model rejects function tools on /v1/chat/completions unless reasoning
+// effort is "none" (400 otherwise), so default to that. Override with
+// GYSM_AGENT_REASONING only if the model/endpoint supports tools with reasoning.
+export const AGENT_REASONING_EFFORT = process.env.GYSM_AGENT_REASONING || "none";
 
 export function agentCreditsForUsage(usage: { prompt_tokens?: number | null; completion_tokens?: number | null }): number {
   const rate = MODEL_COST_PER_1M_TOKENS["gpt-5.6-terra"];

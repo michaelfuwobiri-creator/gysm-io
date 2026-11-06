@@ -17,6 +17,23 @@ beforeEach(() => {
 });
 
 describe("runAgentTurn", () => {
+  it("sends reasoning_effort none (the model rejects tools otherwise)", async () => {
+    create.mockResolvedValueOnce(reply({ content: "Hi." }));
+    await runAgentTurn({ userId: "u", history: [], userText: "hello", emit: () => {} });
+    expect(create.mock.calls[0][0].reasoning_effort).toBe("none");
+  });
+
+  it("emits clickable suggestions from suggest_next and ends the turn without running a tool", async () => {
+    create.mockResolvedValueOnce(
+      reply({ content: "Built it.", tool_calls: [toolCall("s1", "suggest_next", { suggestions: [{ title: "Add a contact form", prompt: "Add a contact form to my site" }, { title: "", prompt: "dropped" }] })] })
+    );
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "build a site", emit: (e) => events.push(e) });
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(events.find((e) => e.type === "suggestions").suggestions).toEqual([{ title: "Add a contact form", prompt: "Add a contact form to my site" }]);
+  });
+
   it("runs an auto tool, then finishes with text", async () => {
     create
       .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }))

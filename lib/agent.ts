@@ -5,6 +5,7 @@ import {
   AGENT_CREDITS_PER_DEPLOY,
   AGENT_CREDITS_LIGHT,
   AGENT_MODEL,
+  AGENT_REASONING_EFFORT,
   agentCreditsForUsage,
 } from "@/lib/credits-constants";
 import {
@@ -106,6 +107,7 @@ export async function runAgentTurn(opts: {
         tools: AGENT_TOOLS as any,
         parallel_tool_calls: false,
         max_completion_tokens: 8000,
+        reasoning_effort: AGENT_REASONING_EFFORT as any,
       });
       if (response.usage) await charge(agentCreditsForUsage(response.usage));
       else await charge(1);
