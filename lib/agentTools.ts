@@ -3,6 +3,7 @@ import dns from "dns";
 import http from "http";
 import https from "https";
 import { sql } from "@/lib/db";
+import { saveAgentProject } from "@/lib/agentProjects";
 import { getConnection, getValidAccessToken, type ConnectedBackend } from "@/lib/backendStore";
 import { runSql } from "@/lib/supabaseBackend";
 import { getUserSandbox, runInSandbox } from "@/lib/shell/sandbox";
@@ -179,7 +180,14 @@ export async function toolDeploy(userId: string, args: any): Promise<ToolResult>
   } catch {
     /* table may not be migrated yet */
   }
-  if (state === "READY") return { ok: true, creditsKind: "deploy", output: `Deployed. Live at ${url} (state READY, ${files.length} files).` };
+  if (state === "READY") {
+    // Save the site as a normal project so it appears on the dashboard.
+    const indexFile = files.find((f) => f.file === "index.html");
+    const indexHtml = indexFile ? Buffer.from(indexFile.data, "base64").toString("utf8") : null;
+    const projectId = await saveAgentProject({ userId, project, url, indexHtml });
+    const saved = projectId ? " It's also saved to the user's dashboard as a project." : "";
+    return { ok: true, creditsKind: "deploy", output: `Deployed. Live at ${url} (state READY, ${files.length} files).${saved}` };
+  }
   if (state === "ERROR" || state === "CANCELED") {
     return { ok: false, creditsKind: "deploy", output: `Deployment ${state}. Call get_logs with source 'deployment' to see the build log.` };
   }

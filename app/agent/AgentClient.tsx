@@ -58,11 +58,11 @@ const TOOL_LABEL: Record<string, string> = {
   suggest_next: "Suggestions",
 };
 
-export default function AgentClient({ initialCredits, userKey }: { initialCredits: number; userKey: string }) {
+export default function AgentClient({ initialCredits, userKey, initialPrompt = "" }: { initialCredits: number; userKey: string; initialPrompt?: string }) {
   const storageKey = `gysm-agent:${userKey}`;
   const [items, setItems] = useState<Item[]>([]);
   const [messages, setMessages] = useState<unknown[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialPrompt);
   const [busy, setBusy] = useState(false);
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
@@ -72,6 +72,20 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<unknown[]>([]);
   messagesRef.current = messages;
+
+  // The homepage and use-case pages stash the visitor's idea here before
+  // sign-up; prefill it (never auto-run it) and clear it.
+  useEffect(() => {
+    try {
+      const pending = localStorage.getItem("gysm_pending_prompt");
+      if (pending) {
+        localStorage.removeItem("gysm_pending_prompt");
+        setText((t) => t || pending.slice(0, 2000));
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -192,11 +206,14 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 24px)", maxWidth: 820, margin: "0 auto", padding: "0 12px" }}>
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 20 }}>GYSM Agent</h1>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Builds, runs, and deploys in your private workspace. Deploys and database changes ask you first.</div>
+          <h1 style={{ margin: 0, fontSize: 20 }}>GYSM Builder</h1>
+          <div style={{ fontSize: 12, opacity: 0.7 }}>Describe what you want. The agent builds it, checks it, and deploys it. Deploys and database changes ask you first.</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: 12, border: `1px solid ${PINK}`, borderRadius: 999, padding: "2px 10px" }}>{credits} cr</span>
+          <a href="/builder?classic=1" style={{ fontSize: 12, opacity: 0.7, textDecoration: "underline", color: "inherit" }}>
+            Classic builder
+          </a>
           <button onClick={reset} disabled={busy} style={{ fontSize: 12, background: "none", border: "1px solid #8884", borderRadius: 8, padding: "4px 8px", color: "inherit" }}>
             New chat
           </button>
@@ -315,7 +332,7 @@ export default function AgentClient({ initialCredits, userKey }: { initialCredit
               submit(text);
             }
           }}
-          placeholder="What should the agent build?"
+          placeholder="What do you want to build?"
           rows={2}
           style={{ flex: 1, borderRadius: 12, border: "1px solid #8886", padding: 10, background: "none", color: "inherit", resize: "none", font: "inherit" }}
         />

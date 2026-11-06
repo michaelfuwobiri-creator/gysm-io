@@ -28,6 +28,10 @@ const NAV_GROUPS: {
     title: "Workspace",
     items: [
       { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "grid" },
+      // The main builder: an autonomous agent that builds, runs and deploys
+      // -- see app/agent/page.tsx. The classic prompt builder lives at
+      // /builder?classic=1.
+      { key: "agent", label: "Builder", href: "/agent", icon: "terminal" },
       { key: "templates", label: "Templates", href: "/templates", icon: "layout" },
       { key: "connectors", label: "Connectors", href: "/connectors", icon: "plug" },
       { key: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: "chart" },
@@ -39,8 +43,6 @@ const NAV_GROUPS: {
       { key: "shell", label: "Shell (beta)", href: "/shell", icon: "terminal" },
       { key: "gysmlink", label: "gysmlink", href: "/gysmlink", icon: "link" },
       { key: "shield", label: "Shield", href: "/shield", icon: "shield" },
-      // Autonomous build/run/deploy agent -- see app/agent/page.tsx.
-      { key: "agent", label: "Agent (beta)", href: "/agent", icon: "terminal" },
     ],
   },
   {

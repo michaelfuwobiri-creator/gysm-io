@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/isAdmin";
 import { sql } from "@/lib/db";
@@ -31,6 +32,11 @@ export default async function BuilderPage({
 }: {
   searchParams: { projectId?: string; template?: string; prompt?: string; remixSkill?: string; remixPrompt?: string };
 }) {
+  // The Agent is the main builder now. A bare /builder visit goes there; any
+  // link that carries context (?projectId=, ?template=, ?prompt=, ?success=,
+  // or ?classic=1) still opens this classic builder so nothing existing breaks.
+  if (Object.keys(searchParams ?? {}).length === 0) redirect("/agent");
+
   let initialHtml: string | null = null;
   let initialPrompt = "";
   let initialProjectId: string | null = null;

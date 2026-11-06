@@ -55,6 +55,20 @@ export default async function DashboardPage() {
     console.error("[dashboard] failed to load projects:", error.message);
   }
 
+  // Live URLs for sites the Agent deployed (best-effort: the column is added
+  // by migration 0034 and its absence just means no live links).
+  const liveUrls: Record<string, string> = {};
+  try {
+    const rows = (await sql`
+      select id, live_url from projects
+      where (user_id = ${user.id} or org_id = ${user.orgId ?? ""}) and live_url is not null
+      limit 200
+    `) as any[];
+    for (const r of rows) liveUrls[r.id] = r.live_url;
+  } catch {
+    /* live_url not migrated yet */
+  }
+
   // Curated templates shown in the dashboard's "Start from a template"
   // strip -- same is_template=true rows /templates uses (see
   // app/templates/page.tsx). Best-effort: a failure here shouldn't take
@@ -117,7 +131,7 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-bold text-black/40 uppercase tracking-wider">
               {user.orgId ? "Team builds" : "Your builds"}
             </h2>
-            <a href="/builder" className="text-[13px] font-bold text-[#FF0080] hover:text-[#FF0080]">
+            <a href="/agent" className="text-[13px] font-bold text-[#FF0080] hover:text-[#FF0080]">
               + New build
             </a>
           </div>
@@ -184,7 +198,7 @@ export default async function DashboardPage() {
                     Open in builder
                   </a>
                   <a
-                    href={`/publish/${p.id}`}
+                    href={liveUrls[p.id] || `/publish/${p.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 text-center px-3 py-2 rounded-lg border border-black/10 text-xs font-bold hover:bg-black/[0.03]"

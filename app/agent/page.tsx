@@ -10,14 +10,19 @@ export const dynamic = "force-dynamic";
 // GYSM Agent: give it a goal and it writes files, runs commands, sets up
 // database tables and deploys, in the user's own sandbox. Deploys and
 // database changes always wait for the user's approval.
-export default async function AgentPage() {
+export default async function AgentPage({ searchParams }: { searchParams: { prompt?: string } }) {
   const user = await getUser();
-  if (!user) redirect("/sign-in?redirect_url=/agent");
+  if (!user) {
+    const back = searchParams?.prompt ? `/agent?prompt=${encodeURIComponent(searchParams.prompt)}` : "/agent";
+    redirect(`/sign-in?redirect_url=${encodeURIComponent(back)}`);
+  }
+  // A deep link only prefills the box; it never starts a run (no surprise credit spend).
+  const initialPrompt = typeof searchParams?.prompt === "string" ? searchParams.prompt.slice(0, 2000) : "";
   const credits = await getCreditBalance(user.id);
 
   return (
     <AppShell active="agent">
-      <AgentClient initialCredits={credits} userKey={user.id} />
+      <AgentClient initialCredits={credits} userKey={user.id} initialPrompt={initialPrompt} />
     </AppShell>
   );
 }

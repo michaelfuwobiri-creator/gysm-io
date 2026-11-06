@@ -91,7 +91,7 @@ export default function PromptHero({ greetingName }: { greetingName: string | nu
         // works without the image rather than blocking the build.
       }
     }
-    router.push(trimmed ? `/builder?prompt=${encodeURIComponent(trimmed)}` : "/builder");
+    router.push(trimmed ? `/agent?prompt=${encodeURIComponent(trimmed)}` : "/agent");
   }
 
   return (
