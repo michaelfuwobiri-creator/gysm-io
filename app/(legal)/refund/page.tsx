@@ -32,7 +32,7 @@ export default function RefundPage() {
             failed-generation refund above — this includes cases where you simply change your mind or
             don&apos;t end up using the credits. If a technical error on our end left you charged
             without receiving the credits, email{" "}
-            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a> with your
+            <a href="mailto:info@gysm.io" className="underline">info@gysm.io</a> with your
             account email and the approximate purchase time and we&apos;ll fix it.
           </p>
         </section>
@@ -66,7 +66,7 @@ export default function RefundPage() {
             cooling-off periods for digital services in the EU/UK) that can&apos;t be waived by this
             policy. This isn&apos;t legal advice — if you believe a mandatory right applies to your
             purchase, contact{" "}
-            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a> and we&apos;ll
+            <a href="mailto:info@gysm.io" className="underline">info@gysm.io</a> and we&apos;ll
             work it out.
           </p>
         </section>
@@ -75,7 +75,7 @@ export default function RefundPage() {
           <h2 className="text-[18px] font-bold text-black mb-2">How to request something not covered above</h2>
           <p>
             Email{" "}
-            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a> with your
+            <a href="mailto:info@gysm.io" className="underline">info@gysm.io</a> with your
             account email, what was purchased, and roughly when — we review case-by-case and reply
             within one business day.
           </p>

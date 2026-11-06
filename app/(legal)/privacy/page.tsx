@@ -98,7 +98,7 @@ export default function PrivacyPage() {
             including the right to know what we collect and to delete it — we don't sell or share
             personal information for cross-context behavioral advertising, so there's no "opt out of
             sale" toggle needed. To exercise any of these rights, email{" "}
-            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a>; we'll verify
+            <a href="mailto:info@gysm.io" className="underline">info@gysm.io</a>; we'll verify
             your request and respond within the time required by applicable law.
           </p>
         </section>
@@ -122,7 +122,7 @@ export default function PrivacyPage() {
           <h2 className="text-[18px] font-bold text-black mb-2">Contact</h2>
           <p>
             Questions about this policy or your data can be sent to{" "}
-            <a href="mailto:support@gysm.io" className="underline">support@gysm.io</a>.
+            <a href="mailto:info@gysm.io" className="underline">info@gysm.io</a>.
           </p>
         </section>
       </div>

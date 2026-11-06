@@ -45,7 +45,7 @@ const SECTIONS = [
   {
     title: "Company",
     links: [
-      { href: "mailto:support@gysm.io?subject=Work%20with%20us", label: "Work with us" },
+      { href: "mailto:info@gysm.io?subject=Work%20with%20us", label: "Work with us" },
       { href: "/support", label: "Support" },
       { href: "/terms", label: "Terms" },
       { href: "/privacy", label: "Privacy" },

@@ -1,5 +1,5 @@
 -- App Store Guideline 1.2: users can report objectionable content and block
--- other users. Reports are reviewed by the team (support@gysm.io, within 24h).
+-- other users. Reports are reviewed by the team (info@gysm.io, within 24h).
 create table if not exists content_reports (
   id          uuid primary key default gen_random_uuid(),
   reporter_id text not null,

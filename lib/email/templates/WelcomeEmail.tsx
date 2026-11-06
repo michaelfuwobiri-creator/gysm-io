@@ -13,7 +13,7 @@ export default function WelcomeEmail({ name }: { name: string | null }) {
         Start building
       </Button>
       <Text style={{ ...textStyle, marginTop: 24, fontSize: 12, color: "#999" }}>
-        Questions? Just reply to this email or reach us at support@gysm.io.
+        Questions? Just reply to this email or reach us at info@gysm.io.
       </Text>
     </EmailLayout>
   );

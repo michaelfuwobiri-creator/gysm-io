@@ -293,7 +293,7 @@ export default function Page() {
         <div className="max-w-[1280px] mx-auto px-5 md:px-8 py-12 md:py-16">
           <span className="font-black tracking-tighter text-[16px]">GYSM</span>
           <p className="mt-3 text-[12px] leading-[1.6] text-black/40 max-w-[320px]">{t("footer.tagline")}</p>
-          <a href="mailto:support@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">support@gysm.io</a>
+          <a href="mailto:info@gysm.io" className="mt-4 inline-block text-[12px] font-semibold text-black/60 hover:text-black">info@gysm.io</a>
           <NewsletterSignup source="homepage_footer" />
           <div className="mt-10 pt-6 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-3 text-[11px] text-black/30">
             <span>© 2026 GYSM — built for founders who ship</span>
