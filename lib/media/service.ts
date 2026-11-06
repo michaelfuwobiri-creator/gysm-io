@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { deductCredit, addCredits } from "@/lib/credits";
+import { deductCredit, refundCredits } from "@/lib/credits";
+import { usageBlockedError } from "@/lib/planUsage";
 import { MEDIA_CREDIT_COST, MEDIA_KIND_ENV_VAR, type MediaKind } from "@/lib/mediaCreditsConstants";
 import { sendBuildFailedEmail } from "@/lib/email/send";
 
@@ -39,7 +40,7 @@ export async function requireUserAndCredit(
   const cost = MEDIA_CREDIT_COST[kind];
   const deducted = await deductCredit(user.id, cost);
   if (!deducted) {
-    return { ok: false, status: 402, error: `Not enough credits -- this costs ${cost}.` };
+    return { ok: false, status: 402, error: (await usageBlockedError(user.id)).error };
   }
   return { ok: true, user, cost };
 }
@@ -82,7 +83,7 @@ export async function markProcessing(id: string, providerJobId: string): Promise
 export async function markFailed(id: string, user: MediaUser, cost: number, kind: string, error: string): Promise<void> {
   await Promise.all([
     sql`update media_generations set status = 'failed', error = ${error}, updated_at = now() where id = ${id}`,
-    addCredits(user.id, cost),
+    refundCredits(user.id, cost),
   ]);
   if (user.email) await sendBuildFailedEmail(user.email, user.name, kind, error);
 }

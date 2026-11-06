@@ -1,3 +1,4 @@
+import { usageBlockedError } from "@/lib/planUsage";
 import OpenAI from "openai";
 import { chargeCredits } from "@/lib/credits";
 import {
@@ -70,11 +71,13 @@ export async function runAgentTurn(opts: {
   const messages: ChatMessage[] = [...opts.history];
   let spent = 0;
   let balance = 0;
+  let exhausted = false;
 
   const charge = async (credits: number) => {
     if (credits <= 0) return;
     spent += credits;
     balance = await chargeCredits(userId, credits);
+    if (balance <= 0) exhausted = true;
   };
 
   const run = async (id: string, name: string, args: any, secret?: string): Promise<string> => {
@@ -129,6 +132,12 @@ export async function runAgentTurn(opts: {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 120_000, maxRetries: 1 });
   try {
     for (let step = 0; step < MAX_STEPS_PER_TURN; step++) {
+      if (exhausted) {
+        // Out of allowance mid-task: stop cleanly instead of running on.
+        const why = await usageBlockedError(userId);
+        emit({ type: "text", text: `_${why.error} Say "continue" after that to pick up where I left off._` });
+        break;
+      }
       const response = await openai.chat.completions.create({
         model: AGENT_MODEL,
         messages: [{ role: "system", content: systemPrompt(opts.localFolder) }, ...(messages as any[])],

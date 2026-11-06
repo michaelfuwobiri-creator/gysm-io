@@ -5,7 +5,7 @@ import Stripe from "stripe";
 // DATABASE_URL isn't set. Since only NEXT_PUBLIC_* vars are ever inlined
 // into client bundles, that throw would fire in every visitor's browser.
 // credits-constants.ts has the same plan/build numbers with no db import.
-import { CREDITS_PER_PLAN, BUILDS_PER_PLAN, BUILD_COST_USD, FLAT_PROFIT_USD } from "@/lib/credits-constants";
+import { CREDITS_PER_PLAN, BUILDS_PER_PLAN, BUILD_COST_USD, FLAT_PROFIT_USD, PLAN_MONTHLY_ID, PLAN_MONTHLY_PRICE_EUR } from "@/lib/credits-constants";
 
 // Standard US Stripe card rate (2.9% + $0.30/transaction) -- stable,
 // published pricing, not something that needed the same web research as
@@ -70,6 +70,7 @@ export function getStripe(): Stripe {
 
 export type PricingPlan = {
   id:
+    | "plan_monthly"
     | "credits_starter"
     | "credits_popular"
     | "credits_bulk"
@@ -81,7 +82,7 @@ export type PricingPlan = {
     | "voiie_agency";
   name: string;
   price: number;
-  currency: "usd";
+  currency: "usd" | "eur";
   /** 'month' = recurring subscription. 'one_time' = single Checkout payment. */
   interval: "month" | "one_time";
   credits: number;
@@ -99,6 +100,10 @@ export type PricingPlan = {
    *  lib/voiie/billing.ts, not something a random visitor should be able
    *  to self-serve buy. */
   hidden?: boolean;
+  /** When set and no Stripe Price ID is configured, checkout creates the
+   *  price on the fly from this amount (minor units, e.g. cents) and the
+   *  plan's currency/interval, so the plan works without a Dashboard step. */
+  inlineAmount?: number;
 };
 
 /**
@@ -145,6 +150,25 @@ export type PricingPlan = {
  * this page will advertise one number and charge another.
  */
 export const PRICING_PLANS: PricingPlan[] = [
+  // Nov 2026: GYSM moved to a single EUR 20/month plan with Claude-style
+  // usage limits (a 5-hour window plus a weekly cap, lib/planUsage.ts). The
+  // packs and the Builder/Pro/Studio plans below stay defined (hidden) so
+  // existing subscribers keep renewing and old balances keep working, but
+  // they are no longer sold.
+  {
+    id: PLAN_MONTHLY_ID,
+    name: "GYSM Monthly",
+    price: PLAN_MONTHLY_PRICE_EUR,
+    currency: "eur",
+    interval: "month",
+    credits: 0,
+    builds: 0,
+    description: "Build and publish sites with the GYSM Agent, live on your own name.gysm.io.",
+    tagline: "Usage resets every 5 hours, with a weekly limit",
+    highlight: true,
+    priceIdEnvVar: "STRIPE_PLAN_MONTHLY_PRICE_ID",
+    inlineAmount: PLAN_MONTHLY_PRICE_EUR * 100,
+  },
   {
     id: "credits_starter",
     name: "Starter Pack",
@@ -156,6 +180,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "Try it out. 5 builds, no subscription.",
     tagline: "Just enough to try it",
     priceIdEnvVar: "STRIPE_CREDITS_STARTER_PRICE_ID",
+    hidden: true,
   },
   {
     id: "credits_popular",
@@ -169,6 +194,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     tagline: "The sweet spot",
     highlight: true,
     priceIdEnvVar: "STRIPE_CREDITS_POPULAR_PRICE_ID",
+    hidden: true,
   },
   {
     id: "credits_bulk",
@@ -181,6 +207,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "50 builds, no subscription.",
     tagline: "Stock up",
     priceIdEnvVar: "STRIPE_CREDITS_BULK_PRICE_ID",
+    hidden: true,
   },
   {
     id: "plan_builder",
@@ -193,6 +220,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "For solo builders shipping side projects. 40 builds/mo.",
     tagline: "For your next side project",
     priceIdEnvVar: "STRIPE_PLAN_BUILDER_PRICE_ID",
+    hidden: true,
   },
   {
     id: "plan_pro",
@@ -206,6 +234,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     tagline: "Built for freelance work",
     highlight: true,
     priceIdEnvVar: "STRIPE_PLAN_PRO_PRICE_ID",
+    hidden: true,
   },
   {
     id: "plan_studio",
@@ -218,6 +247,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "For agencies shipping at scale. 600 builds/mo.",
     tagline: "Ship without limits",
     priceIdEnvVar: "STRIPE_PLAN_STUDIO_PRICE_ID",
+    hidden: true,
   },
   // VOIIE plans -- one-time payment a hunted lead makes to take their
   // free demo (see lib/voiie/demo.ts) live for real. Not shown on
@@ -316,7 +346,7 @@ export function getPlanById(planId: string | undefined | null): PricingPlan | un
  * discipline the env vars already require, just with a safety net under
  * it now instead of a silent single point of failure.
  */
-export const DEFAULT_LIVE_PRICE_IDS: Record<PricingPlan["id"], string> = {
+export const DEFAULT_LIVE_PRICE_IDS: Partial<Record<PricingPlan["id"], string>> = {
   credits_starter: "price_1UByxVDE5QfMC9H1FKBdHVIk",
   credits_popular: "price_1UByxjDE5QfMC9H1Rc5Km9vo",
   credits_bulk: "price_1UByxlDE5QfMC9H1eQsGbept",
@@ -334,4 +364,10 @@ export function getPriceId(planId: string): string | undefined {
   const plan = getPlanById(planId);
   if (!plan) return undefined;
   return process.env[plan.priceIdEnvVar] || DEFAULT_LIVE_PRICE_IDS[plan.id];
+}
+
+/** Display price, e.g. "€20" or "$4.99". */
+export function formatPlanPrice(plan: PricingPlan): string {
+  const symbol = plan.currency === "eur" ? "€" : "$";
+  return Number.isInteger(plan.price) ? `${symbol}${plan.price}` : `${symbol}${plan.price.toFixed(2)}`;
 }

@@ -1,3 +1,4 @@
+import { usageBlockedError } from "@/lib/planUsage";
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
@@ -111,10 +112,7 @@ export async function POST(req: NextRequest) {
 
   const balance = await getCreditBalance(user.id);
   if (balance < buildCost) {
-    return Response.json(
-      { error: tier !== "fast" ? "Not enough credits for that model on this build." : "You're out of credits.", code: "NO_CREDITS" },
-      { status: 402 }
-    );
+    return Response.json(await usageBlockedError(user.id), { status: 402 });
   }
 
   const encoder = new TextEncoder();
@@ -222,7 +220,7 @@ export async function POST(req: NextRequest) {
         // earlier balance check and both ship a free build.
         const deducted = await deductCredit(user.id, buildCost);
         if (!deducted) {
-          send({ type: "error", error: "You're out of credits.", code: "NO_CREDITS" });
+          send({ type: "error", ...(await usageBlockedError(user.id)) });
           controller.close();
           return;
         }

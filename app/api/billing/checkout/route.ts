@@ -27,9 +27,14 @@ export async function POST(req: NextRequest) {
   if (!plan) {
     return NextResponse.json({ error: `Unknown plan "${planId}".` }, { status: 400 });
   }
+  // Retired plans (packs, Builder/Pro/Studio) are no longer sold; VOIIE plans
+  // have their own checkout in lib/voiie/billing.ts.
+  if (plan.hidden) {
+    return NextResponse.json({ error: "That plan is no longer available. Choose the GYSM monthly plan." }, { status: 400 });
+  }
 
   const priceId = getPriceId(planId);
-  if (!priceId) {
+  if (!priceId && !plan.inlineAmount) {
     console.error(`[billing/checkout] missing env var ${plan.priceIdEnvVar} for plan ${planId}`);
     return NextResponse.json(
       { error: "This plan isn't configured yet. Try again shortly." },
@@ -39,11 +44,23 @@ export async function POST(req: NextRequest) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
-  function createSession(price: string) {
+  function createSession(price: string | undefined) {
+    // No Price ID configured: create the price inline from the plan itself.
+    const lineItem: any = price
+      ? { price, quantity: 1 }
+      : {
+          quantity: 1,
+          price_data: {
+            currency: plan.currency,
+            unit_amount: plan.inlineAmount,
+            product_data: { name: plan.name },
+            ...(plan.interval === "month" ? { recurring: { interval: "month" } } : {}),
+          },
+        };
     return getStripe().checkout.sessions.create({
       mode: plan.interval === "month" ? "subscription" : "payment",
       payment_method_types: ["card"],
-      line_items: [{ price, quantity: 1 }],
+      line_items: [lineItem],
       client_reference_id: user.id,
       customer_email: user.email ?? undefined,
       metadata: { userId: user.id, planId: plan.id },

@@ -1,3 +1,4 @@
+import { usageBlockedError } from "@/lib/planUsage";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
 import { explainCommand } from "@/lib/shell/agent";
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   if (!command) return Response.json({ error: "No command to explain." }, { status: 400 });
 
   if ((await getCreditBalance(user.id)) < MIN_BALANCE) {
-    return Response.json({ error: "You're out of credits.", code: "NO_CREDITS" }, { status: 402 });
+    return Response.json(await usageBlockedError(user.id), { status: 402 });
   }
 
   try {

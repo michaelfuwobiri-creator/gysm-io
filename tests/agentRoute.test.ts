@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({ getUser: vi.fn() }));
 vi.mock("@/lib/credits", () => ({ getCreditBalance: vi.fn(), chargeCredits: vi.fn() }));
+vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
 vi.mock("@/lib/agent", () => ({
   runAgentTurn: vi.fn(async (o: any) => {
     o.emit({ type: "text", text: "hello" });
@@ -39,7 +40,7 @@ describe("POST /api/agent", () => {
     (getCreditBalance as any).mockResolvedValue(10);
     const res = await POST(req({ text: "hi" }));
     expect(res.status).toBe(402);
-    expect((await res.json()).code).toBe("NO_CREDITS");
+    expect((await res.json()).code).toBe("NO_PLAN");
     expect(runAgentTurn).not.toHaveBeenCalled();
   });
   it("streams NDJSON events", async () => {

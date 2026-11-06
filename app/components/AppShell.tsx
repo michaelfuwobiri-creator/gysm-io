@@ -1,7 +1,6 @@
-import { formatCredits } from "@/lib/credits-constants";
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
 import { getUser } from "@/lib/auth";
-import { getCreditBalance } from "@/lib/credits";
+import { getUsageSummary, type UsageSummary } from "@/lib/planUsage";
 import CommandPalette, { CommandPaletteTrigger } from "./CommandPalette";
 import MobileAppHeader from "./MobileAppHeader";
 
@@ -223,7 +222,7 @@ export default async function AppShell({
   children: React.ReactNode;
 }) {
   const user = await getUser();
-  const credits = user ? await getCreditBalance(user.id) : 0;
+  const usage: UsageSummary = user ? await getUsageSummary(user.id) : { title: "Credits", value: "0", cta: { href: "/pricing", label: "Subscribe →" } };
   const displayName = user?.name || user?.email || "there";
   const initial = displayName.trim().charAt(0).toUpperCase() || "G";
 
@@ -288,15 +287,17 @@ export default async function AppShell({
           {/* Credits / plan card -- real balance, not a placeholder. */}
           <div className="rounded-xl border border-black/10 bg-black/[0.02] p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Credits</span>
-              <span className="text-[13px] font-black">{formatCredits(credits)}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">{usage.title}</span>
+              <span className="text-[13px] font-black">{usage.value}</span>
             </div>
-            <a
-              href="/pricing"
-              className="text-[12px] font-bold text-center py-1.5 rounded-full bg-black text-white hover:opacity-90 transition"
-            >
-              Upgrade →
-            </a>
+            {usage.cta && (
+              <a
+                href={usage.cta.href}
+                className="text-[12px] font-bold text-center py-1.5 rounded-full bg-black text-white hover:opacity-90 transition"
+              >
+                {usage.cta.label}
+              </a>
+            )}
           </div>
           <div className="flex items-center justify-between gap-2 px-1 pb-1">
             <OrganizationSwitcher
@@ -315,7 +316,7 @@ export default async function AppShell({
           groups={mobileGroups}
           displayName={displayName}
           initial={initial}
-          credits={credits}
+          usage={usage}
           footerSlot={
             <>
               <OrganizationSwitcher

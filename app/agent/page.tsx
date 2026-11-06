@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AppShell from "../components/AppShell";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
+import { hasMonthlyPlan } from "@/lib/planUsage";
 import AgentClient from "./AgentClient";
 
 export const metadata = { title: "Agent · GYSM" };
@@ -18,11 +19,11 @@ export default async function AgentPage({ searchParams }: { searchParams: { prom
   }
   // A deep link only prefills the box; it never starts a run (no surprise credit spend).
   const initialPrompt = typeof searchParams?.prompt === "string" ? searchParams.prompt.slice(0, 2000) : "";
-  const credits = await getCreditBalance(user.id);
+  const [credits, onPlan] = await Promise.all([getCreditBalance(user.id), hasMonthlyPlan(user.id)]);
 
   return (
     <AppShell active="agent">
-      <AgentClient initialCredits={credits} userKey={user.id} initialPrompt={initialPrompt} />
+      <AgentClient initialCredits={credits} onPlan={onPlan} userKey={user.id} initialPrompt={initialPrompt} />
     </AppShell>
   );
 }

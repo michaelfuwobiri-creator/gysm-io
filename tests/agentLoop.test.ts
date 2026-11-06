@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const create = vi.fn();
 vi.mock("openai", () => ({ default: class { chat = { completions: { create } }; } }));
 vi.mock("@/lib/credits", () => ({ chargeCredits: vi.fn(async () => 900) }));
+vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
 vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn() }));
 
 import { runAgentTurn } from "@/lib/agent";

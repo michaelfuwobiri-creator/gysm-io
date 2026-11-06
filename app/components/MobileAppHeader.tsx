@@ -1,6 +1,5 @@
 "use client";
 
-import { formatCredits } from "@/lib/credits-constants";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -34,11 +33,11 @@ interface MobileAppHeaderProps {
   groups: NavGroup[];
   displayName: string;
   initial: string;
-  credits: number;
+  usage: { title: string; value: string; cta: { href: string; label: string } | null };
   footerSlot?: React.ReactNode;
 }
 
-export default function MobileAppHeader({ groups, displayName, initial, credits, footerSlot }: MobileAppHeaderProps) {
+export default function MobileAppHeader({ groups, displayName, initial, usage, footerSlot }: MobileAppHeaderProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -130,16 +129,18 @@ export default function MobileAppHeader({ groups, displayName, initial, credits,
 
             <div className="rounded-xl border border-black/10 bg-black/[0.02] p-3 flex flex-col gap-2 mt-2 mb-4">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">Credits</span>
-                <span className="text-[13px] font-black">{formatCredits(credits)}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">{usage.title}</span>
+                <span className="text-[13px] font-black">{usage.value}</span>
               </div>
-              <a
-                href="/pricing"
-                onClick={() => setOpen(false)}
-                className="text-[12px] font-bold text-center py-1.5 rounded-full bg-black text-white hover:opacity-90 transition"
-              >
-                Upgrade →
-              </a>
+              {usage.cta && (
+                <a
+                  href={usage.cta.href}
+                  onClick={() => setOpen(false)}
+                  className="text-[12px] font-bold text-center py-1.5 rounded-full bg-black text-white hover:opacity-90 transition"
+                >
+                  {usage.cta.label}
+                </a>
+              )}
             </div>
 
             {footerSlot && (

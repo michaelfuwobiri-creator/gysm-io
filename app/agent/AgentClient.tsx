@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCredits, UNLIMITED_BALANCE } from "@/lib/credits-constants";
+import { formatCredits, PLAN_WINDOW_LIMIT_CREDITS, UNLIMITED_BALANCE } from "@/lib/credits-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
@@ -97,7 +97,7 @@ const TOOL_LABEL: Record<string, string> = {
 type ClientCall = { toolCallId: string; name: string; args: any; summary: string; write: boolean };
 type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?: boolean };
 
-export default function AgentClient({ initialCredits, userKey, initialPrompt = "" }: { initialCredits: number; userKey: string; initialPrompt?: string }) {
+export default function AgentClient({ initialCredits, onPlan = false, userKey, initialPrompt = "" }: { initialCredits: number; onPlan?: boolean; userKey: string; initialPrompt?: string }) {
   const storageKey = `gysm-agent:${userKey}`;
   const [items, setItems] = useState<Item[]>([]);
   const [messages, setMessages] = useState<unknown[]>([]);
@@ -212,7 +212,7 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
         });
         if (!res.ok || !res.body) {
           const j = await res.json().catch(() => ({}));
-          const msg = j?.code === "NO_CREDITS" ? "You're out of credits. Top up on the Pricing page to keep going." : j?.error || "Something went wrong.";
+          const msg = j?.code === "NO_CREDITS" ? "You're out of credits. Subscribe on the Pricing page to keep going." : j?.error || "Something went wrong.";
           push({ id: uid(), kind: "note", text: msg, tone: "error" });
           return;
         }
@@ -484,7 +484,15 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
               Preview
             </button>
           )}
-          <span className="gb-pill" title="Your credit balance">{formatCredits(credits)}{credits >= UNLIMITED_BALANCE ? "" : " credits"}</span>
+          {credits >= UNLIMITED_BALANCE ? (
+            <span className="gb-pill" title="Your plan">Unlimited</span>
+          ) : onPlan ? (
+            <a className="gb-pill" href="/billing" title="Usage left in this 5-hour window. Resets are shown in Billing.">
+              {Math.max(0, Math.min(100, Math.floor((credits / PLAN_WINDOW_LIMIT_CREDITS) * 100)))}% left
+            </a>
+          ) : (
+            <span className="gb-pill" title="Your credit balance">{formatCredits(credits)} credits</span>
+          )}
           <a className="gb-ghost" href="/builder?classic=1">
             Classic builder
           </a>

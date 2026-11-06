@@ -5,10 +5,10 @@ import { sql } from "@/lib/db";
 // (client-bundle DB leak fix).
 import { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, BUILDS_PER_PLAN, CREDITS_PER_PLAN, FLAT_PROFIT_USD, BUILD_COST_USD, UNLIMITED_BALANCE } from "@/lib/credits-constants";
 import { isUnlimitedUser } from "@/lib/unlimited";
+import { getPlanUsage, hasMonthlyPlan, recordPlanUsage } from "@/lib/planUsage";
 export { CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE, BUILDS_PER_PLAN, CREDITS_PER_PLAN, FLAT_PROFIT_USD, BUILD_COST_USD };
 
-export async function getCreditBalance(userId: string): Promise<number> {
-  if (await isUnlimitedUser(userId)) return UNLIMITED_BALANCE;
+async function storedBalance(userId: string): Promise<number> {
   try {
     const rows = await sql`select balance from credits where user_id = ${userId}`;
     return (rows[0] as any)?.balance ?? 0;
@@ -16,6 +16,21 @@ export async function getCreditBalance(userId: string): Promise<number> {
     console.error("[credits] getCreditBalance failed:", error.message);
     return 0;
   }
+}
+
+/**
+ * What the user can spend right now, in credits. Admins: unlimited.
+ * Monthly-plan subscribers: what's left of their 5-hour window / weekly cap
+ * (lib/planUsage.ts), plus any credits they bought before subscribing. Everyone
+ * else: their credit balance.
+ */
+export async function getCreditBalance(userId: string): Promise<number> {
+  if (await isUnlimitedUser(userId)) return UNLIMITED_BALANCE;
+  if (await hasMonthlyPlan(userId)) {
+    const [usage, stored] = await Promise.all([getPlanUsage(userId), storedBalance(userId)]);
+    return usage.remaining + stored;
+  }
+  return storedBalance(userId);
 }
 
 export async function hasActiveSubscription(userId: string): Promise<boolean> {
@@ -47,6 +62,14 @@ export async function deductCredit(
   amount: number = CREDIT_COST_PER_BUILD
 ): Promise<boolean> {
   if (await isUnlimitedUser(userId)) return true;
+  if (await hasMonthlyPlan(userId)) {
+    // Plan allowance first; credits bought earlier are the fallback.
+    const usage = await getPlanUsage(userId);
+    if (usage.remaining >= amount) {
+      await recordPlanUsage(userId, amount);
+      return true;
+    }
+  }
   try {
     const rows = await sql`
       update credits
@@ -85,6 +108,15 @@ export async function addCredits(userId: string, amount: number): Promise<void> 
 // on a minimum balance BEFORE starting work (see SHELL_MIN_BALANCE_FOR_AI).
 export async function chargeCredits(userId: string, amount: number): Promise<number> {
   if (await isUnlimitedUser(userId)) return UNLIMITED_BALANCE;
+  if (await hasMonthlyPlan(userId)) {
+    const before = await getPlanUsage(userId);
+    if (before.remaining > 0) {
+      // Metered after the fact: the work already happened, so record all of
+      // it even if it goes a little past the limit; the next check blocks.
+      const after = await recordPlanUsage(userId, amount);
+      return after.remaining + (await storedBalance(userId));
+    }
+  }
   try {
     const rows = await sql`
       update credits
@@ -97,4 +129,14 @@ export async function chargeCredits(userId: string, amount: number): Promise<num
     console.error("[credits] chargeCredits failed:", error.message);
     return 0;
   }
+}
+
+/** Gives back a charge for work that failed (e.g. a media job). */
+export async function refundCredits(userId: string, amount: number): Promise<void> {
+  if (await isUnlimitedUser(userId)) return;
+  if (await hasMonthlyPlan(userId)) {
+    await recordPlanUsage(userId, -amount);
+    return;
+  }
+  await addCredits(userId, amount);
 }

@@ -26,6 +26,7 @@ import { PRICING_PLANS, type PricingPlan } from "@/lib/stripe";
 // convention. One-time packs are "consumable", monthly plans are
 // "auto-renewable subscriptions" in App Store Connect's product type.
 export const IAP_PRODUCT_IDS: Record<PricingPlan["id"], string> = {
+  plan_monthly: "io.gysm.app.plan_monthly",
   credits_starter: "io.gysm.app.credits_starter",
   credits_popular: "io.gysm.app.credits_popular",
   credits_bulk: "io.gysm.app.credits_bulk",

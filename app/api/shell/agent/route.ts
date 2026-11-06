@@ -1,3 +1,4 @@
+import { usageBlockedError } from "@/lib/planUsage";
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
 import { SHELL_MIN_BALANCE_FOR_AI } from "@/lib/credits-constants";
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
   const balance = await getCreditBalance(user.id);
   if (balance < SHELL_MIN_BALANCE_FOR_AI) {
-    return Response.json({ error: "You're out of credits.", code: "NO_CREDITS" }, { status: 402 });
+    return Response.json(await usageBlockedError(user.id), { status: 402 });
   }
 
   const history = sanitizeHistory(body?.messages);

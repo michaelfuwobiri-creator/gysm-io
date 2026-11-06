@@ -1,3 +1,4 @@
+import { usageBlockedError } from "@/lib/planUsage";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiKey } from "@/lib/apiKeys";
 import { getCreditBalance, deductCredit, CREDIT_COST_PER_BUILD, CREDIT_COST_PER_BUILD_BEST, CREDIT_COST_PER_BUILD_CLAUDE } from "@/lib/credits";
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const balance = await getCreditBalance(auth.userId);
   if (balance < buildCost) {
-    return NextResponse.json({ error: "Out of credits.", code: "NO_CREDITS" }, { status: 402 });
+    return NextResponse.json(await usageBlockedError(auth.userId), { status: 402 });
   }
 
   const result = await generateWebsite(prompt, undefined, undefined, undefined, tier);
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
 
   const deducted = await deductCredit(auth.userId, buildCost);
   if (!deducted) {
-    return NextResponse.json({ error: "Out of credits.", code: "NO_CREDITS" }, { status: 402 });
+    return NextResponse.json(await usageBlockedError(auth.userId), { status: 402 });
   }
 
   const schemaSql = extractSchemaSql(result.html);

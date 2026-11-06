@@ -150,7 +150,7 @@ export const CREDITS_PER_PLAN = Object.fromEntries(
 // so 1 credit means the same thing everywhere in GYSM.
 export const SHELL_MODEL = "claude-sonnet-5";
 const SHELL_MODEL_RATE = MODEL_COST_PER_1M_TOKENS["claude-sonnet-5"];
-const USD_PER_CREDIT = BUILD_COST_USD.fast / CREDIT_COST_PER_BUILD;
+export const USD_PER_CREDIT = BUILD_COST_USD.fast / CREDIT_COST_PER_BUILD;
 
 export function shellCreditsForUsage(usage: {
   input_tokens?: number | null;
@@ -189,9 +189,23 @@ export const AGENT_MODEL = process.env.GYSM_AGENT_MODEL || "gpt-5.6-terra";
 // GYSM_AGENT_REASONING only if the model/endpoint supports tools with reasoning.
 export const AGENT_REASONING_EFFORT = process.env.GYSM_AGENT_REASONING || "none";
 
-export function agentCreditsForUsage(usage: { prompt_tokens?: number | null; completion_tokens?: number | null }): number {
+// OpenAI bills prompt tokens it has cached (the repeated system prompt, tool
+// list and earlier conversation) at a fraction of the normal input rate.
+// Charging them at the full rate overstated an Agent step several times over.
+// 10% is OpenAI's usual cached-input discount for this model family; check it
+// against the OpenAI invoice and adjust if it differs.
+export const AGENT_CACHED_INPUT_FACTOR = 0.1;
+
+export function agentCreditsForUsage(usage: {
+  prompt_tokens?: number | null;
+  completion_tokens?: number | null;
+  prompt_tokens_details?: { cached_tokens?: number | null } | null;
+}): number {
   const rate = MODEL_COST_PER_1M_TOKENS["gpt-5.6-terra"];
-  const usd = ((usage.prompt_tokens ?? 0) * rate.input + (usage.completion_tokens ?? 0) * rate.output) / 1_000_000;
+  const prompt = usage.prompt_tokens ?? 0;
+  const cached = Math.min(prompt, usage.prompt_tokens_details?.cached_tokens ?? 0);
+  const usd =
+    ((prompt - cached) * rate.input + cached * rate.input * AGENT_CACHED_INPUT_FACTOR + (usage.completion_tokens ?? 0) * rate.output) / 1_000_000;
   return Math.max(1, Math.ceil(usd / USD_PER_CREDIT));
 }
 
@@ -210,3 +224,24 @@ export const UNLIMITED_BALANCE = 1_000_000_000;
 export function formatCredits(balance: number): string {
   return balance >= UNLIMITED_BALANCE ? "Unlimited" : String(balance);
 }
+
+// ---------------------------------------------------------------------------
+// GYSM monthly plan (EUR 20/month), with Claude-style usage limits instead
+// of a credit balance: a 5-hour window that starts with the first request,
+// and a weekly cap that starts the same way. Both are measured in real AI
+// cost, so a cheap request uses little and a long Agent build uses more.
+//
+// Budget: up to EUR 10 of AI cost per subscriber per month (about USD 10.80),
+// which leaves roughly EUR 6 after Stripe fees and EU VAT even for someone
+// who uses every window. Weekly cap = monthly budget spread over 52/12 weeks;
+// one 5-hour window = 40% of the week, so a heavy day can't use the week up.
+export const PLAN_MONTHLY_ID = "plan_monthly";
+export const PLAN_MONTHLY_PRICE_EUR = 20;
+export const PLAN_MONTHLY_AI_BUDGET_USD = 10.8;
+export const PLAN_WEEKLY_LIMIT_USD = Math.round(((PLAN_MONTHLY_AI_BUDGET_USD * 12) / 52) * 100) / 100;
+export const PLAN_WINDOW_LIMIT_USD = Math.round(PLAN_WEEKLY_LIMIT_USD * 0.4 * 100) / 100;
+export const PLAN_WINDOW_HOURS = 5;
+export const PLAN_WEEK_DAYS = 7;
+/** The same limits in credits, the unit every charge in GYSM is counted in. */
+export const PLAN_WINDOW_LIMIT_CREDITS = Math.floor(PLAN_WINDOW_LIMIT_USD / USD_PER_CREDIT);
+export const PLAN_WEEKLY_LIMIT_CREDITS = Math.floor(PLAN_WEEKLY_LIMIT_USD / USD_PER_CREDIT);
