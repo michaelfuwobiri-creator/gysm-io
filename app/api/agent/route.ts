@@ -61,14 +61,24 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const emit = (e: AgentEvent) => controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+      const emit = (e: AgentEvent) => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+        } catch {
+          /* the browser stopped listening (Stop pressed or tab closed) */
+        }
+      };
       try {
-        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, emit });
+        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, signal: req.signal, emit });
       } catch (error: any) {
         console.error("[agent] turn failed:", error?.message || error);
         emit({ type: "error", error: "Couldn't reach your workspace. Please try again in a moment." });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       }
     },
   });

@@ -128,6 +128,8 @@
 .gb-send:hover:not(:disabled) { background: var(--gb-fuchsia-ink); }
 .gb-send:active:not(:disabled) { transform: scale(.95); }
 .gb-send:disabled { background: #ebe7ee; color: #a8a3ae; opacity: 1; }
+.gb-send.stop { background: #1b1720; color: #fff; }
+.gb-send.stop:hover:not(:disabled) { background: #3a3340; }
 .gb-send.working:disabled { background: var(--gb-fuchsia, #ff0080); color: #fff; }
 .gb-send svg { width: 18px; height: 18px; }
 .gb-foot { text-align: center; font-size: 11.5px; color: var(--gb-muted); padding-top: 8px; }

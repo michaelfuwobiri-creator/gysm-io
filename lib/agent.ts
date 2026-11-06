@@ -65,6 +65,8 @@ export async function runAgentTurn(opts: {
   localFolder?: string | null;
   /** The browser's result for a pending local_* tool call. */
   clientResult?: { toolCallId: string; ok: boolean; output: string; declined?: boolean };
+  /** Aborted when the user presses Stop (the browser drops the request). */
+  signal?: AbortSignal;
   emit: (e: AgentEvent) => void;
 }): Promise<void> {
   const { userId, emit } = opts;
@@ -132,6 +134,8 @@ export async function runAgentTurn(opts: {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 120_000, maxRetries: 1 });
   try {
     for (let step = 0; step < MAX_STEPS_PER_TURN; step++) {
+      // Stop pressed: don't start another model call or tool run.
+      if (opts.signal?.aborted) break;
       if (exhausted) {
         // Out of allowance mid-task: stop cleanly instead of running on.
         const why = await usageBlockedError(userId);
@@ -145,7 +149,7 @@ export async function runAgentTurn(opts: {
         parallel_tool_calls: false,
         max_completion_tokens: 8000,
         reasoning_effort: AGENT_REASONING_EFFORT as any,
-      });
+      }, opts.signal ? { signal: opts.signal } : undefined);
       if (response.usage) await charge(agentCreditsForUsage(response.usage));
       else await charge(1);
 
@@ -157,6 +161,12 @@ export async function runAgentTurn(opts: {
       messages.push(assistant);
       if (msg.content && msg.content.trim()) emit({ type: "text", text: msg.content });
       if (!call) break;
+      if (opts.signal?.aborted) {
+        // Stopped between the model reply and its tool call: answer the open
+        // call so the saved history stays valid, and don't run it.
+        messages.push({ role: "tool", tool_call_id: call.id, content: "The user stopped this before it ran." });
+        break;
+      }
 
       let args: any = {};
       try {
@@ -212,8 +222,12 @@ export async function runAgentTurn(opts: {
       }
     }
   } catch (error: any) {
-    console.error("[agent] step failed:", error?.message || error);
-    emit({ type: "error", error: "The agent hit a problem. Please try again." });
+    if (opts.signal?.aborted) {
+      // The user pressed Stop; nothing went wrong.
+    } else {
+      console.error("[agent] step failed:", error?.message || error);
+      emit({ type: "error", error: "The agent hit a problem. Please try again." });
+    }
   }
 
   // Never hand the browser a history that ends on an unanswered tool result

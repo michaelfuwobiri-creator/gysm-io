@@ -47,6 +47,45 @@ describe("runAgentTurn", () => {
     expect(state.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
   });
 
+  it("stops before the next model call when the user presses Stop", async () => {
+    const ctrl = new AbortController();
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] }));
+    (executeTool as any).mockImplementation(async () => {
+      ctrl.abort(); // Stop pressed while the tool runs
+      return { ok: true, output: "Wrote a.txt" };
+    });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "make files", signal: ctrl.signal, emit: (e) => events.push(e) });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(events.some((e) => e.type === "error")).toBe(false);
+    const state = events.find((e) => e.type === "state");
+    expect(state.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "tool"]);
+  });
+
+  it("answers an open tool call without running it when stopped before the tool starts", async () => {
+    const ctrl = new AbortController();
+    create.mockImplementationOnce(async () => {
+      ctrl.abort();
+      return reply({ content: null, tool_calls: [toolCall("c1", "write_file", { path: "a.txt", content: "x" })] });
+    });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", signal: ctrl.signal, emit: (e) => events.push(e) });
+    expect(executeTool).not.toHaveBeenCalled();
+    const state = events.find((e) => e.type === "state");
+    expect(state.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "tool"]);
+  });
+
+  it("does not report an error when the model call is aborted", async () => {
+    const ctrl = new AbortController();
+    create.mockImplementationOnce(async () => {
+      ctrl.abort();
+      throw new Error("aborted");
+    });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", signal: ctrl.signal, emit: (e) => events.push(e) });
+    expect(events.some((e) => e.type === "error")).toBe(false);
+  });
+
   it("stops at a proposal for deploy without running it", async () => {
     create.mockResolvedValueOnce(reply({ content: "Ready.", tool_calls: [toolCall("c1", "deploy", { project: "site" })] }));
     const events: any[] = [];

@@ -143,6 +143,8 @@ export default function AgentClient({
   const pendingLocalRef = useRef<Record<string, ClientCall>>({});
   const runClientCallRef = useRef<(c: ClientCall) => Promise<void>>(async () => {});
   const sendRef = useRef<(b: any) => Promise<void>>(async () => {});
+  const abortRef = useRef<AbortController | null>(null);
+  const stoppedRef = useRef(false);
 
   useEffect(() => setFolderSupported(folderAccessSupported()), []);
 
@@ -248,6 +250,16 @@ export default function AgentClient({
 
   const send = useCallback(
     async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string }; clientResult?: ClientResult }) => {
+      // A fresh message or decision starts a new run; a continuation of a run
+      // the user already stopped (a local tool result) must not go on.
+      if (body.clientResult && stoppedRef.current) {
+        setBusy(false);
+        setActivity("");
+        return;
+      }
+      if (!body.clientResult) stoppedRef.current = false;
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       setBusy(true);
       setSuggestions([]);
       let clientCall: ClientCall | null = null;
@@ -255,6 +267,7 @@ export default function AgentClient({
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: ctrl.signal,
           body: JSON.stringify({ ...body, messages: messagesRef.current, localFolder: folderRef.current ? folderRef.current.name : undefined }),
         });
         if (!res.ok || !res.body) {
@@ -313,9 +326,16 @@ export default function AgentClient({
         }
         // The agent asked for something on the user's computer: run it here
         // (reads) or ask first (writes), then continue the same turn.
-        if (clientCall) await runClientCallRef.current(clientCall);
+        if (clientCall && !stoppedRef.current) await runClientCallRef.current(clientCall);
       } catch {
-        push({ id: uid(), kind: "note", text: "Connection lost. Please try again.", tone: "error" });
+        if (ctrl.signal.aborted || stoppedRef.current) {
+          // Pressed Stop: the history the browser holds is still the last
+          // complete one, so the next message continues cleanly.
+          setItems((prev) => prev.map((i) => (i.kind === "tool" && i.running ? { ...i, running: false, ok: false, output: "Stopped." } : i)));
+          push({ id: uid(), kind: "note", text: "Stopped.", tone: "muted" });
+        } else {
+          push({ id: uid(), kind: "note", text: "Connection lost. Please try again.", tone: "error" });
+        }
       } finally {
         setBusy(false);
         setActivity("");
@@ -347,6 +367,21 @@ export default function AgentClient({
     setItems((prev) => prev.map((i) => (i.kind === "tool" && i.callId === call.toolCallId ? { ...i, running: false, ok: r.ok, output: r.output.slice(0, 4000) } : i)));
     await sendRef.current({ clientResult: { toolCallId: call.toolCallId, ok: r.ok, output: r.output } });
   };
+
+  const stop = useCallback(() => {
+    stoppedRef.current = true;
+    abortRef.current?.abort();
+  }, []);
+
+  // Esc stops the running prompt.
+  useEffect(() => {
+    if (!busy) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, stop]);
 
   const submit = (t: string) => {
     const v = t.trim();
@@ -502,9 +537,18 @@ export default function AgentClient({
                 </button>
               ))}
           </div>
-          <button type="submit" className={`gb-send${busy ? " working" : ""}`} disabled={!canSend} aria-label={busy ? "GYSM is working" : "Send"}>
+          <button
+            type={busy ? "button" : "submit"}
+            className={`gb-send${busy ? " stop" : ""}`}
+            disabled={!busy && !canSend}
+            onClick={busy ? stop : undefined}
+            aria-label={busy ? "Stop" : "Send"}
+            title={busy ? "Stop (Esc)" : "Send"}
+          >
             {busy ? (
-              <GysmMark size={22} working onFuchsia />
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <rect x="5.5" y="5.5" width="9" height="9" rx="1.8" />
+              </svg>
             ) : (
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" />
