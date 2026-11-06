@@ -242,3 +242,11 @@
 
 .gb-ai-text { white-space: normal; }
 .gb-mic.on { color: #FF0080; }
+
+.gb-history { margin: 8px auto; width: min(720px, calc(100% - 24px)); padding: 10px 12px; border: 1px solid rgba(127,127,127,.25); border-radius: 12px; font-size: 14px; background: inherit; }
+.gb-history-head { display: flex; justify-content: space-between; align-items: center; }
+.gb-history ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+.gb-history li { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.gb-history-title { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.gb-history-title small { opacity: .6; }
+.gb-history-btns { display: flex; gap: 6px; flex: none; }

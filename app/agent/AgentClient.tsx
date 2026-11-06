@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
 import Markdown from "./Markdown";
+import { archiveChat, parseChats, removeChat, serializeChats, type SavedChat } from "@/lib/agentChats";
 import { itemsBefore, messagesBeforeUser, userItemBefore, userPositionFromEnd } from "@/lib/agentHistory";
 import "./builder.css";
 import { folderAccessSupported, localFileExists, runLocalTool, type DirHandleLike } from "@/lib/localFolder";
@@ -184,6 +185,11 @@ export default function AgentClient({
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   // The agent's live checklist for a bigger job (update_plan). Not saved.
+  // Older conversations the user can bring back (kept in this browser).
+  const [chats, setChats] = useState<SavedChat[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const chatIdRef = useRef(`chat-${Date.now().toString(36)}`);
+  const historyKey = `gysm-agent-chats:${userKey}`;
   // Voice dictation (Web Speech API), shown only where the browser has it.
   const [micSupported, setMicSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -271,6 +277,23 @@ export default function AgentClient({
       /* storage unavailable */
     }
   }, [storageKey]);
+
+  useEffect(() => {
+    try {
+      setChats(parseChats(localStorage.getItem(historyKey)));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [historyKey]);
+
+  const saveChats = (next: SavedChat[]) => {
+    setChats(next);
+    try {
+      localStorage.setItem(historyKey, serializeChats(next));
+    } catch {
+      /* storage full or unavailable */
+    }
+  };
 
   // Opening a saved build or template (dashboard, templates, BuildGuild):
   // copy it into the workspace, show it in Preview, and prefill the box.
@@ -665,11 +688,34 @@ export default function AgentClient({
 
   const reset = () => {
     if (busy) return;
+    // Keep the conversation we are leaving so it can be restored later.
+    saveChats(archiveChat(chats, chatIdRef.current, items, messages, Date.now()));
+    chatIdRef.current = `chat-${Date.now().toString(36)}`;
     setItems([]);
     setMessages([]);
     setEditing(null);
     setPreviewOpen(false);
     setLastProject(null);
+  };
+
+  const restoreChat = (id: string) => {
+    if (busy) return;
+    const target = chats.find((c) => c.id === id);
+    if (!target) return;
+    // Park the current conversation, then bring the chosen one back.
+    const parked = archiveChat(chats, chatIdRef.current, items, messages, Date.now());
+    saveChats(removeChat(parked, id));
+    chatIdRef.current = target.id;
+    setItems(target.items as Item[]);
+    setMessages(target.messages);
+    messagesRef.current = target.messages;
+    setSuggestions([]);
+    setQuestion(null);
+    setPlan([]);
+    setEditing(null);
+    setPreviewOpen(false);
+    setLastProject(null);
+    setHistoryOpen(false);
   };
 
   const canSend = !busy && (!!text.trim() || attached.length > 0);
@@ -834,11 +880,47 @@ export default function AgentClient({
               Subscribe
             </a>
           )}
+          <button className="gb-ghost" onClick={() => setHistoryOpen((o) => !o)} aria-expanded={historyOpen} title="Bring back an earlier chat">
+            History{chats.length ? ` (${chats.length})` : ""}
+          </button>
           <button className="gb-ghost" onClick={reset} disabled={busy}>
             New chat
           </button>
         </div>
       </header>
+
+      {historyOpen && (
+        <div className="gb-history" role="region" aria-label="Earlier chats">
+          <div className="gb-history-head">
+            <b>Earlier chats</b>
+            <button type="button" className="gb-ghost" onClick={() => setHistoryOpen(false)}>
+              Close
+            </button>
+          </div>
+          {chats.length === 0 ? (
+            <div className="gb-mem-empty">No earlier chats yet. When you start a new chat, the one you leave is saved here.</div>
+          ) : (
+            <ul>
+              {chats.map((c) => (
+                <li key={c.id}>
+                  <span className="gb-history-title">
+                    {c.title}
+                    <small>{new Date(c.savedAt).toLocaleString()}</small>
+                  </span>
+                  <span className="gb-history-btns">
+                    <button type="button" className="gb-secondary" onClick={() => restoreChat(c.id)} disabled={busy}>
+                      Restore
+                    </button>
+                    <button type="button" className="gb-ghost" onClick={() => saveChats(removeChat(chats, c.id))} aria-label={`Delete chat: ${c.title}`}>
+                      Delete
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="gb-scroll">
