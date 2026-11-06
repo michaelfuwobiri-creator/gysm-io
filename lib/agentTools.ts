@@ -82,7 +82,9 @@ export async function toolReadFile(userId: string, args: any): Promise<ToolResul
 export async function toolRunCommand(userId: string, args: any): Promise<ToolResult> {
   const cmd = typeof args?.cmd === "string" ? args.cmd.trim() : "";
   if (!cmd) return { ok: false, output: "No command given." };
-  if (cmd.length > 8000) return { ok: false, output: "Command is too long." };
+  if (cmd.length > 8000) {
+    return { ok: false, output: `Command is too long (${cmd.length} characters, the limit is 8000). Do not create files with heredocs in run_command. Use write_file for each file (up to ${MAX_WRITE_BYTES} bytes each) and keep run_command for short commands.` };
+  }
   const root = await workspaceRoot(userId);
   const r = await runInSandbox(userId, cmd, root);
   return {

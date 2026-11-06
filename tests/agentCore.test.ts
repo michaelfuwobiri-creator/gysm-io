@@ -163,3 +163,11 @@ describe("describeCall", () => {
     expect(describeCall("write_file", { path: "a", content: "abc" })).toMatch(/Write a \(3 chars\)/);
   });
 });
+
+describe("file creation guidance", () => {
+  it("steers the model to write_file instead of heredocs", async () => {
+    const { systemPrompt } = await import("@/lib/agentCore");
+    expect(systemPrompt()).toMatch(/write_file and edit_file/);
+    expect(systemPrompt()).toMatch(/heredocs/);
+  });
+});
