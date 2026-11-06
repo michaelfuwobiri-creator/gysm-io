@@ -22,6 +22,7 @@ import {
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
 import { addMemory, forgetMemory } from "@/lib/agentMemory";
+import type { CleanAttachment } from "@/lib/agentAttachCore";
 import { applyEdit, htmlToText, isBlockedIp, parseFetchUrl, validEnvKey, validateReadSql, analyzeHtml, extractSameOriginLinks } from "@/lib/agentGuards";
 
 // The six GYSM Agent tools. Every one acts only on the calling user's own
@@ -93,6 +94,21 @@ export async function toolRunCommand(userId: string, args: any): Promise<ToolRes
     creditsKind: "command",
     output: `exit code: ${r.exitCode}${r.truncated ? " (output truncated)" : ""}\n${r.output || "(no output)"}`,
   };
+}
+
+/** Saves attached files into the workspace under uploads/. Returns an error text, or null on success. */
+export async function saveAttachments(userId: string, files: CleanAttachment[]): Promise<string | null> {
+  try {
+    const root = await workspaceRoot(userId);
+    const mk = await runInSandbox(userId, `mkdir -p -- ${quote(root + "/uploads")}`, root);
+    if (mk.exitCode !== 0) return "couldn't create the uploads folder";
+    const sandbox = await getUserSandbox(userId);
+    await sandbox.writeFiles(files.map((f) => ({ path: `${root}/${f.path}`, content: Buffer.from(f.data, "base64") })));
+    return null;
+  } catch (e: any) {
+    console.error("[agent] saving attachments failed:", e?.message || e);
+    return "the workspace is unavailable";
+  }
 }
 
 // -- deploy ----------------------------------------------------------------

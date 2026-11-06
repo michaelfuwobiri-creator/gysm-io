@@ -4,10 +4,10 @@ const create = vi.fn();
 vi.mock("openai", () => ({ default: class { chat = { completions: { create } }; } }));
 vi.mock("@/lib/credits", () => ({ chargeCredits: vi.fn(async () => 900) }));
 vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
-vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn() }));
+vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn(), saveAttachments: vi.fn(async () => null) }));
 
 import { runAgentTurn } from "@/lib/agent";
-import { executeTool } from "@/lib/agentTools";
+import { executeTool, saveAttachments } from "@/lib/agentTools";
 
 const reply = (message: any) => ({ choices: [{ message }], usage: { prompt_tokens: 100, completion_tokens: 20 } });
 const toolCall = (id: string, name: string, args: any) => ({ id, type: "function", function: { name, arguments: JSON.stringify(args) } });
@@ -68,6 +68,27 @@ describe("runAgentTurn", () => {
     await runAgentTurn({ userId: "u", history: [], userText: "build", emit: (e) => events.push(e) });
     expect(create).toHaveBeenCalledTimes(2);
     expect(events.some((e) => e.type === "question")).toBe(false);
+  });
+
+  it("saves attachments, tells the model where they are and shows it the images for this turn only", async () => {
+    create.mockResolvedValueOnce(reply({ content: "Got your logo." }));
+    const files = [
+      { name: "logo.png", mime: "image/png", kind: "image" as const, data: "aGk=", bytes: 2, path: "uploads/logo.png" },
+      { name: "brief.txt", mime: "text/plain", kind: "text" as const, data: Buffer.from("Bakery in Rome").toString("base64"), bytes: 14, path: "uploads/brief.txt" },
+    ];
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "use my logo", attachments: files, emit: (e) => events.push(e) });
+    expect(saveAttachments).toHaveBeenCalledWith("u", files);
+    const sent = create.mock.calls[0][0].messages;
+    const userMsg = sent[sent.length - 1];
+    expect(Array.isArray(userMsg.content)).toBe(true);
+    expect(userMsg.content[0].text).toContain("uploads/logo.png");
+    expect(userMsg.content[0].text).toContain("Bakery in Rome");
+    expect(userMsg.content[1].image_url.url).toBe("data:image/png;base64,aGk=");
+    // The saved history keeps plain text (no image data) so it stays small.
+    const state = events.find((e) => e.type === "state");
+    expect(typeof state.messages[0].content).toBe("string");
+    expect(state.messages[0].content).not.toContain("base64,aGk");
   });
 
   it("runs an auto tool, then finishes with text", async () => {

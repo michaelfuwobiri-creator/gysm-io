@@ -25,6 +25,19 @@ beforeEach(() => {
   (getCreditBalance as any).mockResolvedValue(500);
 });
 
+describe("POST /api/agent attachments", () => {
+  it("400 when an attachment is not allowed", async () => {
+    const res = await POST(req({ text: "hi", attachments: [{ name: "a.exe", mime: "application/x-msdownload", data: "eA==" }] }));
+    expect(res.status).toBe(400);
+  });
+  it("accepts a message that is only a file and passes the file to the turn", async () => {
+    const res = await POST(req({ attachments: [{ name: "a.txt", mime: "text/plain", data: "aGk=" }] }));
+    expect(res.status).toBe(200);
+    await res.text();
+    expect((runAgentTurn as any).mock.calls[0][0].attachments).toHaveLength(1);
+  });
+});
+
 describe("POST /api/agent", () => {
   it("401 when signed out", async () => {
     (getUser as any).mockResolvedValue(null);

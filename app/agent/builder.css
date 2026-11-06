@@ -219,3 +219,6 @@
 .gb-mem ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 180px; overflow: auto; }
 .gb-mem li { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .gb-mem-empty { margin-top: 6px; opacity: .7; }
+
+.gb-attached { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 4px 0; }
+.gb-attach-err { color: #c0392b; font-size: 13px; }

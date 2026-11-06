@@ -25,7 +25,8 @@ import {
   truncate,
   type ChatMessage,
 } from "@/lib/agentCore";
-import { executeTool } from "@/lib/agentTools";
+import { executeTool, saveAttachments } from "@/lib/agentTools";
+import { attachmentNote, contentWithImages, type CleanAttachment } from "@/lib/agentAttachCore";
 import { cleanPlan, cleanQuestion, cleanSuggestions, type AgentQuestion, type PlanStep, type Suggestion } from "@/lib/agentGuards";
 
 // GYSM Agent loop. The conversation (OpenAI chat format) lives in the
@@ -58,6 +59,16 @@ function proposalDetail(name: string, args: any): string {
   return "";
 }
 
+/** The history for the model; this turn's images ride along on the last user message only. */
+function withImages(messages: ChatMessage[], attached: CleanAttachment[]): any[] {
+  if (!attached.some((f) => f.kind === "image")) return messages as any[];
+  let last = -1;
+  messages.forEach((m, i) => {
+    if (m.role === "user") last = i;
+  });
+  return messages.map((m, i) => (i === last ? { ...m, content: contentWithImages(String(m.content ?? ""), attached) } : m)) as any[];
+}
+
 export async function runAgentTurn(opts: {
   userId: string;
   history: ChatMessage[];
@@ -67,6 +78,8 @@ export async function runAgentTurn(opts: {
   localFolder?: string | null;
   /** The browser's result for a pending local_* tool call. */
   clientResult?: { toolCallId: string; ok: boolean; output: string; declined?: boolean };
+  /** Files attached to this message (validated by the route). */
+  attachments?: CleanAttachment[];
   /** The "what you remember" prompt section, loaded by the route. */
   memory?: string;
   /** Aborted when the user presses Stop (the browser drops the request). */
@@ -98,6 +111,14 @@ export async function runAgentTurn(opts: {
     return result.output;
   };
 
+  // Attached files: save them in the workspace and describe them to the model.
+  const attached = opts.attachments ?? [];
+  let userText = opts.userText;
+  if (attached.length > 0) {
+    const saveError = await saveAttachments(userId, attached);
+    userText = (userText || "I attached some files. Please take a look.") + attachmentNote(attached, saveError);
+  }
+
   // 1. Resolve a pending proposal.
   const pending = pendingToolCall(messages);
   if (pending) {
@@ -126,9 +147,9 @@ export async function runAgentTurn(opts: {
       resultText = "The user declined this action. Do not retry it; ask what they'd like instead.";
     }
     messages.push({ role: "tool", tool_call_id: pending.id, content: resultText });
-    if (opts.userText) messages.push({ role: "user", content: opts.userText });
-  } else if (opts.userText) {
-    messages.push({ role: "user", content: opts.userText });
+    if (userText) messages.push({ role: "user", content: userText });
+  } else if (userText) {
+    messages.push({ role: "user", content: userText });
   } else {
     emit({ type: "error", error: "Nothing to do." });
     return;
@@ -148,7 +169,7 @@ export async function runAgentTurn(opts: {
       }
       const response = await openai.chat.completions.create({
         model: AGENT_MODEL,
-        messages: [{ role: "system", content: systemPrompt(opts.localFolder, opts.memory) }, ...(messages as any[])],
+        messages: [{ role: "system", content: systemPrompt(opts.localFolder, opts.memory) }, ...withImages(messages, attached)],
         tools: agentToolsFor(!!opts.localFolder) as any,
         parallel_tool_calls: false,
         max_completion_tokens: 8000,

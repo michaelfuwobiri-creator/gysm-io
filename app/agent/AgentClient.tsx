@@ -101,6 +101,37 @@ const TOOL_LABEL: Record<string, string> = {
 type ClientCall = { toolCallId: string; name: string; args: any; summary: string; write: boolean };
 type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?: boolean };
 
+const MAX_IMAGE_SIDE = 1400;
+
+function fileToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = () => reject(new Error("That file couldn't be read."));
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Reads a chosen file as base64. Large photos are shrunk first so the upload stays small. */
+async function readAttachment(file: File): Promise<{ name: string; mime: string; data: string }> {
+  if (file.type.startsWith("image/") && file.size > 600_000 && file.type !== "image/gif") {
+    try {
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bmp.width * scale));
+      canvas.height = Math.max(1, Math.round(bmp.height * scale));
+      canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+      if (blob) return { name: file.name.replace(/\.[^.]+$/, "") + ".jpg", mime: "image/jpeg", data: await fileToBase64(blob) };
+    } catch {
+      /* fall through and send the original */
+    }
+  }
+  if (file.size > 2_400_000) throw new Error(`${file.name} is too large (limit about 2.4 MB).`);
+  return { name: file.name, mime: file.type || "application/octet-stream", data: await fileToBase64(file) };
+}
+
 export default function AgentClient({
   initialCredits,
   onPlan = false,
@@ -122,6 +153,10 @@ export default function AgentClient({
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   // The agent's live checklist for a bigger job (update_plan). Not saved.
+  // Files attached to the message being written (sent once, then cleared).
+  const [attached, setAttached] = useState<{ name: string; mime: string; data: string }[]>([]);
+  const [attachError, setAttachError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // What the agent remembers about the user (remember/forget tools); shown in a small panel.
   const [memOpen, setMemOpen] = useState(false);
   const [memories, setMemories] = useState<{ id: number; text: string }[]>([]);
@@ -260,7 +295,7 @@ export default function AgentClient({
   const push = useCallback((item: Item) => setItems((prev) => [...prev, item]), []);
 
   const send = useCallback(
-    async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string }; clientResult?: ClientResult }) => {
+    async (body: { text?: string; attachments?: { name: string; mime: string; data: string }[]; decision?: { toolCallId: string; approve: boolean; secret?: string }; clientResult?: ClientResult }) => {
       // A fresh message or decision starts a new run; a continuation of a run
       // the user already stopped (a local tool result) must not go on.
       if (body.clientResult && stoppedRef.current) {
@@ -427,12 +462,35 @@ export default function AgentClient({
     }
   };
 
+  const addFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    setAttachError("");
+    const next = [...attached];
+    for (const file of Array.from(list)) {
+      if (next.length >= 4) {
+        setAttachError("You can attach up to 4 files at a time.");
+        break;
+      }
+      try {
+        next.push(await readAttachment(file));
+      } catch (e: any) {
+        setAttachError(e?.message || "That file couldn't be read.");
+      }
+    }
+    setAttached(next);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const submit = (t: string) => {
     const v = t.trim();
-    if (!v || busy) return;
+    if ((!v && attached.length === 0) || busy) return;
+    const files = attached;
     setText("");
-    push({ id: uid(), kind: "user", text: v });
-    void send({ text: v });
+    setAttached([]);
+    setAttachError("");
+    const shown = files.length ? `${v}${v ? "\n\n" : ""}Attached: ${files.map((f) => f.name).join(", ")}` : v;
+    push({ id: uid(), kind: "user", text: shown });
+    void send({ text: v, ...(files.length ? { attachments: files } : {}) });
   };
 
   const decideLocal = async (item: Extract<Item, { kind: "proposal" }>, approve: boolean) => {
@@ -533,7 +591,7 @@ export default function AgentClient({
     setLastProject(null);
   };
 
-  const canSend = !busy && !!text.trim();
+  const canSend = !busy && (!!text.trim() || attached.length > 0);
   const fillStarter = (prompt: string) => {
     setText(prompt);
     requestAnimationFrame(() => taRef.current?.focus());
@@ -574,6 +632,19 @@ export default function AgentClient({
           submit(text);
         }}
       >
+        {(attached.length > 0 || attachError) && (
+          <div className="gb-attached">
+            {attached.map((f, i) => (
+              <span key={`${f.name}-${i}`} className="gb-tag">
+                {f.name}
+                <button type="button" className="gb-ghost" aria-label={`Remove ${f.name}`} onClick={() => setAttached((prev) => prev.filter((_, j) => j !== i))}>
+                  ×
+                </button>
+              </span>
+            ))}
+            {attachError && <span className="gb-attach-err">{attachError}</span>}
+          </div>
+        )}
         <textarea
           ref={taRef}
           id="gb-input"
@@ -606,6 +677,17 @@ export default function AgentClient({
                   + Folder
                 </button>
               ))}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              accept="image/*,.pdf,.txt,.md,.csv,.json,.html,.css,.js,.svg"
+              onChange={(e) => void addFiles(e.target.files)}
+            />
+            <button type="button" className="gb-ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} title="Attach images or files (logo, photos, a brief)">
+              + File
+            </button>
             <button type="button" className="gb-ghost" onClick={toggleMemory} aria-expanded={memOpen} title="What GYSM remembers about you between chats">
               Memory
             </button>
