@@ -4,6 +4,7 @@ import { PLAN_WINDOW_LIMIT_CREDITS, UNLIMITED_BALANCE } from "@/lib/credits-cons
 import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
+import Markdown from "./Markdown";
 import { itemsBefore, messagesBeforeUser, userItemBefore, userPositionFromEnd } from "@/lib/agentHistory";
 import "./builder.css";
 import { folderAccessSupported, localFileExists, runLocalTool, type DirHandleLike } from "@/lib/localFolder";
@@ -183,6 +184,10 @@ export default function AgentClient({
   // Clickable next steps from the agent; cleared as soon as anything new is sent.
   const [suggestions, setSuggestions] = useState<{ title: string; prompt: string }[]>([]);
   // The agent's live checklist for a bigger job (update_plan). Not saved.
+  // Voice dictation (Web Speech API), shown only where the browser has it.
+  const [micSupported, setMicSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recogRef = useRef<any>(null);
   // Files attached to the message being written (sent once, then cleared).
   const [attached, setAttached] = useState<{ name: string; mime: string; data: string }[]>([]);
   const [attachError, setAttachError] = useState("");
@@ -493,6 +498,51 @@ export default function AgentClient({
     }
   };
 
+  useEffect(() => {
+    const w = window as any;
+    setMicSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
+    return () => {
+      try {
+        recogRef.current?.abort();
+      } catch {
+        /* already stopped */
+      }
+    };
+  }, []);
+
+  const toggleMic = () => {
+    if (listening) {
+      try {
+        recogRef.current?.stop();
+      } catch {
+        /* already stopped */
+      }
+      return;
+    }
+    const w = window as any;
+    const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const r = new Ctor();
+    r.lang = navigator.language || "en-US";
+    r.interimResults = false;
+    r.continuous = true;
+    r.onresult = (ev: any) => {
+      let heard = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) heard += ev.results[i][0].transcript;
+      heard = heard.trim();
+      if (heard) setText((t) => (t && !/\s$/.test(t) ? `${t} ${heard}` : `${t}${heard}`));
+    };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    recogRef.current = r;
+    try {
+      r.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  };
+
   const addFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return;
     setAttachError("");
@@ -719,6 +769,18 @@ export default function AgentClient({
             <button type="button" className="gb-ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} title="Attach images or files (logo, photos, a brief)">
               + File
             </button>
+            {micSupported && (
+              <button
+                type="button"
+                className={`gb-ghost gb-mic${listening ? " on" : ""}`}
+                onClick={toggleMic}
+                disabled={busy}
+                aria-pressed={listening}
+                title={listening ? "Stop dictating" : "Dictate with your voice"}
+              >
+                {listening ? "Listening…" : "Voice"}
+              </button>
+            )}
             <button type="button" className="gb-ghost" onClick={toggleMemory} aria-expanded={memOpen} title="What GYSM remembers about you between chats">
               Memory
             </button>
@@ -856,7 +918,7 @@ export default function AgentClient({
                         <GysmMark size={22} />
                       </div>
                       <div className="gb-ai-body">
-                        <div className="gb-ai-text">{item.text}</div>
+                        <div className="gb-ai-text"><Markdown text={item.text} /></div>
                         <div className="gb-msg-actions">
                           <button className="gb-act" onClick={() => copyText(item.id, item.text)} aria-label="Copy reply">
                             {copiedId === item.id ? <IconCheck /> : <IconCopy />}

@@ -226,3 +226,19 @@
 .gb-file { margin: 8px 0; padding: 10px 12px; border: 1px solid rgba(127,127,127,.25); border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .gb-file-name { font-weight: 600; word-break: break-all; }
 .gb-file-gone { font-size: 13px; opacity: .7; }
+
+.gb-md > * { margin: 0 0 8px; }
+.gb-md > *:last-child { margin-bottom: 0; }
+.gb-md p, .gb-md blockquote { white-space: pre-wrap; overflow-wrap: anywhere; }
+.gb-md h3, .gb-md h4 { font-size: 1em; font-weight: 700; margin-top: 12px; }
+.gb-md ul, .gb-md ol { padding-left: 22px; display: grid; gap: 3px; }
+.gb-md code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 5px; }
+.gb-md blockquote { border-left: 3px solid rgba(127,127,127,.4); padding-left: 10px; opacity: .85; }
+.gb-md a { color: #FF0080; text-decoration: underline; }
+.gb-codeblock { border: 1px solid rgba(127,127,127,.25); border-radius: 10px; overflow: hidden; }
+.gb-codehead { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; font-size: 12px; background: rgba(127,127,127,.12); }
+.gb-codeblock pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+.gb-codeblock pre code { background: none; padding: 0; }
+
+.gb-ai-text { white-space: normal; }
+.gb-mic.on { color: #FF0080; }
