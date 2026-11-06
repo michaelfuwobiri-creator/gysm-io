@@ -91,7 +91,7 @@ export default function PricingPage() {
                 <li>• The GYSM Agent: builds, edits and checks whole sites for you</li>
                 <li>• Preview before anything goes live</li>
                 <li>• Publish to your own name.gysm.io, with images and fonts</li>
-                <li>• Classic builder, Shell and media tools included</li>
+                <li>• Shell and media tools included</li>
               </ul>
               <CheckoutButton planId={plan.id} label={`Subscribe for ${formatPlanPrice(plan)}/month`} highlight={false} />
             </div>
