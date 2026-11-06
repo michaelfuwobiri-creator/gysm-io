@@ -27,6 +27,41 @@ export default function PreviewPanel({
   const [phone, setPhone] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [tick, setTick] = useState(0);
+  // The hosted gysm.io copy of this preview.
+  const [link, setLink] = useState<{ url: string; skipped: string[] } | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const makeLink = useCallback(async () => {
+    setLinking(true);
+    setLinkError("");
+    try {
+      const res = await fetch("/api/agent/preview/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.url) setLinkError(j?.error || "Couldn't create the link.");
+      else setLink({ url: j.url, skipped: Array.isArray(j.skipped) ? j.skipped : [] });
+    } catch {
+      setLinkError("Couldn't create the link. Check your connection.");
+    } finally {
+      setLinking(false);
+    }
+  }, [project]);
+
+  const copyLink = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard blocked: the link is still shown to select */
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +84,8 @@ export default function PreviewPanel({
   useEffect(() => {
     setEntry(undefined);
     setFiles(null);
+    setLink(null);
+    setLinkError("");
   }, [project]);
   useEffect(() => {
     void load();
@@ -96,6 +133,9 @@ export default function PreviewPanel({
               Phone
             </button>
           </div>
+          <button type="button" className="gb-ghost" onClick={makeLink} disabled={linking} title="Host this preview at a gysm.io link you can open or share. Anyone with the link can see it.">
+            {linking ? "Creating…" : link ? "Update gysm.io link" : "Get gysm.io link"}
+          </button>
           <button type="button" className="gb-ghost" onClick={() => setTick((t) => t + 1)} disabled={loading} aria-label="Refresh preview">
             {loading ? "Loading…" : "Refresh"}
           </button>
@@ -118,6 +158,24 @@ export default function PreviewPanel({
           <div className="gb-pv-msg">Loading your site…</div>
         )}
       </div>
+
+      {(link || linkError) && (
+        <div className="gb-pv-link" role="status">
+          {linkError ? (
+            <span className="gb-pv-err">{linkError}</span>
+          ) : link ? (
+            <>
+              <a href={link.url} target="_blank" rel="noopener noreferrer" title={link.url}>
+                {link.url.replace(/^https?:\/\//, "")}
+              </a>
+              <button type="button" className="gb-ghost" onClick={copyLink}>
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <span className="gb-pv-small">Anyone with this link can see it.{link.skipped.length ? ` Not included (images and other files can't be hosted yet): ${link.skipped.slice(0, 4).join(", ")}${link.skipped.length > 4 ? "…" : ""}.` : ""}</span>
+            </>
+          ) : null}
+        </div>
+      )}
 
       <div className="gb-pv-foot">
         <span>This is your workspace copy. It is not live yet.</span>

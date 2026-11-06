@@ -191,3 +191,9 @@
 @media (max-width: 900px) {
   .gb-preview { position: fixed; inset: 0; width: 100%; z-index: 90; border-left: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
+
+.gb-pv-link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 14px; border-top: 1px solid var(--gb-line); background: var(--gb-fuchsia-soft); font-size: 13px; }
+.gb-pv-link a { color: var(--gb-fuchsia-ink); font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.gb-pv-link a:hover { text-decoration: underline; }
+.gb-pv-small { color: var(--gb-muted); font-size: 12px; flex-basis: 100%; }
+.gb-pv-err { color: var(--gb-danger); }
