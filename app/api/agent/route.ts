@@ -1,7 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { getCreditBalance } from "@/lib/credits";
 import { AGENT_MIN_BALANCE } from "@/lib/credits-constants";
-import { sanitizeHistory } from "@/lib/agentCore";
+import { cleanLocalFolderName, sanitizeHistory } from "@/lib/agentCore";
 import { runAgentTurn, type AgentEvent } from "@/lib/agent";
 
 // GYSM Agent turn. Streams NDJSON AgentEvents (see lib/agent.ts).
@@ -35,7 +35,18 @@ export async function POST(req: Request) {
         }
       : undefined;
 
-  if (!userText && !decision) {
+  const localFolder = cleanLocalFolderName(body?.localFolder);
+  const clientResult =
+    body?.clientResult && typeof body.clientResult.toolCallId === "string"
+      ? {
+          toolCallId: body.clientResult.toolCallId as string,
+          ok: body.clientResult.ok === true,
+          output: typeof body.clientResult.output === "string" ? body.clientResult.output.slice(0, 120_000) : "",
+          declined: body.clientResult.declined === true,
+        }
+      : undefined;
+
+  if (!userText && !decision && !clientResult) {
     return Response.json({ error: "Tell the agent what to build." }, { status: 400 });
   }
 
@@ -51,7 +62,7 @@ export async function POST(req: Request) {
     async start(controller) {
       const emit = (e: AgentEvent) => controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
       try {
-        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, emit });
+        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, emit });
       } catch (error: any) {
         console.error("[agent] turn failed:", error?.message || error);
         emit({ type: "error", error: "Couldn't reach your workspace. Please try again in a moment." });

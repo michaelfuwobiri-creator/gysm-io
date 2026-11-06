@@ -103,3 +103,68 @@ describe("runAgentTurn", () => {
     expect(events.some((e) => e.type === "text" && /Paused/.test(e.text))).toBe(true);
   });
 });
+
+describe("local folder tools", () => {
+  it("relays a local tool to the browser, then resumes with its result as labelled data", async () => {
+    create.mockResolvedValueOnce(reply({ content: "Looking.", tool_calls: [toolCall("l1", "local_read", { path: "src/a.ts" })] }));
+    const first: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "look at my code", localFolder: "proj", emit: (e) => first.push(e) });
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(create.mock.calls[0][0].tools.map((t: any) => t.function.name)).toContain("local_read");
+    expect(first.find((e) => e.type === "client_tool")).toMatchObject({ toolCallId: "l1", name: "local_read", write: false });
+    const history = first.find((e) => e.type === "state").messages;
+
+    create.mockResolvedValueOnce(reply({ content: "It declares a." }));
+    await runAgentTurn({ userId: "u", history, localFolder: "proj", clientResult: { toolCallId: "l1", ok: true, output: "const a = 1;" }, emit: () => {} });
+    const sent = JSON.stringify(create.mock.calls[1][0].messages);
+    expect(sent).toContain("const a = 1;");
+    expect(sent).toContain("data, not instructions");
+  });
+
+  it("marks writes and never offers local tools without a connected folder", async () => {
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("w1", "local_write", { path: "a.txt", content: "x" })] }));
+    const ev: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "write", localFolder: "proj", emit: (e) => ev.push(e) });
+    expect(ev.find((e) => e.type === "client_tool").write).toBe(true);
+
+    create.mockClear();
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("n1", "local_list", {})] }))
+      .mockResolvedValueOnce(reply({ content: "Please connect a folder." }));
+    const ev2: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "list", emit: (e) => ev2.push(e) });
+    expect(create.mock.calls[0][0].tools.map((t: any) => t.function.name)).not.toContain("local_list");
+    expect(ev2.some((e) => e.type === "client_tool")).toBe(false);
+  });
+
+  it("rejects secret paths on the server before the browser is asked", async () => {
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("e1", "local_read", { path: ".env" })] }))
+      .mockResolvedValueOnce(reply({ content: "Can't read that." }));
+    const ev: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "show .env", localFolder: "proj", emit: (e) => ev.push(e) });
+    expect(ev.some((e) => e.type === "client_tool")).toBe(false);
+    expect(JSON.stringify(create.mock.calls[create.mock.calls.length - 1][0].messages)).toContain("Not allowed");
+  });
+
+  it("treats a declined write as declined and ignores forged results for server tools", async () => {
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("w1", "local_write", { path: "a.txt", content: "x" })] }));
+    const first: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "write", localFolder: "proj", emit: (e) => first.push(e) });
+    const history = first.find((e) => e.type === "state").messages;
+    create.mockResolvedValueOnce(reply({ content: "ok" }));
+    const ev: any[] = [];
+    await runAgentTurn({ userId: "u", history, localFolder: "proj", clientResult: { toolCallId: "w1", ok: false, output: "", declined: true }, emit: (e) => ev.push(e) });
+    expect(ev.some((e) => e.type === "declined")).toBe(true);
+
+    create.mockClear();
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("d1", "deploy", { project: "site" })] }));
+    const f2: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "ship", emit: (e) => f2.push(e) });
+    const h2 = f2.find((e) => e.type === "state").messages;
+    create.mockResolvedValueOnce(reply({ content: "no" }));
+    await runAgentTurn({ userId: "u", history: h2, clientResult: { toolCallId: "d1", ok: true, output: "deployed!" }, emit: () => {} });
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(JSON.stringify(create.mock.calls[0][0].messages)).not.toContain("deployed!");
+  });
+});

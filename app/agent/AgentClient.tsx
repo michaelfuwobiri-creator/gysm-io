@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { folderAccessSupported, localFileExists, runLocalTool, type DirHandleLike } from "@/lib/localFolder";
 
 // GYSM Agent UI: one timeline of chat text, tool activity and approval
 // cards. The conversation history (OpenAI chat format) is kept here and
@@ -19,6 +20,8 @@ type Item =
       detail: string;
       risky: boolean;
       secretLabel?: string;
+      /** A change to the user's own computer, run by this browser after approval. */
+      local?: boolean;
       resolved?: "approved" | "declined";
     }
   | { id: string; kind: "note"; text: string; tone?: "error" | "muted" };
@@ -56,7 +59,14 @@ const TOOL_LABEL: Record<string, string> = {
   fetch_url: "Fetch page",
   review_site: "Site review",
   suggest_next: "Suggestions",
+  local_list: "Your folder",
+  local_read: "Read (your computer)",
+  local_write: "Write (your computer)",
+  local_edit: "Edit (your computer)",
 };
+
+type ClientCall = { toolCallId: string; name: string; args: any; summary: string; write: boolean };
+type ClientResult = { toolCallId: string; ok: boolean; output: string; declined?: boolean };
 
 export default function AgentClient({ initialCredits, userKey, initialPrompt = "" }: { initialCredits: number; userKey: string; initialPrompt?: string }) {
   const storageKey = `gysm-agent:${userKey}`;
@@ -72,6 +82,33 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<unknown[]>([]);
   messagesRef.current = messages;
+  // The folder the user connected. The handle lives only in memory: after a
+  // reload the user reconnects, which is also how permission is re-granted.
+  const folderRef = useRef<DirHandleLike | null>(null);
+  const [folderName, setFolderName] = useState<string | null>(null);
+  const [folderSupported, setFolderSupported] = useState(false);
+  const [folderError, setFolderError] = useState("");
+  const pendingLocalRef = useRef<Record<string, ClientCall>>({});
+  const runClientCallRef = useRef<(c: ClientCall) => Promise<void>>(async () => {});
+  const sendRef = useRef<(b: any) => Promise<void>>(async () => {});
+
+  useEffect(() => setFolderSupported(folderAccessSupported()), []);
+
+  const connectFolder = async () => {
+    setFolderError("");
+    try {
+      const handle = await (window as any).showDirectoryPicker({ id: "gysm-agent", mode: "readwrite" });
+      folderRef.current = handle;
+      setFolderName(handle.name);
+    } catch (e: any) {
+      if (e?.name !== "AbortError") setFolderError("Couldn't open that folder. Your browser may have blocked it (system folders aren't allowed).");
+    }
+  };
+  const disconnectFolder = () => {
+    folderRef.current = null;
+    setFolderName(null);
+    pendingLocalRef.current = {};
+  };
 
   // The homepage and use-case pages stash the visitor's idea here before
   // sign-up; prefill it (never auto-run it) and clear it.
@@ -116,14 +153,15 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
   const push = useCallback((item: Item) => setItems((prev) => [...prev, item]), []);
 
   const send = useCallback(
-    async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string } }) => {
+    async (body: { text?: string; decision?: { toolCallId: string; approve: boolean; secret?: string }; clientResult?: ClientResult }) => {
       setBusy(true);
       setSuggestions([]);
+      let clientCall: ClientCall | null = null;
       try {
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...body, messages: messagesRef.current }),
+          body: JSON.stringify({ ...body, messages: messagesRef.current, localFolder: folderRef.current ? folderRef.current.name : undefined }),
         });
         if (!res.ok || !res.body) {
           const j = await res.json().catch(() => ({}));
@@ -148,7 +186,10 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
             if (e.balance || e.spent) setCredits(e.balance);
-          } else if (e.type === "state") setMessages(e.messages);
+          } else if (e.type === "state") {
+            messagesRef.current = e.messages;
+            setMessages(e.messages);
+          } else if (e.type === "client_tool") clientCall = { toolCallId: e.toolCallId, name: e.name, args: e.args, summary: e.summary, write: e.write };
           else if (e.type === "error") push({ id: uid(), kind: "note", text: e.error, tone: "error" });
         };
         for (;;) {
@@ -167,6 +208,9 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
             }
           }
         }
+        // The agent asked for something on the user's computer: run it here
+        // (reads) or ask first (writes), then continue the same turn.
+        if (clientCall) await runClientCallRef.current(clientCall);
       } catch {
         push({ id: uid(), kind: "note", text: "Connection lost. Please try again.", tone: "error" });
       } finally {
@@ -175,6 +219,30 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
     },
     [push]
   );
+  sendRef.current = send;
+
+  runClientCallRef.current = async (call: ClientCall) => {
+    const root = folderRef.current;
+    if (!root) {
+      await sendRef.current({ clientResult: { toolCallId: call.toolCallId, ok: false, output: "The folder is no longer connected." } });
+      return;
+    }
+    if (call.write) {
+      // Writes always wait for an explicit click.
+      pendingLocalRef.current[call.toolCallId] = call;
+      const exists = await localFileExists(root, String(call.args?.path ?? ""));
+      const detail =
+        call.name === "local_write"
+          ? `${exists ? "Overwrites" : "Creates"} ${call.args?.path} in "${root.name}"\n\n${String(call.args?.content ?? "").slice(0, 3000)}`
+          : `Edits ${call.args?.path} in "${root.name}"\n\n--- replace ---\n${String(call.args?.old_string ?? "").slice(0, 1500)}\n--- with ---\n${String(call.args?.new_string ?? "").slice(0, 1500)}`;
+      push({ id: uid(), kind: "proposal", callId: call.toolCallId, name: call.name, summary: call.summary, detail, risky: call.name === "local_write" && exists, local: true });
+      return;
+    }
+    push({ id: uid(), kind: "tool", callId: call.toolCallId, name: call.name, summary: call.summary, running: true });
+    const r = await runLocalTool(root, call.name, call.args);
+    setItems((prev) => prev.map((i) => (i.kind === "tool" && i.callId === call.toolCallId ? { ...i, running: false, ok: r.ok, output: r.output.slice(0, 4000) } : i)));
+    await sendRef.current({ clientResult: { toolCallId: call.toolCallId, ok: r.ok, output: r.output } });
+  };
 
   const submit = (t: string) => {
     const v = t.trim();
@@ -184,8 +252,29 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
     void send({ text: v });
   };
 
+  const decideLocal = async (item: Extract<Item, { kind: "proposal" }>, approve: boolean) => {
+    const call = pendingLocalRef.current[item.callId];
+    delete pendingLocalRef.current[item.callId];
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
+    if (!call || !folderRef.current) {
+      void send({ clientResult: { toolCallId: item.callId, ok: false, output: "The folder is no longer connected." } });
+      return;
+    }
+    if (!approve) {
+      void send({ clientResult: { toolCallId: item.callId, ok: false, output: "", declined: true } });
+      return;
+    }
+    const r = await runLocalTool(folderRef.current, call.name, call.args);
+    push({ id: uid(), kind: "tool", callId: call.toolCallId, name: call.name, summary: call.summary, running: false, ok: r.ok, output: r.output });
+    void send({ clientResult: { toolCallId: item.callId, ok: r.ok, output: r.output } });
+  };
+
   const decide = (item: Extract<Item, { kind: "proposal" }>, approve: boolean) => {
     if (busy) return;
+    if (item.local) {
+      void decideLocal(item, approve);
+      return;
+    }
     const secret = item.secretLabel ? secrets[item.id] : undefined;
     if (approve && item.secretLabel && !secret?.trim()) return;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
@@ -211,6 +300,16 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span style={{ fontSize: 12, border: `1px solid ${PINK}`, borderRadius: 999, padding: "2px 10px" }}>{credits} cr</span>
+          {folderSupported && (
+            <button
+              onClick={folderName ? disconnectFolder : connectFolder}
+              disabled={busy}
+              title={folderName ? "Disconnect this folder" : "Let the agent work in a folder on your computer. You approve every change."}
+              style={{ fontSize: 12, background: "none", border: `1px solid ${folderName ? PINK : "#8884"}`, borderRadius: 8, padding: "4px 8px", color: "inherit" }}
+            >
+              {folderName ? `Folder: ${folderName} ✕` : "Connect folder"}
+            </button>
+          )}
           <a href="/builder?classic=1" style={{ fontSize: 12, opacity: 0.7, textDecoration: "underline", color: "inherit" }}>
             Classic builder
           </a>
@@ -219,6 +318,13 @@ export default function AgentClient({ initialCredits, userKey, initialPrompt = "
           </button>
         </div>
       </header>
+
+      {folderError && <div style={{ fontSize: 12, color: "#d33", paddingBottom: 6 }}>{folderError}</div>}
+      {folderName && (
+        <div style={{ fontSize: 12, opacity: 0.75, paddingBottom: 6 }}>
+          The agent can read and list "{folderName}" and asks before it changes anything. It can't see .env files or keys.
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
         {items.length === 0 && (
