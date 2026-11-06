@@ -34,6 +34,22 @@ definitions:
     - &cap_sync
       name: Sync Capacitor iOS project
       script: npx cap sync ios
+    - &init_keychain
+      name: Set up a keychain for code signing
+      script: keychain initialize
+    - &fetch_signing
+      name: Fetch (or create) the App Store certificate and profile from Apple
+      script: |
+        # Uses the gysm_asc App Store Connect API key (needs Admin role the first
+        # time, to create the distribution certificate). CERTIFICATE_PRIVATE_KEY
+        # comes from the gysm_ios group. It is only used if a new certificate
+        # has to be created.
+        app-store-connect fetch-signing-files "$BUNDLE_ID" \
+          --type IOS_APP_STORE \
+          --create
+    - &add_certs
+      name: Add the certificates to the keychain
+      script: keychain add-certificates
     - &set_signing
       name: Apply App Store signing profile to the Xcode project
       script: xcode-project use-profiles
@@ -65,14 +81,14 @@ workflows:
       app_store_connect: gysm_asc
     environment:
       <<: *environment
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: io.gysm.app
     triggering:
       events: []   # manual only: click "Start new build"
     scripts:
       - *install_js
       - *cap_sync
+      - *init_keychain
+      - *fetch_signing
+      - *add_certs
       - *set_signing
       - *set_build_number
       - *build_ipa
@@ -90,14 +106,14 @@ workflows:
       app_store_connect: gysm_asc
     environment:
       <<: *environment
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: io.gysm.app
     triggering:
       events: []
     scripts:
       - *install_js
       - *cap_sync
+      - *init_keychain
+      - *fetch_signing
+      - *add_certs
       - *set_signing
       - *set_build_number
       - *build_ipa

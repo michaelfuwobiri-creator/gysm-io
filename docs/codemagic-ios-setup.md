@@ -7,7 +7,11 @@ The build config is `codemagic.yaml` (bundle id `io.gysm.app`, Team FJU33P8JUF).
 2. Teams → Integrations → Developer Portal → App Store Connect → add your API key
    (App Manager access). Name it **gysm_asc**. The key stays inside Codemagic.
 3. Environment variables → new group **gysm_ios** with `APP_STORE_APPLE_ID`
-   (numeric Apple ID of the app record).
+   (numeric Apple ID of the app record), and a **secure** variable `CERTIFICATE_PRIVATE_KEY`
+   (only used when Codemagic has to create a new distribution certificate). Make one with:
+   `ssh-keygen -t rsa -b 2048 -m PEM -f codemagic_key -q -N ""` and paste the contents of the
+   private key file `codemagic_key`. The API key in step 2 needs the Admin role for the first
+   build, so the certificate and App Store profile can be created automatically.
 4. App Store Connect → Apps → + → New App: bundle id `io.gysm.app`, name "GYSM — AI App Builder".
 5. Monetization → In-App Purchases / Subscriptions: create the product ids in `lib/iap.ts`
    (credits_starter, credits_popular, credits_bulk as consumables; plan_builder/pro/studio.monthly
