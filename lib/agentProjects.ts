@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { cleanSlug, slugProblem } from "@/lib/previewSlug";
+import { bundlePreview, type PreviewFile } from "@/lib/previewBundle";
 import { ENTRY_PATH, HOSTED_MAX_FILES, HOSTED_MAX_FILE_BYTES, HOSTED_MAX_TOTAL_BYTES, isBinaryHostedPath, normalizeHostedPath, replaceProjectFiles, type ProjectFile } from "@/lib/projectFiles";
 
 // Saves a site the Agent deployed as a normal project, so it shows up on the
@@ -23,6 +24,71 @@ export function buildProjectHtml(indexHtml: string | null, project: string, url:
 <body style="margin:0;font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;background:#0A0A0A;color:#fff;text-align:center">
 <div><h1 style="margin:0 0 12px">${esc(project)}</h1><p style="opacity:.6;margin:0 0 20px">Built and deployed by GYSM Agent.</p>
 <a href="${esc(url)}" style="background:#FF0080;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:700">Open the live site</a></div></body></html>`;
+}
+
+const NAV_SCRIPT_RE = /<script>document\.addEventListener\('click'[^]*?gysmPreviewNav[^]*?<\/script>/;
+
+/**
+ * The html saved on the project row for a multi-file site: index.html with its
+ * stylesheets, scripts and images baked in, so the dashboard card (which shows
+ * it in an iframe with no server behind it) looks like the real site. Falls
+ * back to smaller versions, then to the bare index.html, when it is too big.
+ */
+export function thumbnailBundle(files: ProjectFile[]): string {
+  const entry = files.find((f) => f.path === ENTRY_PATH)?.content ?? "";
+  const toPreview = (withBinary: boolean): PreviewFile[] =>
+    files.flatMap((f): PreviewFile[] => (isBinaryHostedPath(f.path) ? (withBinary ? [{ path: f.path, base64: f.content }] : []) : [{ path: f.path, text: f.content }]));
+  for (const withBinary of [true, false]) {
+    try {
+      const b = bundlePreview(toPreview(withBinary), ENTRY_PATH);
+      if (b.ok) {
+        const html = b.html.replace(NAV_SCRIPT_RE, "");
+        if (Buffer.byteLength(html, "utf8") <= MAX_PROJECT_HTML_BYTES) return html;
+      }
+    } catch {
+      /* fall through to a smaller version */
+    }
+  }
+  return entry;
+}
+
+const REL_STYLESHEET_RE = /<link\b[^>]*\brel\s*=\s*["']?stylesheet[^>]*\bhref\s*=\s*["'](?!https?:|\/\/|data:)[^"']+/i;
+const REL_SCRIPT_RE = /<script\b[^>]*\ssrc\s*=\s*["'](?!https?:|\/\/|data:)[^"']+/i;
+
+/** True when a saved page still points at its own css/js files (so a card would show it unstyled). */
+export function looksUnbundled(html: unknown): boolean {
+  return typeof html === "string" && (REL_STYLESHEET_RE.test(html) || REL_SCRIPT_RE.test(html));
+}
+
+const BINARY_PATH_SQL = "\\.(png|jpe?g|gif|webp|avif|ico|woff2?|ttf|otf|mp3|mp4|webm)$";
+
+/**
+ * Dashboard cards for multi-file agent sites: projects.html is the site's real
+ * index.html (it is what gets hosted, downloaded and pushed), so it still
+ * points at style.css and friends. For the card only, this builds a copy with
+ * the stylesheets and scripts baked in. Nothing is written back. Text files
+ * only (images are skipped to keep it light). Returns id -> html for the card.
+ */
+export async function bundleAgentThumbnails(rows: { id: string; prompt?: string | null; html?: string | null }[], max = 24): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const todo = rows.filter((r) => typeof r.prompt === "string" && r.prompt.startsWith("[Agent] ") && looksUnbundled(r.html)).slice(0, max);
+  if (todo.length === 0) return out;
+  try {
+    const extra = (await sql`
+      select project_id, path, content from project_files
+      where project_id = any(${todo.map((r) => r.id)}::uuid[]) and path <> ${ENTRY_PATH} and path !~* ${BINARY_PATH_SQL}
+    `) as { project_id: string; path: string; content: string }[];
+    const byProject = new Map<string, ProjectFile[]>();
+    for (const e of extra) byProject.set(e.project_id, [...(byProject.get(e.project_id) ?? []), { path: e.path, content: e.content }]);
+    for (const r of todo) {
+      const files = byProject.get(r.id);
+      if (!files?.length) continue;
+      out[r.id] = thumbnailBundle([{ path: ENTRY_PATH, content: String(r.html) }, ...files]);
+    }
+  } catch (e: any) {
+    console.error("[dashboard] couldn't build card previews:", e?.message || e);
+  }
+  return out;
 }
 
 export async function saveAgentProject(opts: {

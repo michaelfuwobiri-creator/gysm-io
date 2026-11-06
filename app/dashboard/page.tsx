@@ -12,6 +12,7 @@ import RenameButton from "./RenameButton";
 import DuplicateButton from "./DuplicateButton";
 import DeployVercelButton from "./DeployVercelButton";
 import { getUsageStats } from "@/lib/usage";
+import { bundleAgentThumbnails } from "@/lib/agentProjects";
 
 // Reads straight from Neon. Every project generated through /api/generate
 // is saved there, keyed by the Clerk user id (see lib/auth.ts and
@@ -25,7 +26,12 @@ import { getUsageStats } from "@/lib/usage";
 // root (see db/migrations/0004 and app/api/generate/route.ts), and shows
 // up in that build's History panel instead of as a separate dashboard
 // card.
-export default async function DashboardPage() {
+const PAGE_SIZE = 24;
+const MAX_PAGE = 100;
+// Builds with a huge saved page get a plain card instead of a heavy preview.
+const MAX_THUMB_CHARS = 600_000;
+
+export default async function DashboardPage({ searchParams }: { searchParams?: { limit?: string } }) {
   const user = await getUser();
   if (!user) {
     redirect("/sign-in?redirect_url=/dashboard");
@@ -36,64 +42,77 @@ export default async function DashboardPage() {
   // switch-to-see-a-different-workspace behavior as any Clerk Orgs app.
   // Switching back to "Personal account" shows exactly what this page
   // always showed before teams existed.
-  let list: any[] = [];
-  try {
-    list = user.orgId
-      ? await sql`
-          select id, prompt, html, created_at, is_public, title, name, views from projects
-          where org_id = ${user.orgId} and root_project_id is null
-          order by created_at desc
-          limit 50
-        `
-      : await sql`
-          select id, prompt, html, created_at, is_public, title, name, views from projects
-          where user_id = ${user.id} and org_id is null and root_project_id is null
-          order by created_at desc
-          limit 50
-        `;
-  } catch (error: any) {
-    console.error("[dashboard] failed to load projects:", error.message);
-  }
+  const limit = Math.min(MAX_PAGE, Math.max(PAGE_SIZE, Number.parseInt(searchParams?.limit ?? "", 10) || PAGE_SIZE));
 
-  // Live URLs for sites the Agent deployed (best-effort: the column is added
-  // by migration 0034 and its absence just means no live links).
-  const liveUrls: Record<string, string> = {};
-  try {
-    const rows = (await sql`
-      select id, live_url from projects
-      where (user_id = ${user.id} or org_id = ${user.orgId ?? ""}) and live_url is not null
-      limit 200
-    `) as any[];
-    for (const r of rows) liveUrls[r.id] = r.live_url;
-  } catch {
-    /* live_url not migrated yet */
-  }
-
-  // Curated templates shown in the dashboard's "Start from a template"
-  // strip -- same is_template=true rows /templates uses (see
-  // app/templates/page.tsx). Best-effort: a failure here shouldn't take
-  // down the rest of the dashboard, so it just renders no strip.
-  let templates: TemplateStripItem[] = [];
-  try {
-    templates = (await sql`
-      select id, name, prompt, template_blurb as blurb, html from projects
-      where is_template = true
-      order by created_at desc
-      limit 6
-    `) as TemplateStripItem[];
-  } catch (error: any) {
-    console.error("[dashboard] failed to load templates:", error.message);
-  }
+  // The four reads are independent, so they run together instead of one
+  // after another. Each is best-effort: one failing never blanks the page.
+  const [rawList, liveUrls, templates, usage] = await Promise.all([
+    (async (): Promise<any[]> => {
+      try {
+        // html is only sent for reasonably sized pages (it is shown in a small
+        // preview card); id/title/etc. always come back.
+        return (user.orgId
+          ? await sql`
+              select id, prompt, case when length(html) <= ${MAX_THUMB_CHARS} then html end as html, created_at, is_public, title, name, views from projects
+              where org_id = ${user.orgId} and root_project_id is null
+              order by created_at desc
+              limit ${limit}
+            `
+          : await sql`
+              select id, prompt, case when length(html) <= ${MAX_THUMB_CHARS} then html end as html, created_at, is_public, title, name, views from projects
+              where user_id = ${user.id} and org_id is null and root_project_id is null
+              order by created_at desc
+              limit ${limit}
+            `) as any[];
+      } catch (error: any) {
+        console.error("[dashboard] failed to load projects:", error.message);
+        return [];
+      }
+    })(),
+    // Live URLs for sites the Agent deployed (best-effort: the column is added
+    // by migration 0034 and its absence just means no live links).
+    (async (): Promise<Record<string, string>> => {
+      const out: Record<string, string> = {};
+      try {
+        const rows = (await sql`
+          select id, live_url from projects
+          where (user_id = ${user.id} or org_id = ${user.orgId ?? ""}) and live_url is not null
+          limit 200
+        `) as any[];
+        for (const r of rows) out[r.id] = r.live_url;
+      } catch {
+        /* live_url not migrated yet */
+      }
+      return out;
+    })(),
+    // Curated templates for the "Start from a template" strip (same
+    // is_template=true rows /templates uses). A failure just hides the strip.
+    (async (): Promise<TemplateStripItem[]> => {
+      try {
+        return (await sql`
+          select id, name, prompt, template_blurb as blurb, html from projects
+          where is_template = true
+          order by created_at desc
+          limit 6
+        `) as TemplateStripItem[];
+      } catch (error: any) {
+        console.error("[dashboard] failed to load templates:", error.message);
+        return [];
+      }
+    })(),
+    // Real usage snapshot, not a fabricated metric -- see lib/usage.ts.
+    getUsageStats(user.orgId ?? user.id),
+  ]);
 
   // Best-effort first name for the PromptHero greeting -- falls back to
   // null (renders "Ready to build?" with no name) rather than showing a
   // raw email or user id.
-  const greetingName = user.name ? user.name.split(" ")[0].split("@")[0] : null;
+  // A multi-file agent site's saved index.html still points at its own css/js,
+  // so its card would show unstyled. Build a styled copy for the card only.
+  const healed = await bundleAgentThumbnails(rawList);
+  const list = rawList.map((p) => (healed[p.id] ? { ...p, html: healed[p.id] } : p));
 
-  // Real usage snapshot, not a fabricated metric -- see lib/usage.ts for
-  // exactly what this counts and why it doesn't include a spend-over-time
-  // chart (no transaction ledger exists yet, only a current balance).
-  const usage = await getUsageStats(user.orgId ?? user.id);
+  const greetingName = user.name ? user.name.split(" ")[0].split("@")[0] : null;
 
   return (
     <AppShell active="dashboard">
@@ -148,12 +167,24 @@ export default async function DashboardPage() {
             {list.map((p) => (
               <div key={p.id} className="bg-white border border-black/5 shadow-sm rounded-2xl p-4 flex flex-col gap-3">
                 <div className="bg-white rounded-lg h-[180px] overflow-hidden pointer-events-none border border-black/5">
-                  <iframe srcDoc={toThumbnailHtml(p.html)} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title={p.prompt} scrolling="no" tabIndex={-1} />
+                  {p.html ? (
+                    <iframe
+                      srcDoc={toThumbnailHtml(p.html)}
+                      loading="lazy"
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin"
+                      title={p.name || p.prompt || "Build preview"}
+                      scrolling="no"
+                      tabIndex={-1}
+                    />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-xs text-black/40 px-4 text-center">No preview yet. Open it in the builder.</div>
+                  )}
                 </div>
 
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <RenameButton projectId={p.id} initialName={p.name || p.prompt} />
+                    <RenameButton projectId={p.id} initialName={p.name || p.prompt || "Untitled build"} />
                     <div className="text-[11px] text-black/40 mt-0.5">
                       {new Date(p.created_at).toLocaleDateString("en-US", { timeZone: "UTC" })}
                       {p.is_public && <> • {p.views ?? 0} views</>}
@@ -164,7 +195,7 @@ export default async function DashboardPage() {
                       projectId={p.id}
                       initialIsPublic={!!p.is_public}
                       initialTitle={p.title || ""}
-                      defaultTitle={p.prompt.slice(0, 80)}
+                      defaultTitle={String(p.name || p.prompt || "").slice(0, 80)}
                     />
                     <a
                       href={`/publish/${p.id}/app-stores`}
@@ -208,6 +239,14 @@ export default async function DashboardPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {list.length >= limit && limit < MAX_PAGE && (
+          <div className="text-center mt-6">
+            <a href={`/dashboard?limit=${Math.min(MAX_PAGE, limit + PAGE_SIZE)}`} className="inline-block px-4 py-2 rounded-lg border border-black/10 text-sm font-bold hover:bg-black/[0.03]">
+              Show more builds
+            </a>
           </div>
         )}
       </div>
