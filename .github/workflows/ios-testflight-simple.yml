@@ -46,18 +46,42 @@ jobs:
       - name: Put the App Store Connect key on the runner
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
         run: |
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          echo "$ASC_KEY_CONTENT" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          set -e
+          KEY_ID="$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')"
+          ISSUER="$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')"
+          [ -n "$KEY_ID" ] || { echo "::error::Secret ASC_KEY_ID is empty"; exit 1; }
+          [ -n "$ISSUER" ] || { echo "::error::Secret ASC_ISSUER_ID is empty"; exit 1; }
+          [ -n "$ASC_KEY_CONTENT" ] || { echo "::error::Secret ASC_KEY_CONTENT is empty"; exit 1; }
+          echo "Key ID length: ${#KEY_ID} (expected 10), Issuer ID length: ${#ISSUER} (expected 36)"
+          DIR="$RUNNER_TEMP/asc"
+          mkdir -p "$DIR"
+          KEY_PATH="$DIR/AuthKey_${KEY_ID}.p8"
+          # Accept either the base64 of the .p8 or the raw PEM text.
+          if printf '%s' "$ASC_KEY_CONTENT" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_CONTENT" > "$KEY_PATH"
+          else
+            printf '%s' "$ASC_KEY_CONTENT" | tr -d '[:space:]' | base64 --decode > "$KEY_PATH"
+          fi
+          chmod 600 "$KEY_PATH"
+          if ! head -n1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY"; then
+            echo "::error::ASC_KEY_CONTENT did not decode to a .p8 key. Re-copy it with the Set-Clipboard command and save the secret again."
+            exit 1
+          fi
+          openssl pkey -in "$KEY_PATH" -noout || { echo "::error::The key file is not a valid private key (truncated paste?)"; exit 1; }
+          echo "Key file OK ($(wc -c < "$KEY_PATH") bytes)"
+          {
+            echo "ASC_KEY_PATH=$KEY_PATH"
+            echo "ASC_KEY_ID_CLEAN=$KEY_ID"
+            echo "ASC_ISSUER_CLEAN=$ISSUER"
+          } >> "$GITHUB_ENV"
 
       - name: Set the build number
         run: cd ios/App && xcrun agvtool new-version -all "${{ github.run_number }}"
 
       - name: Archive
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -project ios/App/App.xcodeproj \
@@ -66,16 +90,13 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/App.xcarchive \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_STYLE=Automatic
 
       - name: Export (and upload to TestFlight)
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           DEST=export
           if [ "${{ github.event.inputs.upload }}" = "true" ]; then DEST=upload; fi
@@ -95,9 +116,9 @@ jobs:
             -exportPath build/ios \
             -exportOptionsPlist build/ExportOptions.plist \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID_CLEAN" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_CLEAN"
 
       - name: Keep the .ipa and logs
         if: always()
