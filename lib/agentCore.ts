@@ -84,10 +84,14 @@ export const AGENT_TOOLS = [
     function: {
       name: "deploy",
       description:
-        "Publish a project folder from the workspace to a public URL on Vercel. The user must approve every deploy. Use after the project builds locally.",
+        "Publish a site from the workspace so it is live at <name>.gysm.io. Static files only: HTML, CSS, JS, images and fonts (no server code). For a site with a build step, run the build first and pass the output folder (e.g. 'dist'). Publishing again updates the same address. The user must approve every deploy.",
       parameters: {
         type: "object",
-        properties: { project: { type: "string", description: "Project folder name inside the workspace, e.g. 'my-site'." } },
+        properties: {
+          project: { type: "string", description: "Project folder name inside the workspace, e.g. 'my-site'." },
+          folder: { type: "string", description: "Optional: the folder inside the project that holds index.html, e.g. 'dist', 'build' or 'out'. Omit when index.html is at the top of the project." },
+          name: { type: "string", description: "Optional: the name for <name>.gysm.io. Only set it when the user asked for a specific name; otherwise the project keeps its current name or gets one from the folder name." },
+        },
         required: ["project"],
       },
     },
@@ -344,8 +348,12 @@ export const LOCAL_TOOL_DEFS = [
 ] as const;
 
 /** Tools offered to the model: the local ones only while a folder is connected. */
+// set_env is not offered: sites are published as static files on gysm.io, so
+// there is no server that could use a secret.
+const OFFERED_TOOLS = AGENT_TOOLS.filter((t) => t.function.name !== "set_env");
+
 export function agentToolsFor(hasLocalFolder: boolean) {
-  return hasLocalFolder ? [...AGENT_TOOLS, ...LOCAL_TOOL_DEFS] : [...AGENT_TOOLS];
+  return hasLocalFolder ? [...OFFERED_TOOLS, ...LOCAL_TOOL_DEFS] : [...OFFERED_TOOLS];
 }
 
 /** Display name of the connected folder: one short, printable line. */
@@ -416,18 +424,19 @@ The user has connected a folder on their own computer, named "${folder}". You ca
 }
 
 function systemPromptBase(): string {
-  return `You are GYSM Agent, the autonomous builder built into gysm.io. You turn a goal into a working project by writing files, running commands, creating database tables and deploying, all inside the user's own private workspace. If asked who or what you are, say you are GYSM Agent; do not name or guess any underlying AI model or vendor.
+  return `You are GYSM Agent, the autonomous builder built into gysm.io. You turn a goal into a working website by writing files, running commands and publishing it live at <name>.gysm.io, all inside the user's own private workspace. If asked who or what you are, say you are GYSM Agent; do not name or guess any underlying AI model or vendor.
 
 How you work:
 - Plan briefly, then act with your tools. Check each result before the next step; fix errors yourself instead of handing them back.
-- Put each project in its own folder in the workspace (e.g. my-site/). Prefer simple, dependency-light stacks; static HTML/CSS/JS is fine for most sites.
+- Put each project in its own folder in the workspace (e.g. my-site/). Prefer simple, dependency-light stacks; static HTML/CSS/JS is best.
+- Sites are published on gysm.io as static files (HTML, CSS, JS, images, fonts; up to 150 files, 2 MB each, 15 MB in total). There is no server: no API routes, server-side code or secrets. With a framework, use a static export (Vite build, Next.js output: 'export') and deploy its output folder with the folder argument. If the user needs a backend, say it isn't supported on gysm.io yet.
 - Create and change files with write_file and edit_file, one file per call, never with cat/echo heredocs in run_command (commands are limited to 8000 characters). Split a big page into index.html, styles.css and script.js.
 - Verify before you deploy: build or open the files and confirm they are correct.
-- deploy, create_db_table and set_env need the user's approval; the user sees exactly what will happen. Never try to get around that.
-- Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. For API keys call set_env: the user types the value privately and you never see it; never ask for a secret in chat.
+- deploy and create_db_table need the user's approval; the user sees exactly what will happen. Never try to get around that.
+- Prefer edit_file for small changes, list_dir and search to find your way around, list_tables before changing a schema, and query_db to check data. Use web_search and fetch_url for current docs instead of guessing. Never ask for a secret in chat, and never put one in a site's files: published files are public.
 - run_command is sandboxed to the user's own VM. Mark deletes, overwrites, sudo and hard-to-undo commands risky. Never run interactive programs, never attack other systems, never mine crypto, never exfiltrate secrets.
 - Never write real secrets into files. Use placeholders and tell the user where to set them.
-- Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves), then call review_site on the live URL and fix real problems you find before reporting back.
+- Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
 - When done, write a short summary (what you built or found, where it is), then in that same message call suggest_next with 2-4 concrete next steps (for example fixing a finding, improving the design, adding a feature, or connecting a database). Suggestions only propose work; the user decides. Keep messages short; the user may be on a phone.`;
 }
@@ -675,7 +684,7 @@ export function describeCall(tool: string, args: any): string {
     case "run_command":
       return `Run: ${String(args?.cmd ?? "").slice(0, 300)}`;
     case "deploy":
-      return `Deploy project "${String(args?.project ?? "?")}" to a public URL`;
+      return `Publish "${String(args?.project ?? "?")}${args?.folder ? "/" + String(args.folder) : ""}" live on gysm.io${args?.name ? ` as ${String(args.name)}.gysm.io` : ""}`;
     case "create_db_table":
       return `Run schema SQL on your database`;
     case "get_logs":

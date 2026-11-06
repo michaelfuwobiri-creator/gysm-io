@@ -50,7 +50,7 @@ const RESULT_UI_MAX = 4000;
 function proposalDetail(name: string, args: any): string {
   if (name === "create_db_table") return String(args?.sql ?? "").slice(0, 6000);
   if (name === "run_command") return String(args?.cmd ?? "").slice(0, 2000);
-  if (name === "deploy") return `Folder: ${String(args?.project ?? "")}`;
+  if (name === "deploy") return `Folder: ${String(args?.project ?? "")}${args?.folder ? "/" + String(args.folder) : ""}\nGoes live at ${args?.name ? String(args.name) : "its name"}.gysm.io. Anyone with the address can see it.`;
   if (name === "set_env") return String(args?.purpose ?? "").slice(0, 300);
   return "";
 }

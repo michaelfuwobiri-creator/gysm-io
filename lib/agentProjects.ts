@@ -1,6 +1,6 @@
 import { sql } from "@/lib/db";
 import { cleanSlug, slugProblem } from "@/lib/previewSlug";
-import { ENTRY_PATH, MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, normalizePath, replaceProjectFiles, type ProjectFile } from "@/lib/projectFiles";
+import { ENTRY_PATH, HOSTED_MAX_FILES, HOSTED_MAX_FILE_BYTES, HOSTED_MAX_TOTAL_BYTES, isBinaryHostedPath, normalizeHostedPath, replaceProjectFiles, type ProjectFile } from "@/lib/projectFiles";
 
 // Saves a site the Agent deployed as a normal project, so it shows up on the
 // dashboard (and can be published to BuildGuild) like any other build.
@@ -74,28 +74,34 @@ export async function saveAgentProject(opts: {
 
 export type PreviewSelection = { files: ProjectFile[]; skipped: string[]; error?: string };
 
-/** Picks the files gysm.io can host (text web files, size caps), and makes sure there is an index.html. */
-export function selectHostableFiles(input: { path: string; text?: string }[]): PreviewSelection {
+/**
+ * Picks the files gysm.io can host (web text files plus images, fonts and
+ * media, within the size caps) and makes sure there is an index.html.
+ * Binary files keep their base64 text as content.
+ */
+export function selectHostableFiles(input: { path: string; text?: string; base64?: string }[]): PreviewSelection {
   const skipped: string[] = [];
   const kept: ProjectFile[] = [];
   let total = 0;
   for (const f of input) {
-    const path = normalizePath(f.path);
-    if (!path || typeof f.text !== "string") {
+    const path = normalizeHostedPath(f.path);
+    const binary = path ? isBinaryHostedPath(path) : false;
+    const content = binary ? f.base64 : f.text;
+    if (!path || typeof content !== "string") {
       skipped.push(f.path);
       continue;
     }
-    const bytes = Buffer.byteLength(f.text, "utf8");
-    if (bytes > MAX_FILE_BYTES || total + bytes > MAX_TOTAL_BYTES || kept.length >= MAX_FILES) {
+    const bytes = binary ? Math.floor((content.length * 3) / 4) : Buffer.byteLength(content, "utf8");
+    if (bytes > HOSTED_MAX_FILE_BYTES || total + bytes > HOSTED_MAX_TOTAL_BYTES || kept.length >= HOSTED_MAX_FILES) {
       skipped.push(f.path);
       continue;
     }
     total += bytes;
-    kept.push({ path, content: f.text });
+    kept.push({ path, content });
   }
   if (!kept.some((f) => f.path === ENTRY_PATH)) {
-    const firstPage = kept.filter((f) => /\.html$/i.test(f.path)).sort((a, b) => a.path.split("/").length - b.path.split("/").length || a.path.localeCompare(b.path))[0];
-    if (!firstPage) return { files: [], skipped, error: "There is no web page (.html file) to host yet." };
+    const firstPage = kept.filter((f) => /\.html?$/i.test(f.path)).sort((a, b) => a.path.split("/").length - b.path.split("/").length || a.path.localeCompare(b.path))[0];
+    if (!firstPage) return { files: [], skipped, error: "There is no web page (index.html) to publish. Build the site first, or pick the folder that has index.html in it." };
     kept.unshift({ path: ENTRY_PATH, content: firstPage.content });
   }
   return { files: kept, skipped };
@@ -135,7 +141,7 @@ export async function projectIdForSlug(slug: string): Promise<string | null> {
   }
 }
 
-export type SlugResult = { slug: string | null; error?: string; taken?: boolean; previous?: string | null };
+export type SlugResult = { slug: string | null; error?: string; taken?: boolean; previous?: string | null; created?: boolean };
 
 function pgCode(e: any): string | undefined {
   return e?.code || e?.sourceError?.code;
@@ -162,7 +168,7 @@ export async function setPreviewSlug(opts: { id: string; userId: string; wanted?
       if (want === current) return { slug: current };
       try {
         await sql`update projects set preview_slug = ${want} where id = ${id} and user_id = ${userId}`;
-        return { slug: want, previous: current };
+        return { slug: want, previous: current, created: true };
       } catch (e: any) {
         if (pgCode(e) === "23505") return { slug: current, error: `${want}.gysm.io is already taken. Try another name.`, taken: true };
         throw e;
@@ -177,7 +183,7 @@ export async function setPreviewSlug(opts: { id: string; userId: string; wanted?
       if (slugProblem(candidate)) continue;
       try {
         await sql`update projects set preview_slug = ${candidate} where id = ${id} and user_id = ${userId}`;
-        return { slug: candidate };
+        return { slug: candidate, created: true };
       } catch (e: any) {
         if (pgCode(e) !== "23505") throw e;
       }

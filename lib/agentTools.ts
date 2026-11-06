@@ -3,7 +3,7 @@ import dns from "dns";
 import http from "http";
 import https from "https";
 import { sql } from "@/lib/db";
-import { saveAgentProject } from "@/lib/agentProjects";
+import { PUBLISH_READ_LIMITS, publishAgentSite } from "@/lib/agentPublish";
 import { getConnection, getValidAccessToken, type ConnectedBackend } from "@/lib/backendStore";
 import { runSql } from "@/lib/supabaseBackend";
 import { getUserSandbox, runInSandbox } from "@/lib/shell/sandbox";
@@ -115,85 +115,30 @@ async function deploysToday(userId: string): Promise<number> {
 export async function toolDeploy(userId: string, args: any): Promise<ToolResult> {
   const project = cleanProjectName(args?.project);
   if (!project) return { ok: false, output: "Invalid project name. Use the folder name, e.g. 'my-site'." };
-  const cfg = vercelConfig();
-  if (!cfg) {
-    return { ok: false, output: "Deploying isn't enabled on this GYSM instance yet (AGENT_VERCEL_TOKEN is not set). Tell the user their files are ready in the workspace." };
-  }
   if ((await deploysToday(userId)) >= AGENT_DEPLOYS_PER_DAY) {
     return { ok: false, output: `Daily deploy limit reached (${AGENT_DEPLOYS_PER_DAY} per day). Try again tomorrow.` };
   }
 
-  const root = await workspaceRoot(userId);
-  const dir = `${root}/${project}`;
-  const list = await runInSandbox(userId, `cd -- ${quote(dir)} 2>/dev/null && find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -printf '%P\\t%s\\n' | head -2000`, root);
-  if (list.exitCode !== 0) return { ok: false, output: `Project folder not found: ${project}` };
+  // Sites go live on gysm.io: <name>.gysm.io, the same address as the
+  // Preview panel's link. Static files only (HTML, CSS, JS, images, fonts).
+  const read = await readProjectFiles(userId, project, { folder: args?.folder, ...PUBLISH_READ_LIMITS });
+  if ("error" in read) return { ok: false, output: read.error };
+  const wanted = typeof args?.name === "string" && args.name.trim() ? args.name : undefined;
+  const out = await publishAgentSite({ userId, project, files: read.files, slug: wanted });
+  if ("error" in out) return { ok: false, output: out.error };
 
-  const entries = list.output
-    .split("\n")
-    .map((l) => l.split("\t"))
-    .filter((p) => p.length === 2 && p[0] && !shouldSkipDeployPath(p[0]) && !p[0].includes("\0"))
-    .map(([path, size]) => ({ path, size: Number(size) || 0 }));
-  if (entries.length === 0) return { ok: false, output: "The project folder has no deployable files." };
-  if (entries.length > MAX_DEPLOY_FILES) return { ok: false, output: `Too many files (${entries.length}, max ${MAX_DEPLOY_FILES}). Deploy a build output folder instead.` };
-  const total = entries.reduce((n, e) => n + e.size, 0);
-  if (total > MAX_DEPLOY_BYTES) return { ok: false, output: `Project is too large (${total} bytes, max ${MAX_DEPLOY_BYTES}).` };
-
-  const sandbox = await getUserSandbox(userId);
-  const files: { file: string; data: string; encoding: "base64" }[] = [];
-  for (let i = 0; i < entries.length; i += 10) {
-    const batch = entries.slice(i, i + 10);
-    const bufs = await Promise.all(batch.map((e) => sandbox.readFileToBuffer({ path: `${dir}/${e.path}` })));
-    batch.forEach((e, j) => {
-      const b = bufs[j];
-      if (b) files.push({ file: e.path, data: b.toString("base64"), encoding: "base64" });
-    });
-  }
-
-  const name = deployNameFor(userHash(userId), project);
-  const create = await fetch(`https://api.vercel.com/v13/deployments?${cfg.qs}${cfg.qs ? "&" : ""}skipAutoDetectionConfirmation=1`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name, files, target: "production" }),
-  });
-  const created: any = await create.json().catch(() => ({}));
-  if (!create.ok || !created?.id) {
-    return { ok: false, output: `Deploy failed to start: ${created?.error?.message || create.status}` };
-  }
-
-  // Wait for the build (up to ~100s; the turn has a 300s budget).
-  let state: string = created.readyState || "QUEUED";
-  let aliases: string[] = Array.isArray(created.alias) ? created.alias : [];
-  for (let i = 0; i < 25 && !["READY", "ERROR", "CANCELED"].includes(state); i++) {
-    await new Promise((r) => setTimeout(r, 4000));
-    const poll = await fetch(`https://api.vercel.com/v13/deployments/${created.id}?${cfg.qs}`, {
-      headers: { Authorization: `Bearer ${cfg.token}` },
-    });
-    const info: any = await poll.json().catch(() => ({}));
-    state = info?.readyState || state;
-    if (Array.isArray(info?.alias) && info.alias.length) aliases = info.alias;
-  }
-  // The per-deployment URL sits behind Vercel's deployment protection by
-  // default; the project's production alias (<name>.vercel.app) is the
-  // public one, so prefer it.
-  const publicHost = aliases.find((a) => a === `${name}.vercel.app`) || aliases.find((a) => a.endsWith(".vercel.app") && !a.includes("-git-")) || created.url;
-  const url = `https://${publicHost}`;
   try {
-    await sql`insert into agent_deployments (user_id, project, vercel_deployment_id, url, state) values (${userId}, ${project}, ${created.id}, ${url}, ${state})`;
+    await sql`insert into agent_deployments (user_id, project, vercel_deployment_id, url, state) values (${userId}, ${project}, ${"gysm:" + out.id}, ${out.url}, ${"READY"})`;
   } catch {
     /* table may not be migrated yet */
   }
-  if (state === "READY") {
-    // Save the site as a normal project so it appears on the dashboard.
-    const indexFile = files.find((f) => f.file === "index.html");
-    const indexHtml = indexFile ? Buffer.from(indexFile.data, "base64").toString("utf8") : null;
-    const projectId = await saveAgentProject({ userId, project, url, indexHtml });
-    const saved = projectId ? " It's also saved to the user's dashboard as a project." : "";
-    return { ok: true, creditsKind: "deploy", output: `Deployed. Live at ${url} (state READY, ${files.length} files).${saved}` };
-  }
-  if (state === "ERROR" || state === "CANCELED") {
-    return { ok: false, creditsKind: "deploy", output: `Deployment ${state}. Call get_logs with source 'deployment' to see the build log.` };
-  }
-  return { ok: true, creditsKind: "deploy", output: `Deployment started but is still building (state ${state}). It will be live at ${url}.` };
+  const skipped = out.skipped.length ? ` Not published (unsupported type or over the size limits): ${out.skipped.slice(0, 8).join(", ")}${out.skipped.length > 8 ? "…" : ""}.` : "";
+  const note = out.note ? ` ${out.note}` : "";
+  return {
+    ok: true,
+    creditsKind: "deploy",
+    output: `Live at ${out.url}. It's also on the user's dashboard as a project.${skipped}${note}`,
+  };
 }
 
 // -- create_db_table -------------------------------------------------------
@@ -577,21 +522,33 @@ const PREVIEW_MAX_BYTES = 3 * 1024 * 1024;
 const PREVIEW_TEXT_EXT = /\.(html?|css|m?js|json|svg|txt|md|xml)$/i;
 
 /** Reads a project's files from the user's workspace for the Preview panel. */
-export async function readProjectFiles(userId: string, rawProject: unknown): Promise<{ ok: true; files: { path: string; text?: string; base64?: string }[] } | { ok: false; error: string }> {
+export async function readProjectFiles(
+  userId: string,
+  rawProject: unknown,
+  opts: { folder?: string | null; maxFiles?: number; maxBytes?: number } = {},
+): Promise<{ ok: true; files: { path: string; text?: string; base64?: string }[] } | { ok: false; error: string }> {
   const project = cleanProjectName(rawProject);
   if (!project) return { ok: false, error: "Invalid project name." };
+  let sub = "";
+  if (opts.folder !== undefined && opts.folder !== null && String(opts.folder).trim() !== "" && String(opts.folder).trim() !== ".") {
+    const cleaned = cleanRelPath(opts.folder);
+    if (!cleaned) return { ok: false, error: "Invalid folder. Use a path inside the project, e.g. 'dist'." };
+    sub = `/${cleaned}`;
+  }
+  const maxFiles = opts.maxFiles ?? PREVIEW_MAX_FILES;
+  const maxBytes = opts.maxBytes ?? PREVIEW_MAX_BYTES;
   const root = await workspaceRoot(userId);
-  const dir = `${root}/${project}`;
+  const dir = `${root}/${project}${sub}`;
   const list = await runInSandbox(userId, `cd -- ${quote(dir)} 2>/dev/null && find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -printf '%P\\t%s\\n' | head -1000`, root);
-  if (list.exitCode !== 0) return { ok: false, error: `Project folder not found: ${project}` };
+  if (list.exitCode !== 0) return { ok: false, error: `Folder not found: ${project}${sub}` };
   const entries = list.output
     .split("\n")
     .map((l) => l.split("\t"))
     .filter((p) => p.length === 2 && p[0] && !shouldSkipDeployPath(p[0]) && !p[0].includes("\0"))
     .map(([path, size]) => ({ path, size: Number(size) || 0 }));
   if (entries.length === 0) return { ok: false, error: "The project folder is empty." };
-  if (entries.length > PREVIEW_MAX_FILES) return { ok: false, error: `Too many files to preview (${entries.length}).` };
-  if (entries.reduce((n, e) => n + e.size, 0) > PREVIEW_MAX_BYTES) return { ok: false, error: "This project is too large to preview here." };
+  if (entries.length > maxFiles) return { ok: false, error: `Too many files (${entries.length}, the limit is ${maxFiles}).` };
+  if (entries.reduce((n, e) => n + e.size, 0) > maxBytes) return { ok: false, error: `This project is too large (over ${Math.round(maxBytes / 1_000_000)} MB).` };
 
   const sandbox = await getUserSandbox(userId);
   const files: { path: string; text?: string; base64?: string }[] = [];

@@ -197,7 +197,7 @@ export default function PreviewPanel({
       )}
 
       <div className="gb-pv-foot">
-        <span>This is your workspace copy. It is not live yet.</span>
+        <span>This is your workspace copy. Deploy or update the gysm.io link to put changes live.</span>
         {canDeploy ? (
           <button type="button" className="gb-primary" onClick={onDeploy}>
             Deploy this site

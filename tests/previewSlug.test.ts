@@ -61,7 +61,7 @@ describe("setPreviewSlug / projectIdForSlug", () => {
   });
   it("makes a name from the project and skips taken ones", async () => {
     (sql as any).mockResolvedValueOnce([{ preview_slug: null }]).mockRejectedValueOnce(taken).mockResolvedValueOnce([]);
-    expect(await setPreviewSlug({ id: "i", userId: "u", fallbackFrom: "Heartline" })).toEqual({ slug: "heartline-2" });
+    expect(await setPreviewSlug({ id: "i", userId: "u", fallbackFrom: "Heartline" })).toEqual({ slug: "heartline-2", created: true });
   });
   it("reports a taken or invalid asked-for name", async () => {
     (sql as any).mockResolvedValueOnce([{ preview_slug: null }]).mockRejectedValueOnce(taken);
@@ -73,7 +73,7 @@ describe("setPreviewSlug / projectIdForSlug", () => {
   });
   it("saves a free asked-for name", async () => {
     (sql as any).mockResolvedValueOnce([{ preview_slug: null }]).mockResolvedValueOnce([]);
-    expect(await setPreviewSlug({ id: "i", userId: "u", wanted: "My Site", fallbackFrom: "x" })).toEqual({ slug: "my-site", previous: null });
+    expect(await setPreviewSlug({ id: "i", userId: "u", wanted: "My Site", fallbackFrom: "x" })).toEqual({ slug: "my-site", previous: null, created: true });
   });
   it("falls back to no name when migration 0035 is missing", async () => {
     (sql as any).mockRejectedValueOnce(missing);

@@ -159,7 +159,8 @@ describe("sanitizeHistory", () => {
 
 describe("describeCall", () => {
   it("summarises calls", () => {
-    expect(describeCall("deploy", { project: "x" })).toMatch(/Deploy project "x"/);
+    expect(describeCall("deploy", { project: "x" })).toMatch(/Publish "x" live on gysm.io/);
+    expect(describeCall("deploy", { project: "x", folder: "dist", name: "cool" })).toMatch(/Publish "x\/dist" live on gysm.io as cool.gysm.io/);
     expect(describeCall("write_file", { path: "a", content: "abc" })).toMatch(/Write a \(3 chars\)/);
   });
 });

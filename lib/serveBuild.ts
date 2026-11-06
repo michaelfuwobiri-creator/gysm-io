@@ -1,13 +1,13 @@
 import { sql } from "@/lib/db";
 import { injectAiGeneratedMeta } from "@/lib/aiDisclosure";
-import { ENTRY_PATH, contentTypeFor, normalizePath } from "@/lib/projectFilesCore";
+import { ENTRY_PATH, hostedContentType, isBinaryHostedPath, normalizeHostedPath } from "@/lib/projectFilesCore";
 import { getProjectFile } from "@/lib/projectFiles";
 
 // Shared by /a/<id>/... and /s/<name>/...: answers with one file of a build.
 export async function serveBuildFile(projectId: string, pathParts: string[] | undefined, opts: { sandbox: boolean }): Promise<Response> {
   const notFound = () => new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   const requested = pathParts && pathParts.length ? pathParts.join("/") : ENTRY_PATH;
-  const path = normalizePath(requested);
+  const path = normalizeHostedPath(requested);
   if (!path) return notFound();
 
   let file;
@@ -24,9 +24,13 @@ export async function serveBuildFile(projectId: string, pathParts: string[] | un
     sql`update projects set views = views + 1 where id = ${projectId}`.catch(() => {});
   }
 
-  const body = path.endsWith(".html") ? injectAiGeneratedMeta(file.content) : file.content;
+  const body: BodyInit = isBinaryHostedPath(path)
+    ? new Uint8Array(Buffer.from(file.content, "base64"))
+    : path.endsWith(".html") || path.endsWith(".htm")
+      ? injectAiGeneratedMeta(file.content)
+      : file.content;
   const headers: Record<string, string> = {
-    "Content-Type": contentTypeFor(path),
+    "Content-Type": hostedContentType(path),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Cache-Control": "public, max-age=0, must-revalidate",

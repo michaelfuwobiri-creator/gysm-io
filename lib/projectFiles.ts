@@ -83,9 +83,27 @@ export async function replaceProjectFiles(projectId: string, files: ProjectFile[
   await sql`update projects set html = ${entry.content} where id = ${projectId}`;
   if (!ready) return; // single-file save before the migration: nothing else to store
   await sql`delete from project_files where project_id = ${projectId}`;
+  // Insert in batches of up to ~3 MB per query (hosted sites can carry images).
+  let paths: string[] = [];
+  let contents: string[] = [];
+  let size = 0;
+  const flush = async () => {
+    if (!paths.length) return;
+    await sql`
+      insert into project_files (project_id, path, content)
+      select ${projectId}::uuid, p, c from unnest(${paths}::text[], ${contents}::text[]) as t(p, c)
+    `;
+    paths = [];
+    contents = [];
+    size = 0;
+  };
   for (const f of extras) {
-    await sql`insert into project_files (project_id, path, content) values (${projectId}, ${f.path}, ${f.content})`;
+    if (size > 0 && size + f.content.length > 3_000_000) await flush();
+    paths.push(f.path);
+    contents.push(f.content);
+    size += f.content.length;
   }
+  await flush();
 }
 
 /** Copy-on-write for a new version: the new row starts with the old row's files. */

@@ -198,3 +198,67 @@ export function sameFileSet(a: ProjectFile[], b: ProjectFile[]): boolean {
   const map = new Map(a.map((f) => [f.path, f.content.trim()]));
   return b.every((f) => map.get(f.path) === f.content.trim());
 }
+
+// ---- Hosted sites (Agent publishes to <name>.gysm.io) -----------------------
+// Agent sites can also carry images and fonts. Binary files are stored as
+// base64 text in project_files.content and decoded when served; which files
+// are binary is decided by extension alone.
+
+export const HOSTED_MAX_FILES = 150;
+export const HOSTED_MAX_FILE_BYTES = 2_000_000;
+export const HOSTED_MAX_TOTAL_BYTES = 15_000_000;
+
+const BINARY_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  avif: "image/avif",
+  ico: "image/x-icon",
+  woff: "font/woff",
+  woff2: "font/woff2",
+  ttf: "font/ttf",
+  otf: "font/otf",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  pdf: "application/pdf",
+};
+
+const EXTRA_TEXT_TYPES: Record<string, string> = {
+  htm: "text/html; charset=utf-8",
+  mjs: "text/javascript; charset=utf-8",
+  xml: "application/xml; charset=utf-8",
+  webmanifest: "application/manifest+json; charset=utf-8",
+  map: "application/json; charset=utf-8",
+};
+
+function extOf(path: string): string {
+  return path.split(".").pop()?.toLowerCase() ?? "";
+}
+
+export function isBinaryHostedPath(path: string): boolean {
+  return extOf(path) in BINARY_TYPES;
+}
+
+export function hostedContentType(path: string): string {
+  const ext = extOf(path);
+  return BINARY_TYPES[ext] ?? EXTRA_TEXT_TYPES[ext] ?? contentTypeFor(path);
+}
+
+/** Like normalizePath, but also allows the image, font and media files hosted sites may carry. */
+export function normalizeHostedPath(raw: string): string | null {
+  if (typeof raw !== "string") return null;
+  const ext = extOf(raw.trim());
+  if (ext in BINARY_TYPES || ext in EXTRA_TEXT_TYPES) {
+    // Same rules as normalizePath, minus the extension check.
+    let p = raw.trim().replace(/^\.\//, "");
+    if (!p || p.length > 120) return null;
+    if (p.startsWith("/") || p.includes("\\") || p.includes("\0")) return null;
+    if (!/^[A-Za-z0-9._\-/]+$/.test(p)) return null;
+    for (const s of p.split("/")) if (!s || s === "." || s === ".." || s.startsWith(".")) return null;
+    return p;
+  }
+  return normalizePath(raw);
+}
