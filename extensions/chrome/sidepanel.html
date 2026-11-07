@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GYSM Agent</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">G</span><strong>GYSM Agent</strong></div>
+    <div class="top-actions">
+      <button id="new-chat" class="ghost" type="button" title="Start a new chat">New chat</button>
+    </div>
+  </header>
+  <div id="tab-chip" class="tab-chip" title="The tab GYSM is working on"></div>
+  <div id="banner" class="banner" hidden></div>
+  <main id="log" class="log" aria-live="polite">
+    <div id="empty" class="empty">
+      <p class="hello">Ask me to work in your browser.</p>
+      <div class="starters">
+        <button type="button" class="chip" data-prompt="Summarize this page for me.">Summarize this page</button>
+        <button type="button" class="chip" data-prompt="Find the main call to action on this page and tell me what it does.">Find the main button</button>
+        <button type="button" class="chip" data-prompt="Fill the first form on this page with sample text, but don't submit it.">Fill a form (no submit)</button>
+        <button type="button" class="chip" data-prompt="Build me a landing page that looks like the one in this tab.">Rebuild this page on GYSM</button>
+      </div>
+      <p class="fine">I can read, click, type, scroll and open pages in your current tab. You approve every click, entry and page change. I never type passwords or card numbers.</p>
+    </div>
+  </main>
+  <div id="plan" class="plan" hidden></div>
+  <div id="chips" class="chips" hidden></div>
+  <form id="composer" class="composer" autocomplete="off">
+    <div id="shot-row" class="shot-row" hidden><img id="shot-img" alt="Screenshot to send"><button id="shot-x" type="button" class="ghost" aria-label="Remove screenshot">×</button></div>
+    <textarea id="input" rows="2" placeholder="What should I do in this tab?" aria-label="Message"></textarea>
+    <div class="row">
+      <button id="shot" type="button" class="ghost" title="Send a screenshot of this tab with your message">Screenshot</button>
+      <span class="grow"></span>
+      <button id="stop" type="button" class="stop" hidden>Stop</button>
+      <button id="send" type="submit" class="send">Send</button>
+    </div>
+  </form>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
