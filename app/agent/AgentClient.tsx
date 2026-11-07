@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import GysmMark from "./GysmMark";
 import PreviewPanel from "./PreviewPanel";
 import Markdown from "./Markdown";
+import ConnectCard from "./ConnectCard";
+import { AUTONOMY_SCOPES, SCOPE_LABEL, type AutonomyScope } from "@/lib/agentAutonomy";
 import { archiveChat, parseChats, removeChat, serializeChats, type SavedChat } from "@/lib/agentChats";
 import { itemsBefore, messagesBeforeUser, userItemBefore, userPositionFromEnd } from "@/lib/agentHistory";
 import "./builder.css";
@@ -33,10 +35,15 @@ type Item =
       resolved?: "approved" | "declined";
     }
   | { id: string; kind: "note"; text: string; tone?: "error" | "muted" }
+  /** The agent asks to work on its own; the user picks what it may do. */
+  | { id: string; kind: "autonomy"; goal: string; scopes: AutonomyScope[]; maxSteps: number; resolved?: "allowed" | "refused" }
+  /** Connect a Supabase database (the user approves on Supabase themselves). */
+  | { id: string; kind: "connect"; project: string; projectId: string; stage: "connect" | "pick" | "done" }
   /** A file the agent made for the user. `data` (base64) is kept in memory only, never saved. */
   | { id: string; kind: "file"; name: string; mime: string; data?: string };
 
 type Saved = { items: Item[]; messages: unknown[] };
+type Grant = { scopes: AutonomyScope[]; maxSteps: number; used: number };
 
 const PINK = "#FF0080";
 const MAX_SAVED_ITEMS = 150;
@@ -233,6 +240,15 @@ export default function AgentClient({
   const sendRef = useRef<(b: any) => Promise<void>>(async () => {});
   const abortRef = useRef<AbortController | null>(null);
   const stoppedRef = useRef(false);
+  // Autonomous mode: only ever set by the user pressing Allow on a card. In memory
+  // only, so a reload or a new chat ends it.
+  const [grant, setGrant] = useState<Grant | null>(null);
+  const grantRef = useRef<Grant | null>(null);
+  const pauseRef = useRef(false);
+  const updateGrant = (g: Grant | null) => {
+    grantRef.current = g;
+    setGrant(g);
+  };
 
   useEffect(() => setFolderSupported(folderAccessSupported()), []);
 
@@ -375,7 +391,7 @@ export default function AgentClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: ctrl.signal,
-          body: JSON.stringify({ ...body, messages: messagesRef.current, localFolder: folderRef.current ? folderRef.current.name : undefined }),
+          body: JSON.stringify({ ...body, messages: messagesRef.current, localFolder: folderRef.current ? folderRef.current.name : undefined, autonomy: grantRef.current && grantRef.current.used < grantRef.current.maxSteps ? grantRef.current : undefined }),
         });
         if (!res.ok || !res.body) {
           const j = await res.json().catch(() => ({}));
@@ -408,6 +424,15 @@ export default function AgentClient({
           } else if (e.type === "plan") setPlan(Array.isArray(e.steps) ? e.steps : []);
           else if (e.type === "question") setQuestion({ question: String(e.question ?? ""), options: Array.isArray(e.options) ? e.options.map(String) : [] });
           else if (e.type === "file") push({ id: uid(), kind: "file", name: String(e.name), mime: String(e.mime), data: String(e.data) });
+          else if (e.type === "autonomy_request")
+            push({ id: uid(), kind: "autonomy", goal: String(e.goal ?? ""), scopes: (Array.isArray(e.scopes) ? e.scopes : []).filter((x: string) => x !== "browser"), maxSteps: Number(e.maxSteps) || 40 });
+          else if (e.type === "autonomy") {
+            const g = grantRef.current;
+            if (g) {
+              updateGrant(e.exhausted ? null : { ...g, used: Math.max(g.used, Number(e.used) || 0) });
+              if (e.pause) pauseRef.current = true;
+            }
+          } else if (e.type === "connect") push({ id: uid(), kind: "connect", project: String(e.project ?? ""), projectId: String(e.projectId ?? ""), stage: "connect" });
           else if (e.type === "suggestions") setSuggestions(Array.isArray(e.suggestions) ? e.suggestions : []);
           else if (e.type === "declined") push({ id: uid(), kind: "note", text: `Declined: ${TOOL_LABEL[e.name] || e.name}`, tone: "muted" });
           else if (e.type === "credits") {
@@ -437,6 +462,11 @@ export default function AgentClient({
         // The agent asked for something on the user's computer: run it here
         // (reads) or ask first (writes), then continue the same turn.
         if (clientCall && !stoppedRef.current) await runClientCallRef.current(clientCall);
+        // A long autonomous job continues in a fresh request.
+        if (pauseRef.current && !stoppedRef.current && grantRef.current) {
+          pauseRef.current = false;
+          await sendRef.current({ text: "Continue where you left off." });
+        }
       } catch {
         if (ctrl.signal.aborted || stoppedRef.current) {
           // Pressed Stop: the history the browser holds is still the last
@@ -480,6 +510,9 @@ export default function AgentClient({
 
   const stop = useCallback(() => {
     stoppedRef.current = true;
+    pauseRef.current = false;
+    grantRef.current = null;
+    setGrant(null);
     abortRef.current?.abort();
   }, []);
 
@@ -598,10 +631,42 @@ export default function AgentClient({
     void send({ text: v, ...(files.length ? { attachments: files } : {}) });
   };
 
+  const answerAutonomy = (item: Extract<Item, { kind: "autonomy" }>, allow: boolean, scopes: AutonomyScope[], maxSteps: number) => {
+    if (busy) return;
+    setItems((prev) => prev.map((i) => (i.id === item.id && i.kind === "autonomy" ? { ...i, resolved: allow ? "allowed" : "refused" } : i)));
+    if (allow) {
+      updateGrant({ scopes, maxSteps, used: 0 });
+      void send({ text: "Autonomous mode is on. Go ahead." });
+    } else {
+      void send({ text: "No, ask me before each step." });
+    }
+  };
+
+  const setConnectStage = (id: string, stage: "connect" | "pick" | "done") => setItems((prev) => prev.map((i) => (i.id === id && i.kind === "connect" ? { ...i, stage } : i)));
+
+  // Back from Supabase: show the project picker (or what went wrong).
+  const backendRef = useRef(false);
+  useEffect(() => {
+    if (backendRef.current) return;
+    backendRef.current = true;
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const pid = q.get("projectId");
+      const err = q.get("backendError");
+      if (!q.get("backendPick") && !err) return;
+      window.history.replaceState(null, "", "/agent");
+      if (err) push({ id: uid(), kind: "note", text: err, tone: "error" });
+      else if (pid) push({ id: uid(), kind: "connect", project: "", projectId: pid, stage: "pick" });
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const decideLocal = async (item: Extract<Item, { kind: "proposal" }>, approve: boolean) => {
     const call = pendingLocalRef.current[item.callId];
     delete pendingLocalRef.current[item.callId];
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
+    setItems((prev) => prev.map((i) => (i.id === item.id && i.kind === "proposal" ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
     if (!call || !folderRef.current) {
       void send({ clientResult: { toolCallId: item.callId, ok: false, output: "The folder is no longer connected." } });
       return;
@@ -623,7 +688,7 @@ export default function AgentClient({
     }
     const secret = item.secretLabel ? secrets[item.id] : undefined;
     if (approve && item.secretLabel && !secret?.trim()) return;
-    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
+    setItems((prev) => prev.map((i) => (i.id === item.id && i.kind === "proposal" ? { ...i, resolved: approve ? "approved" : "declined" } : i)));
     setSecrets((prev) => {
       const { [item.id]: _drop, ...rest } = prev;
       return rest;
@@ -692,6 +757,7 @@ export default function AgentClient({
     // Keep the conversation we are leaving so it can be restored later.
     saveChats(archiveChat(chats, chatIdRef.current, items, messages, Date.now()));
     chatIdRef.current = `chat-${Date.now().toString(36)}`;
+    updateGrant(null);
     setItems([]);
     setMessages([]);
     setEditing(null);
@@ -751,6 +817,16 @@ export default function AgentClient({
               ))}
             </ul>
           )}
+        </div>
+      )}
+      {grant && (
+        <div className="gb-auto-bar" role="status">
+          <span>
+            Working on its own · {grant.used}/{grant.maxSteps} steps · {grant.scopes.map((s) => (s === "publish" ? "publish" : "database")).join(" + ")}
+          </span>
+          <button type="button" className="gb-ghost" onClick={busy ? stop : () => updateGrant(null)} title={busy ? "Stop now and turn autonomous mode off" : "Turn autonomous mode off"}>
+            {busy ? "Stop" : "Pause"}
+          </button>
         </div>
       )}
       <form
@@ -1055,6 +1131,19 @@ export default function AgentClient({
                       )}
                     </div>
                   );
+                if (item.kind === "autonomy")
+                  return <AutonomyCard key={item.id} item={item} busy={busy} onAnswer={(allow, scopes, steps) => answerAutonomy(item, allow, scopes, steps)} />;
+                if (item.kind === "connect")
+                  return (
+                    <ConnectCard
+                      key={item.id}
+                      projectId={item.projectId}
+                      project={item.project}
+                      stage={item.stage}
+                      onStage={(st) => setConnectStage(item.id, st)}
+                      onLinked={() => void send({ text: "My Supabase database is connected. Check it with database_status and continue." })}
+                    />
+                  );
                 if (item.kind === "proposal")
                   return (
                     <div key={item.id} className="gb-approve">
@@ -1119,6 +1208,9 @@ export default function AgentClient({
                 <div className="gb-status" role="status" aria-live="polite">
                   <GysmMark size={22} working />
                   <span className="gb-shimmer">{activity || "Thinking…"}</span>
+                  <button type="button" className="gb-stop-btn" onClick={stop} title="Stop now (Esc)">
+                    Stop
+                  </button>
                 </div>
               )}
 
@@ -1167,6 +1259,64 @@ export default function AgentClient({
           onDeploy={() => submit(`Deploy ${lastProject} now`)}
           onClose={() => setPreviewOpen(false)}
         />
+      )}
+    </div>
+  );
+}
+
+
+function AutonomyCard({
+  item,
+  busy,
+  onAnswer,
+}: {
+  item: Extract<Item, { kind: "autonomy" }>;
+  busy: boolean;
+  onAnswer: (allow: boolean, scopes: AutonomyScope[], maxSteps: number) => void;
+}) {
+  const offered = (item.scopes.length ? item.scopes : AUTONOMY_SCOPES.filter((x) => x !== "browser")) as AutonomyScope[];
+  const [picked, setPicked] = useState<AutonomyScope[]>(offered);
+  const [steps, setSteps] = useState(String([10, 25, 50, 100].find((n) => n >= item.maxSteps) ?? 100));
+  return (
+    <div className="gb-approve" role="group" aria-label="Permission to work on its own">
+      <div className="gb-eyebrow">Needs your permission</div>
+      <h3>Let GYSM work on its own?</h3>
+      {item.goal && <p className="gb-card-note">{item.goal}</p>}
+      <div className="gb-card-note">It will only do what you tick, and it stops for anything involving secrets, deleting, or risky commands.</div>
+      {offered.map((sc) => (
+        <label key={sc} className="gb-check">
+          <input
+            type="checkbox"
+            disabled={!!item.resolved}
+            checked={picked.includes(sc)}
+            onChange={(e) => setPicked((p) => (e.target.checked ? [...p, sc] : p.filter((x) => x !== sc)))}
+          />
+          <span>{SCOPE_LABEL[sc]}</span>
+        </label>
+      ))}
+      {item.resolved ? (
+        <div className="gb-resolved">{item.resolved === "allowed" ? "Allowed" : "Not now"}</div>
+      ) : (
+        <>
+          <label className="gb-check">
+            <span>Step limit</span>
+            <select value={steps} onChange={(e) => setSteps(e.target.value)}>
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>
+                  Up to {n} steps
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="gb-btns">
+            <button className="gb-primary" disabled={busy || picked.length === 0} onClick={() => onAnswer(true, picked, Number(steps))}>
+              Allow
+            </button>
+            <button className="gb-secondary" disabled={busy} onClick={() => onAnswer(false, [], 0)}>
+              Not now
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

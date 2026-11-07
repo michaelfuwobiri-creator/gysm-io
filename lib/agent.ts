@@ -30,7 +30,8 @@ import {
   type ChatMessage,
 } from "@/lib/agentCore";
 import { MEDIA_CREDIT_COST } from "@/lib/mediaCreditsConstants";
-import { executeTool, saveAttachments } from "@/lib/agentTools";
+import { executeTool, prepareConnect, saveAttachments } from "@/lib/agentTools";
+import { autoApproves, cleanRequestedScopes, cleanRequestedSteps, remainingSteps, type Autonomy, type AutonomyScope } from "@/lib/agentAutonomy";
 import { pdfToText } from "@/lib/agentPdf";
 import { attachmentNote, contentWithImages, type CleanAttachment } from "@/lib/agentAttachCore";
 import { cleanPlan, cleanQuestion, cleanSuggestions, type AgentQuestion, type PlanStep, type Suggestion } from "@/lib/agentGuards";
@@ -49,6 +50,12 @@ export type AgentEvent =
   // A local_* tool the browser must run against the user's connected folder.
   | { type: "client_tool"; toolCallId: string; name: string; args: any; summary: string; write: boolean }
   | { type: "suggestions"; suggestions: Suggestion[] }
+  // The agent asks to work on its own; the user's answer comes back as `autonomy` on the next request.
+  | { type: "autonomy_request"; goal: string; scopes: AutonomyScope[]; maxSteps: number }
+  // Where the autonomous budget stands. `pause` means this request ran long: the browser should continue.
+  | { type: "autonomy"; used: number; max: number; pause?: boolean; exhausted?: boolean }
+  // A service the user has to connect themselves (they approve on the provider's own page).
+  | { type: "connect"; service: "supabase"; project: string; projectId: string }
   | { type: "plan"; steps: PlanStep[] }
   | { type: "file"; name: string; mime: string; data: string }
   | ({ type: "question" } & AgentQuestion)
@@ -81,6 +88,8 @@ export async function runAgentTurn(opts: {
   history: ChatMessage[];
   userText?: string;
   decision?: { toolCallId: string; approve: boolean; secret?: string };
+  /** The user's explicit grant to work without asking for publish / database steps (validated by the route). */
+  autonomy?: Autonomy | null;
   /** True when the request comes from the GYSM Chrome extension (browser_* tools are offered). */
   browser?: boolean;
   /** Name of the folder the user connected in their browser, if any. */
@@ -100,6 +109,10 @@ export async function runAgentTurn(opts: {
   let spent = 0;
   let balance = 0;
   let exhausted = false;
+  const startedAt = Date.now();
+  const auto: Autonomy | null = opts.autonomy ? { ...opts.autonomy } : null;
+  // A long autonomous job continues in a new request before the host's time limit.
+  const AUTONOMY_SLICE_MS = 170_000;
 
   const charge = async (credits: number) => {
     if (credits <= 0) return;
@@ -185,6 +198,10 @@ export async function runAgentTurn(opts: {
     for (let step = 0; step < MAX_STEPS_PER_TURN; step++) {
       // Stop pressed: don't start another model call or tool run.
       if (opts.signal?.aborted) break;
+      if (auto && Date.now() - startedAt > AUTONOMY_SLICE_MS) {
+        emit({ type: "autonomy", used: auto.used, max: auto.maxSteps, pause: true });
+        break;
+      }
       if (exhausted) {
         // Out of allowance mid-task: stop cleanly instead of running on.
         const why = await usageBlockedError(userId);
@@ -193,7 +210,7 @@ export async function runAgentTurn(opts: {
       }
       const response = await openai.chat.completions.create({
         model: AGENT_MODEL,
-        messages: [{ role: "system", content: systemPrompt(opts.localFolder, opts.memory, !!opts.browser) }, ...withImages(messages, attached)],
+        messages: [{ role: "system", content: systemPrompt(opts.localFolder, opts.memory, !!opts.browser, !!auto) }, ...withImages(messages, attached)],
         tools: agentToolsFor(!!opts.localFolder, !!opts.browser) as any,
         parallel_tool_calls: false,
         max_completion_tokens: 8000,
@@ -254,7 +271,35 @@ export async function runAgentTurn(opts: {
         break; // the browser runs it and sends the result back
       }
 
-      if (needsApproval(name, args)) {
+      // request_autonomy only asks: the user's grant arrives as `autonomy` on a later request.
+      if (name === "request_autonomy") {
+        if (auto && remainingSteps(auto) > 0) {
+          messages.push({ role: "tool", tool_call_id: call.id, content: `Autonomous mode is already on (${remainingSteps(auto)} steps left). Carry on.` });
+          continue;
+        }
+        const goal = String(args?.goal ?? "").trim().slice(0, 400);
+        if (!goal) {
+          messages.push({ role: "tool", tool_call_id: call.id, content: "Say in one or two sentences what you want to do on your own, then call request_autonomy again." });
+          continue;
+        }
+        emit({ type: "autonomy_request", goal, scopes: cleanRequestedScopes(args?.scopes), maxSteps: cleanRequestedSteps(args?.steps) });
+        messages.push({ role: "tool", tool_call_id: call.id, content: "The user was asked for permission. Stop now and wait; if they allow it, their next message says 'Autonomous mode is on'. If they refuse, carry on asking before each step." });
+        break;
+      }
+
+      // connect_service shows a Connect card; the user approves on the provider's page themselves.
+      if (name === "connect_service") {
+        const prep = await prepareConnect(userId, args);
+        messages.push({ role: "tool", tool_call_id: call.id, content: prep.output });
+        if (prep.connect) {
+          emit({ type: "connect", ...prep.connect });
+          break;
+        }
+        continue;
+      }
+
+      const grantCovers = !!auto && !isRiskyCommand(String(args?.cmd ?? ""), args?.risky === true) && autoApproves(name, auto);
+      if (needsApproval(name, args) && !grantCovers) {
         emit({
           type: "proposal",
           toolCallId: call.id,
@@ -302,6 +347,13 @@ export async function runAgentTurn(opts: {
 
       const out = await run(call.id, name, args);
       messages.push({ role: "tool", tool_call_id: call.id, content: out });
+      if (auto) {
+        auto.used = Math.min(auto.maxSteps, auto.used + 1);
+        if (auto.used >= auto.maxSteps) {
+          emit({ type: "text", text: "_I've used the step budget you allowed, so I've stopped. Say \"continue\" and allow more steps if you want me to go on._" });
+          break;
+        }
+      }
 
       if (step === MAX_STEPS_PER_TURN - 1) {
         emit({ type: "text", text: `_Paused after ${MAX_STEPS_PER_TURN} steps. Say "continue" to keep going._` });
@@ -319,6 +371,7 @@ export async function runAgentTurn(opts: {
   // Never hand the browser a history that ends on an unanswered tool result
   // loop break: the next request's sanitizeHistory repairs open calls, so
   // just return what we have.
+  if (auto) emit({ type: "autonomy", used: auto.used, max: auto.maxSteps, exhausted: auto.used >= auto.maxSteps });
   emit({ type: "credits", spent, balance });
   emit({ type: "state", messages });
 }

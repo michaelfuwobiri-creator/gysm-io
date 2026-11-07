@@ -5,7 +5,7 @@ vi.mock("openai", () => ({ default: class { chat = { completions: { create } }; 
 vi.mock("@/lib/credits", () => ({ chargeCredits: vi.fn(async () => 900) }));
 vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
 vi.mock("@/lib/agentPdf", () => ({ pdfToText: vi.fn(async () => ({ ok: true, text: "Croissant 3 EUR", pages: 1, cut: false })) }));
-vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn(), saveAttachments: vi.fn(async () => null) }));
+vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn(), saveAttachments: vi.fn(async () => null), prepareConnect: vi.fn() }));
 
 import { runAgentTurn } from "@/lib/agent";
 import { executeTool, saveAttachments } from "@/lib/agentTools";
@@ -336,5 +336,76 @@ describe("local folder tools", () => {
     await runAgentTurn({ userId: "u", history: h2, clientResult: { toolCallId: "d1", ok: true, output: "deployed!" }, emit: () => {} });
     expect(executeTool).not.toHaveBeenCalled();
     expect(JSON.stringify(create.mock.calls[0][0].messages)).not.toContain("deployed!");
+  });
+});
+
+describe("autonomous mode and connecting", () => {
+  const grant = { scopes: ["database", "publish"] as ("database" | "publish")[], maxSteps: 10, used: 0 };
+
+  it("asks permission with request_autonomy and ends the turn", async () => {
+    create.mockResolvedValueOnce(reply({ content: "This needs a few approvals.", tool_calls: [toolCall("r1", "request_autonomy", { goal: "Build the app, add tables, publish it", scopes: ["database", "publish", "bogus"], steps: 500 })] }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "build a dating app", emit: (e) => events.push(e) });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(events.find((e) => e.type === "autonomy_request")).toEqual({ type: "autonomy_request", goal: "Build the app, add tables, publish it", scopes: ["database", "publish"], maxSteps: 120 });
+    expect(events.some((e) => e.type === "autonomy")).toBe(false);
+  });
+
+  it("without a grant, publishing and database changes still wait for the user", async () => {
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("d1", "deploy", { project: "site" })] }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", emit: (e) => events.push(e) });
+    expect(events.find((e) => e.type === "proposal")?.name).toBe("deploy");
+    expect(executeTool).not.toHaveBeenCalled();
+  });
+
+  it("with a grant, covered steps run without asking and use up the budget", async () => {
+    create
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("t1", "create_db_table", { sql: "create table profiles (id uuid primary key)" })] }))
+      .mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("t2", "deploy", { project: "site" })] }))
+      .mockResolvedValueOnce(reply({ content: "All done." }));
+    (executeTool as any).mockResolvedValue({ ok: true, output: "ok" });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", autonomy: grant, emit: (e) => events.push(e) });
+    expect(events.some((e) => e.type === "proposal")).toBe(false);
+    expect((executeTool as any).mock.calls.map((c: any[]) => c[1])).toEqual(["create_db_table", "deploy"]);
+    expect(events.filter((e) => e.type === "autonomy").pop()).toEqual({ type: "autonomy", used: 2, max: 10, exhausted: false });
+    expect(create.mock.calls[0][0].messages[0].content).toMatch(/AUTONOMOUS MODE IS ON/);
+  });
+
+  it("a grant for one scope does not cover the other", async () => {
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("d1", "deploy", { project: "site" })] }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", autonomy: { ...grant, scopes: ["database"] }, emit: (e) => events.push(e) });
+    expect(events.find((e) => e.type === "proposal")?.name).toBe("deploy");
+  });
+
+  it("risky commands still ask under a grant", async () => {
+    create.mockResolvedValueOnce(reply({ content: null, tool_calls: [toolCall("c1", "run_command", { cmd: "rm -rf site", risky: true })] }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", autonomy: grant, emit: (e) => events.push(e) });
+    expect(events.find((e) => e.type === "proposal")?.name).toBe("run_command");
+    expect(executeTool).not.toHaveBeenCalled();
+  });
+
+  it("stops when the step budget is used up", async () => {
+    create.mockResolvedValue(reply({ content: null, tool_calls: [toolCall("t1", "deploy", { project: "site" })] }));
+    (executeTool as any).mockResolvedValue({ ok: true, output: "ok" });
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "go", autonomy: { ...grant, maxSteps: 5, used: 3 }, emit: (e) => events.push(e) });
+    expect((executeTool as any).mock.calls.length).toBe(2);
+    expect(events.some((e) => e.type === "text" && /step budget/.test(e.text))).toBe(true);
+    expect(events.filter((e) => e.type === "autonomy").pop()).toMatchObject({ used: 5, max: 5, exhausted: true });
+  });
+
+  it("shows a Connect card for connect_service and ends the turn", async () => {
+    const tools = await import("@/lib/agentTools");
+    (tools as any).prepareConnect = vi.fn(async () => ({ ok: true, output: "card shown", connect: { service: "supabase", project: "dating", projectId: "p1" } }));
+    create.mockResolvedValueOnce(reply({ content: "Let's connect.", tool_calls: [toolCall("k1", "connect_service", { service: "supabase", project: "dating" })] }));
+    const events: any[] = [];
+    await runAgentTurn({ userId: "u", history: [], userText: "add sign in", emit: (e) => events.push(e) });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(events.find((e) => e.type === "connect")).toEqual({ type: "connect", service: "supabase", project: "dating", projectId: "p1" });
   });
 });

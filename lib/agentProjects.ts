@@ -17,6 +17,33 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
+/** The GYSM project row for an agent folder, or null when there is none yet. */
+export async function findAgentProjectId(userId: string, project: string): Promise<string | null> {
+  try {
+    const rows = (await sql`select id from projects where user_id = ${userId} and prompt = ${agentProjectMarker(project)} and root_project_id is null limit 1`) as any[];
+    return rows[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Same, creating a small placeholder row first when the folder was never saved as a project (a database needs a project to belong to). */
+export async function ensureAgentProjectId(userId: string, project: string): Promise<string | null> {
+  const found = await findAgentProjectId(userId, project);
+  if (found) return found;
+  try {
+    const html = buildProjectHtml(null, project, "https://www.gysm.io");
+    const rows = (await sql`
+      insert into projects (user_id, prompt, html, name, is_template)
+      values (${userId}, ${agentProjectMarker(project)}, ${html}, ${project}, false) returning id
+    `) as any[];
+    return rows[0]?.id ?? null;
+  } catch (e: any) {
+    console.error("[agent] couldn't create a project for the database:", e?.message || e);
+    return null;
+  }
+}
+
 /** The html stored on the project row: the site's own index.html, or a small link page. */
 export function buildProjectHtml(indexHtml: string | null, project: string, url: string): string {
   if (indexHtml && indexHtml.trim() && Buffer.byteLength(indexHtml, "utf8") <= MAX_PROJECT_HTML_BYTES) return indexHtml;

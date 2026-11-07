@@ -31,6 +31,9 @@ export type ToolName =
   | "send_file"
   | "remember"
   | "forget"
+  | "request_autonomy"
+  | "connect_service"
+  | "database_status"
   | "local_list"
   | "local_read"
   | "local_write"
@@ -373,6 +376,47 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "request_autonomy",
+      description:
+        "Ask the user's permission to work on your own for a bigger job, without stopping at each publish or database change. Shows the user a card (what you want to do, what you may do, how many steps); the turn ends and they allow or refuse it. Use it once, up front, when a goal needs several approvals (for example 'build the app, add its database tables, publish it'). Never assume it was granted: if it is, the next message says 'Autonomous mode is on'. Even then you must never handle secrets, delete data or run risky commands without asking.",
+      parameters: {
+        type: "object",
+        properties: {
+          goal: { type: "string", description: "One or two sentences: what you will do on your own, in plain words." },
+          scopes: { type: "array", items: { type: "string", enum: ["database", "publish", "browser"] }, description: "What you want to do without asking: database = add tables/security rules to the connected database; publish = deploy sites to gysm.io; browser = click, type and open pages in the user's tabs (Chrome extension only)." },
+          steps: { type: "integer", description: "How many steps you expect to need (5-120). Default 40." },
+        },
+        required: ["goal"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "connect_service",
+      description:
+        "Start connecting the user's Supabase account to one of their projects so you get a real database and sign-in for it. The user must approve on Supabase themselves: this shows them a Connect card and ends the turn. After they connect and pick a project, the next message tells you. Call database_status first; do not call this if it is already connected.",
+      parameters: {
+        type: "object",
+        properties: {
+          service: { type: "string", enum: ["supabase"] },
+          project: { type: "string", description: "Project folder this database is for." },
+        },
+        required: ["service", "project"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "database_status",
+      description: "Check whether a project folder has a connected Supabase database. Returns the status and, when active, the public project URL, the public anon key and the GYSM project_id to pass to list_tables, query_db and create_db_table. Never returns private keys.",
+      parameters: { type: "object", properties: { project: { type: "string", description: "Project folder name." } }, required: ["project"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suggest_next",
       description: "Show the user 2-4 clickable next-step suggestions. Call it LAST, after you have written your summary in the same message. Each suggestion has a short title and the exact instruction you would carry out if the user clicks it. Suggestions only propose work; nothing happens until the user clicks.",
       parameters: {
@@ -641,8 +685,14 @@ export function checkLocalCall(name: string, args: any): string | null {
 
 export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "set_env"];
 
-export function systemPrompt(localFolder?: string | null, memory?: string, browser = false): string {
-  return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "");
+export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
+  return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
+}
+
+function autonomousPrompt(): string {
+  return `
+
+AUTONOMOUS MODE IS ON. The user explicitly allowed you to work on your own for this job, within the limits they set. That covers only the things named in the grant (publishing sites and/or adding database tables and security rules): those no longer wait for approval, so be extra careful and check your work before you publish or change a schema. Keep going until the goal is done, then summarise. You still never handle secrets, delete data, run risky commands or touch the user's computer or tabs without asking, and if something goes wrong or the job changes shape, stop and ask. In the browser (Chrome extension), if the grant includes it, you may click, type and open pages without asking on the sites the user allowed, but the extension still stops for anything that buys, pays, sends, posts, deletes or signs out, and never fills passwords or card fields; do not try to get around that. When the step budget runs out you must stop.`;
 }
 
 function localFolderPrompt(folder: string): string {
@@ -671,6 +721,7 @@ How you work:
 - Use generate_image sparingly for real pictures a site needs (hero, banner, product); if the user attached their own images, use those first. Prefer CSS, gradients and SVG for decoration.
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
+- If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then build with list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -959,6 +1010,12 @@ export function describeCall(tool: string, args: any): string {
       return `Remember: ${String(args?.text ?? "").slice(0, 100)}`;
     case "forget":
       return `Forget memory ${String(args?.id ?? "?")}`;
+    case "request_autonomy":
+      return `Ask to work on its own: ${String(args?.goal ?? "").slice(0, 120)}`;
+    case "connect_service":
+      return `Connect ${String(args?.service ?? "Supabase")} for ${String(args?.project ?? "your project")}`;
+    case "database_status":
+      return `Check the database for ${String(args?.project ?? "your project")}`;
     case "browser_tabs":
       return `List your open tabs`;
     case "browser_read":

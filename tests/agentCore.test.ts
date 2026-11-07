@@ -19,7 +19,7 @@ describe("tool schemas", () => {
     expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual([
       "write_file", "read_file", "run_command", "deploy", "create_db_table", "get_logs",
       "edit_file", "list_dir", "search", "query_db", "list_tables", "set_env", "web_search", "fetch_url",
-      "review_site", "update_plan", "ask_user", "generate_image", "read_pdf", "send_file", "remember", "forget", "suggest_next",
+      "review_site", "update_plan", "ask_user", "generate_image", "read_pdf", "send_file", "remember", "forget", "request_autonomy", "connect_service", "database_status", "suggest_next",
     ]);
   });
   it("never names an underlying model in the persona", () => {

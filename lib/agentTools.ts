@@ -5,7 +5,8 @@ import https from "https";
 import { sql } from "@/lib/db";
 import { PUBLISH_READ_LIMITS, publishAgentSite } from "@/lib/agentPublish";
 import { getConnection, getValidAccessToken, type ConnectedBackend } from "@/lib/backendStore";
-import { runSql } from "@/lib/supabaseBackend";
+import { isBackendConnectConfigured, runSql } from "@/lib/supabaseBackend";
+import { ensureAgentProjectId, findAgentProjectId } from "@/lib/agentProjects";
 import { getUserSandbox, runInSandbox } from "@/lib/shell/sandbox";
 import { AGENT_DEPLOYS_PER_DAY } from "@/lib/credits-constants";
 import {
@@ -248,6 +249,46 @@ export async function toolCreateDbTable(userId: string, args: any): Promise<Tool
   } catch (e: any) {
     return { ok: false, creditsKind: "db", output: `Database error: ${String(e?.message || e).slice(0, 800)}` };
   }
+}
+
+// -- database_status / connect_service ------------------------------------
+
+export async function toolDatabaseStatus(userId: string, args: any): Promise<ToolResult> {
+  const project = cleanProjectName(args?.project);
+  if (!project) return { ok: false, output: "Invalid project name." };
+  const projectId = await findAgentProjectId(userId, project);
+  const conn = projectId ? await getConnection(projectId, userId) : null;
+  if (!projectId || !conn || conn.status === "disconnected") {
+    return { ok: true, creditsKind: "light", output: `No database is connected to "${project}". ${isBackendConnectConfigured() ? "Call connect_service to let the user connect Supabase." : "Connecting databases isn't set up on this GYSM instance."}` };
+  }
+  if (conn.status === "active") {
+    return {
+      ok: true,
+      creditsKind: "light",
+      output: `Connected (active). project_id: ${projectId}\nPublic project URL: ${conn.api_url}\nPublic anon key (safe for site files): ${conn.anon_key}\nUse project_id with list_tables, query_db and create_db_table. Turn on row level security for every table you create.`,
+    };
+  }
+  if (conn.status === "error") return { ok: true, creditsKind: "light", output: `The connection failed: ${conn.error_message || "unknown error"}. The user can try connecting again (connect_service).` };
+  return { ok: true, creditsKind: "light", output: `Connection is ${conn.status}. ${conn.status === "provisioning" ? "Supabase is still setting the project up (about 2 minutes); check again shortly." : "The user hasn't finished choosing a Supabase project yet."}` };
+}
+
+export type ConnectPrep = { ok: boolean; output: string; connect?: { service: "supabase"; project: string; projectId: string } };
+
+/** Checks a connect_service call. When a Connect card should be shown, `connect` is set. */
+export async function prepareConnect(userId: string, args: any): Promise<ConnectPrep> {
+  if (args?.service !== "supabase") return { ok: false, output: "Only supabase can be connected for now." };
+  const project = cleanProjectName(args?.project);
+  if (!project) return { ok: false, output: "Invalid project name." };
+  if (!isBackendConnectConfigured()) return { ok: false, output: "Connecting databases isn't set up on this GYSM instance yet. Tell the user." };
+  const projectId = await ensureAgentProjectId(userId, project);
+  if (!projectId) return { ok: false, output: "Couldn't prepare the project for a database. Try again." };
+  const conn = await getConnection(projectId, userId);
+  if (conn?.status === "active") return { ok: true, output: `Already connected. project_id: ${projectId}. Call database_status for the details.` };
+  return {
+    ok: true,
+    output: "A Connect card was shown to the user (they approve on Supabase themselves). Stop now and wait; their next message says when it is connected.",
+    connect: { service: "supabase", project, projectId },
+  };
 }
 
 // -- get_logs --------------------------------------------------------------
@@ -664,6 +705,9 @@ export async function executeTool(userId: string, name: string, args: any, secre
         break;
       case "forget":
         result = await forgetMemory(userId, args?.id);
+        break;
+      case "database_status":
+        result = await toolDatabaseStatus(userId, args);
         break;
       case "write_file":
         result = await toolWriteFile(userId, args);

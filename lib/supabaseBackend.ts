@@ -129,6 +129,12 @@ export async function listOrganizations(accessToken: string): Promise<Array<{ id
   return mgmt(accessToken, "/organizations");
 }
 
+/** The Supabase projects in the account the user just approved (name, region, status only). */
+export async function listSupabaseProjects(accessToken: string): Promise<Array<{ id?: string; ref: string; name: string; region?: string; status?: string; organization_id?: string }>> {
+  const rows = await mgmt(accessToken, "/projects");
+  return Array.isArray(rows) ? rows : [];
+}
+
 export function generateDbPassword(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
