@@ -7,6 +7,8 @@ import { PUBLISH_READ_LIMITS, publishAgentSite } from "@/lib/agentPublish";
 import { getConnection, getValidAccessToken, type ConnectedBackend } from "@/lib/backendStore";
 import { isBackendConnectConfigured, runSql } from "@/lib/supabaseBackend";
 import { ensureAgentProjectId, findAgentProjectId } from "@/lib/agentProjects";
+import { attachDomain, domainSummary, refreshDomain } from "@/lib/customDomain";
+import { cleanDomainInput, domainProblem } from "@/lib/customDomainCore";
 import { getUserSandbox, runInSandbox } from "@/lib/shell/sandbox";
 import { AGENT_DEPLOYS_PER_DAY } from "@/lib/credits-constants";
 import {
@@ -264,6 +266,45 @@ export async function toolSetupUserProfiles(userId: string, args: any): Promise<
   } catch (e: any) {
     return { ok: false, creditsKind: "db", output: `Database error: ${String(e?.message || e).slice(0, 800)}` };
   }
+}
+
+// -- connect_domain / domain_status ----------------------------------------
+
+async function publishedProjectId(userId: string, project: string): Promise<{ id?: string; error?: string }> {
+  const id = await findAgentProjectId(userId, project);
+  if (!id) return { error: `"${project}" hasn't been published yet. Call deploy first, then connect the domain.` };
+  try {
+    const rows = (await sql`select preview_slug, live_url from projects where id = ${id} and user_id = ${userId} limit 1`) as any[];
+    if (!rows[0]) return { error: `"${project}" hasn't been published yet. Call deploy first, then connect the domain.` };
+    if (!rows[0].preview_slug && !rows[0].live_url) return { error: `"${project}" hasn't been published yet. Call deploy first, then connect the domain.` };
+  } catch (e: any) {
+    if (e?.code !== "42703") throw e; // columns missing: migration not run, allow it
+  }
+  return { id };
+}
+
+export async function toolConnectDomain(userId: string, args: any): Promise<ToolResult> {
+  const project = cleanProjectName(args?.project);
+  if (!project) return { ok: false, output: "Invalid project name. Use the folder name, e.g. 'my-site'." };
+  const domain = cleanDomainInput(args?.domain);
+  const problem = domainProblem(domain);
+  if (problem) return { ok: false, output: problem };
+  const found = await publishedProjectId(userId, project);
+  if (!found.id) return { ok: false, output: found.error || "Not published." };
+  const r = await attachDomain(found.id, domain);
+  if (r.ok === false) return { ok: false, creditsKind: "light", output: r.error };
+  return { ok: true, creditsKind: "light", output: domainSummary(r.state) };
+}
+
+export async function toolDomainStatus(userId: string, args: any): Promise<ToolResult> {
+  const project = cleanProjectName(args?.project);
+  if (!project) return { ok: false, output: "Invalid project name." };
+  const id = await findAgentProjectId(userId, project);
+  if (!id) return { ok: false, output: `No published site named "${project}".` };
+  const r = await refreshDomain(id);
+  if (r.ok === false) return { ok: false, creditsKind: "light", output: r.error };
+  if (!r.state) return { ok: true, creditsKind: "light", output: `No custom domain is connected to "${project}". Call connect_domain to add one.` };
+  return { ok: true, creditsKind: "light", output: domainSummary(r.state) };
 }
 
 // -- database_status / connect_service ------------------------------------
@@ -741,6 +782,12 @@ export async function executeTool(userId: string, name: string, args: any, secre
         break;
       case "setup_user_profiles":
         result = await toolSetupUserProfiles(userId, args);
+        break;
+      case "connect_domain":
+        result = await toolConnectDomain(userId, args);
+        break;
+      case "domain_status":
+        result = await toolDomainStatus(userId, args);
         break;
       case "get_logs":
         result = await toolGetLogs(userId, args);

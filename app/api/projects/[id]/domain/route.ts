@@ -2,11 +2,7 @@ import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { addDomainToProject, getDomainStatus, removeDomainFromProject } from "@/lib/vercelDomains";
-
-// Very deliberately conservative: lowercase letters/digits/hyphens/dots
-// only, must contain at least one dot, no leading/trailing hyphen per
-// label. Good enough to reject junk before it ever reaches Vercel's API.
-const DOMAIN_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
+import { cleanDomainInput, domainProblem } from "@/lib/customDomainCore";
 
 async function loadOwnedProject(id: string, userId: string, orgId: string | null) {
   const rows = await sql`
@@ -27,10 +23,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!project) return Response.json({ error: "Build not found." }, { status: 404 });
 
     const body = await req.json().catch(() => ({}));
-    const domain = typeof body?.domain === "string" ? body.domain.trim().toLowerCase() : "";
-    if (!DOMAIN_RE.test(domain)) {
-      return Response.json({ error: "Enter a valid domain, e.g. myapp.com or app.mydomain.com." }, { status: 400 });
-    }
+    const domain = cleanDomainInput(body?.domain);
+    const problem = domainProblem(domain);
+    if (problem) return Response.json({ error: problem }, { status: 400 });
 
     const existing = await sql`select id from projects where custom_domain = ${domain} limit 1`;
     if (existing[0] && (existing[0] as any).id !== project.id) {

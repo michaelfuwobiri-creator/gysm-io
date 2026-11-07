@@ -89,6 +89,8 @@ const TOOL_LABEL: Record<string, string> = {
   deploy: "Deploy",
   create_db_table: "Database schema",
   setup_user_profiles: "User profiles",
+  connect_domain: "Custom domain",
+  domain_status: "Domain status",
   get_logs: "Logs",
   edit_file: "Edit file",
   list_dir: "List folder",

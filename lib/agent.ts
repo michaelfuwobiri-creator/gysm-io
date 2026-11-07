@@ -67,6 +67,7 @@ const RESULT_UI_MAX = 4000;
 
 function proposalDetail(name: string, args: any): string {
   if (name === "create_db_table") return String(args?.sql ?? "").slice(0, 6000);
+  if (name === "connect_domain") return `Adds ${String(args?.domain ?? "").slice(0, 100)} to your published site "${String(args?.project ?? "")}".\nYou'll then add a DNS record where the domain is registered. Nothing else is changed.`;
   if (name === "setup_user_profiles") {
     const cols = Array.isArray(args?.columns) && args.columns.length ? args.columns.map((c: any) => `${String(c?.name ?? "?").slice(0, 40)} (${String(c?.type ?? "?").slice(0, 20)})`).join(", ") : "full_name (text), onboarding_complete (boolean)";
     return `Creates public.profiles with: ${cols}.\nRow level security: each person can only read, create and edit their own row.\nA small fixed trigger creates an empty profile when someone signs up. Nothing else is changed.`;

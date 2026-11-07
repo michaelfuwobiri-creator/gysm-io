@@ -84,3 +84,13 @@ export async function ensureProjectDomain(domain: string, redirect?: string): Pr
     throw e;
   }
 }
+
+/**
+ * Whether the domain's DNS actually points at Vercel. "verified" on the project
+ * only proves ownership; a domain can be verified and still show someone else's
+ * parking page until its A/CNAME record is changed.
+ */
+export async function getDomainDnsConfig(domain: string): Promise<{ misconfigured: boolean }> {
+  const data = await vercelFetch(`/v6/domains/${encodeURIComponent(domain)}/config`);
+  return { misconfigured: data?.misconfigured !== false };
+}

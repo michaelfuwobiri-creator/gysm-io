@@ -18,7 +18,7 @@ import {
 describe("tool schemas", () => {
   it("exposes the six core tools first, then the phase 2 tools", () => {
     expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual([
-      "write_file", "read_file", "run_command", "deploy", "create_db_table", "setup_user_profiles", "get_logs",
+      "write_file", "read_file", "run_command", "deploy", "create_db_table", "setup_user_profiles", "connect_domain", "domain_status", "get_logs",
       "edit_file", "list_dir", "search", "query_db", "list_tables", "set_env", "web_search", "fetch_url",
       "review_site", "update_plan", "ask_user", "generate_image", "read_pdf", "send_file", "remember", "forget", "request_autonomy", "connect_service", "database_status", "suggest_next",
     ]);
@@ -53,6 +53,8 @@ describe("approvals", () => {
     expect(needsApproval("deploy", { project: "x" })).toBe(true);
     expect(needsApproval("create_db_table", { sql: "create table a(id int)" })).toBe(true);
     expect(needsApproval("setup_user_profiles", {})).toBe(true);
+    expect(needsApproval("connect_domain", { project: "a", domain: "a.com" })).toBe(true);
+    expect(needsApproval("domain_status", { project: "a" })).toBe(false);
   });
   it("gates risky commands only", () => {
     expect(needsApproval("run_command", { cmd: "ls -la" })).toBe(false);

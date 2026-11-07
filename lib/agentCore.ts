@@ -14,6 +14,8 @@ export type ToolName =
   | "deploy"
   | "create_db_table"
   | "setup_user_profiles"
+  | "connect_domain"
+  | "domain_status"
   | "get_logs"
   | "edit_file"
   | "list_dir"
@@ -143,6 +145,35 @@ export const AGENT_TOOLS = [
           },
           project_id: { type: "string", description: "GYSM project id whose database to use. Optional when the user has exactly one connected database." },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "connect_domain",
+      description:
+        "Connect the user's own domain (e.g. myapp.com or www.myapp.com) to a site they have already published with deploy. Adds the domain on GYSM and returns the exact DNS records the user must add where the domain is registered. The user must approve it. Never pretend the domain works until domain_status says it is live.",
+      parameters: {
+        type: "object",
+        properties: {
+          project: { type: "string", description: "The project folder name that was deployed." },
+          domain: { type: "string", description: "The domain to connect, e.g. myapp.com or www.myapp.com." },
+        },
+        required: ["project", "domain"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "domain_status",
+      description:
+        "Check whether a project's custom domain is live yet, and what DNS records are still missing. Call it after connect_domain once the user says they added the records.",
+      parameters: {
+        type: "object",
+        properties: { project: { type: "string", description: "The project folder name." } },
+        required: ["project"],
       },
     },
   },
@@ -707,7 +738,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "set_env"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -745,7 +776,7 @@ How you work:
 - Use generate_image sparingly for real pictures a site needs (hero, banner, product); if the user attached their own images, use those first. Prefer CSS, gradients and SVG for decoration.
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
-- If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
+- If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. To put a deployed site on the user's own domain, call connect_domain (the user approves) and then give them the exact DNS records it returns; after they say they added them, call domain_status and only say it is live when it is. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -1056,6 +1087,10 @@ export function describeCall(tool: string, args: any): string {
       return `Publish "${String(args?.project ?? "?")}${args?.folder ? "/" + String(args.folder) : ""}" live on gysm.io${args?.name ? ` as ${String(args.name)}.gysm.io` : ""}`;
     case "create_db_table":
       return `Run schema SQL on your database`;
+    case "connect_domain":
+      return `Connect ${String(args?.domain ?? "?").slice(0, 100)} to "${String(args?.project ?? "?")}"`;
+    case "domain_status":
+      return `Check domain status for "${String(args?.project ?? "?")}"`;
     case "setup_user_profiles":
       return `Set up user profiles on your database (profiles table, row-level security, auto-create on sign-up)`;
     case "get_logs":

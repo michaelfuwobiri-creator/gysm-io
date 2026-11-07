@@ -82,6 +82,29 @@ function isKnownHost(host: string): boolean {
   return false
 }
 
+// host -> verified custom-domain project, cached for a short while so asset
+// requests don't each cost a database round-trip.
+const customCache = new Map<string, { at: number; value: { id: string; agent: boolean } | null }>()
+const CUSTOM_TTL_MS = 30_000
+
+async function customDomainFor(host: string): Promise<{ id: string; agent: boolean } | null> {
+  const bare = host.split(':')[0].toLowerCase()
+  const hit = customCache.get(bare)
+  if (hit && Date.now() - hit.at < CUSTOM_TTL_MS) return hit.value
+  let value: { id: string; agent: boolean } | null = null
+  try {
+    const rows = await sql!`select id, prompt from projects where custom_domain = ${bare} and custom_domain_status = 'verified' limit 1`
+    const row = rows[0] as any
+    if (row) value = { id: row.id, agent: typeof row.prompt === 'string' && row.prompt.startsWith('[Agent] ') }
+  } catch (error) {
+    console.error('[middleware] custom domain lookup failed:', (error as Error).message)
+    return null // don't cache a failure
+  }
+  if (customCache.size > 500) customCache.clear()
+  customCache.set(bare, { at: Date.now(), value })
+  return value
+}
+
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   const host = req.headers.get('host') || ''
 
@@ -130,19 +153,26 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
     }
   }
 
-  if (sql && host && !isKnownHost(host) && req.nextUrl.pathname === '/') {
-    try {
-      const rows = await sql`select id from projects where custom_domain = ${host} and custom_domain_status = 'verified' limit 1`
-      const project = rows[0] as any
-      if (project) {
-        const url = req.nextUrl.clone()
-        url.pathname = `/publish/${project.id}`
+  if (sql && host && !isKnownHost(host)) {
+    const pathname = req.nextUrl.pathname
+    // The platform's own assets (builder pages on a custom domain load these).
+    if (pathname.startsWith('/_next/')) return NextResponse.next()
+    const custom = await customDomainFor(host)
+    if (custom) {
+      const url = req.nextUrl.clone()
+      if (custom.agent) {
+        // A hosted Agent site: every path (pages, styles.css, app.js ...) comes from its files.
+        url.pathname = `/h/${custom.id}${pathname === '/' ? '' : pathname}`
         return NextResponse.rewrite(url)
       }
-    } catch (error) {
-      console.error('[middleware] custom domain lookup failed:', (error as Error).message)
-      // Fall through to normal routing rather than breaking the request.
+      if (pathname === '/') {
+        url.pathname = `/publish/${custom.id}`
+        return NextResponse.rewrite(url)
+      }
     }
+    // Paths with a dot only reach the middleware for unknown hosts so a custom
+    // domain's files can be served; anything else keeps its old behaviour.
+    if (pathname.includes('.')) return NextResponse.next()
   }
 
   return clerkHandler(req, event)
@@ -156,5 +186,7 @@ export const config = {
     // app.js) too. www.gysm.io itself is excluded so the site's own assets
     // still skip the middleware.
     { source: '/:path*', has: [{ type: 'host', value: '^(?:www\\.)?(?!www\\.)[a-z0-9-]+\\.gysm\\.io$' }] },
+    // A user's own domain: its files (styles.css, app.js, images) are served by the middleware too.
+    { source: '/:path*', has: [{ type: 'host', value: '^(?!(?:[a-z0-9-]+\\.)*gysm\\.io(?::\\d+)?$)(?!.*\\.vercel\\.app$)(?!localhost)(?!127\\.0\\.0\\.1).+' }] },
   ],
 }
