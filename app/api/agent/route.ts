@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         }
       };
       try {
-        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, memory, attachments: att.files, signal: req.signal, emit });
+        await runAgentTurn({ userId: user.id, history, userText: userText || undefined, decision, localFolder, clientResult, memory, browser: body?.browser === true, attachments: att.files, signal: req.signal, emit });
       } catch (error: any) {
         console.error("[agent] turn failed:", error?.message || error);
         emit({ type: "error", error: "Couldn't reach your workspace. Please try again in a moment." });
