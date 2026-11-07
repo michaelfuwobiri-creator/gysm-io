@@ -1276,7 +1276,7 @@ function AutonomyCard({
 }) {
   const offered = (item.scopes.length ? item.scopes : AUTONOMY_SCOPES.filter((x) => x !== "browser")) as AutonomyScope[];
   const [picked, setPicked] = useState<AutonomyScope[]>(offered);
-  const [steps, setSteps] = useState(String([10, 25, 50, 100].find((n) => n >= item.maxSteps) ?? 100));
+  const [steps, setSteps] = useState(String([25, 50, 100].find((n) => n >= item.maxSteps) ?? 100));
   return (
     <div className="gb-approve" role="group" aria-label="Permission to work on its own">
       <div className="gb-eyebrow">Needs your permission</div>

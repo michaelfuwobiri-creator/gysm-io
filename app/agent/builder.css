@@ -257,3 +257,6 @@
 .gb-auto-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; padding: 7px 12px; border: 1px solid var(--gb-fuchsia, #ff0080); border-radius: 12px; font-size: 13px; }
 .gb-stop-btn { margin-left: 12px; border: 1px solid var(--gb-line); background: var(--gb-surface); color: #c0182b; border-radius: 999px; padding: 3px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
 .gb-stop-btn:hover { background: #fdecee; }
+.gb-check { justify-content: flex-start; text-align: left; }
+.gb-check input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--gb-fuchsia, #ff0080); }
+.gb-check span { flex: 0 1 auto; text-align: left; }
