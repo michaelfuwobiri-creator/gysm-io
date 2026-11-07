@@ -27,6 +27,7 @@ export type ToolName =
   | "update_plan"
   | "ask_user"
   | "generate_image"
+  | "read_pdf"
   | "send_file"
   | "remember"
   | "forget"
@@ -315,6 +316,18 @@ export const AGENT_TOOLS = [
           shape: { type: "string", enum: ["landscape", "square", "portrait"], description: "Defaults to landscape." },
         },
         required: ["prompt", "path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_pdf",
+      description: "Read the text of a PDF in the workspace (for example one the user attached, saved under uploads/). Returns up to 30,000 characters. Scanned PDFs without a text layer return nothing.",
+      parameters: {
+        type: "object",
+        properties: { path: { type: "string", description: "Relative path of the PDF, e.g. 'uploads/menu.pdf'." } },
+        required: ["path"],
       },
     },
   },
@@ -821,6 +834,8 @@ export function describeCall(tool: string, args: any): string {
       return `Ask you a question`;
     case "generate_image":
       return `Create an image for ${String(args?.path ?? "?")}`;
+    case "read_pdf":
+      return `Read ${String(args?.path ?? "?")}`;
     case "send_file":
       return `Send ${String(args?.path ?? "?")} to you as a download`;
     case "remember":

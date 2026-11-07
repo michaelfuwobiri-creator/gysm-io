@@ -27,6 +27,7 @@ import {
 } from "@/lib/agentCore";
 import { MEDIA_CREDIT_COST } from "@/lib/mediaCreditsConstants";
 import { executeTool, saveAttachments } from "@/lib/agentTools";
+import { pdfToText } from "@/lib/agentPdf";
 import { attachmentNote, contentWithImages, type CleanAttachment } from "@/lib/agentAttachCore";
 import { cleanPlan, cleanQuestion, cleanSuggestions, type AgentQuestion, type PlanStep, type Suggestion } from "@/lib/agentGuards";
 
@@ -120,7 +121,14 @@ export async function runAgentTurn(opts: {
   let userText = opts.userText;
   if (attached.length > 0) {
     const saveError = await saveAttachments(userId, attached);
-    userText = (userText || "I attached some files. Please take a look.") + attachmentNote(attached, saveError);
+    // Text of attached PDFs goes straight into the message so the agent can use it.
+    const pdfTexts: Record<string, string> = {};
+    for (const f of attached) {
+      if (f.kind !== "pdf") continue;
+      const r = await pdfToText(Buffer.from(f.data, "base64"));
+      if (r.ok) pdfTexts[f.name] = r.text;
+    }
+    userText = (userText || "I attached some files. Please take a look.") + attachmentNote(attached, saveError, pdfTexts);
   }
 
   // 1. Resolve a pending proposal.

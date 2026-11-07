@@ -4,6 +4,7 @@ const create = vi.fn();
 vi.mock("openai", () => ({ default: class { chat = { completions: { create } }; } }));
 vi.mock("@/lib/credits", () => ({ chargeCredits: vi.fn(async () => 900) }));
 vi.mock("@/lib/planUsage", () => ({ usageBlockedError: vi.fn(async () => ({ error: "Subscribe to GYSM (€20/month) to keep building.", code: "NO_PLAN" })) }));
+vi.mock("@/lib/agentPdf", () => ({ pdfToText: vi.fn(async () => ({ ok: true, text: "Croissant 3 EUR", pages: 1, cut: false })) }));
 vi.mock("@/lib/agentTools", () => ({ executeTool: vi.fn(), saveAttachments: vi.fn(async () => null) }));
 
 import { runAgentTurn } from "@/lib/agent";
@@ -103,6 +104,14 @@ describe("runAgentTurn", () => {
     const state = events.find((e) => e.type === "state");
     expect(typeof state.messages[0].content).toBe("string");
     expect(state.messages[0].content).not.toContain("base64,aGk");
+  });
+
+  it("puts the text of an attached PDF in the message", async () => {
+    create.mockResolvedValueOnce(reply({ content: "Read it." }));
+    const files = [{ name: "menu.pdf", mime: "application/pdf", kind: "pdf" as const, data: "JVBERg==", bytes: 5, path: "uploads/menu.pdf" }];
+    await runAgentTurn({ userId: "u", history: [], userText: "use my menu", attachments: files, emit: () => {} });
+    const sent = create.mock.calls[0][0].messages;
+    expect(sent[sent.length - 1].content).toContain("Croissant 3 EUR");
   });
 
   it("sends a file to the browser without putting its bytes in the history", async () => {

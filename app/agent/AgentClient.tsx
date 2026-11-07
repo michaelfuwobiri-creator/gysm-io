@@ -95,6 +95,7 @@ const TOOL_LABEL: Record<string, string> = {
   update_plan: "Plan",
   ask_user: "Question",
   generate_image: "Image",
+  read_pdf: "Read PDF",
   send_file: "Send file",
   remember: "Memory",
   forget: "Memory",
