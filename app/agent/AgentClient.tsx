@@ -88,6 +88,7 @@ const TOOL_LABEL: Record<string, string> = {
   run_command: "Run command",
   deploy: "Deploy",
   create_db_table: "Database schema",
+  setup_user_profiles: "User profiles",
   get_logs: "Logs",
   edit_file: "Edit file",
   list_dir: "List folder",

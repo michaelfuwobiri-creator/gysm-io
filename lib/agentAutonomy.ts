@@ -63,7 +63,7 @@ export function remainingSteps(a: Autonomy | null | undefined): number {
  */
 export function autoApproves(tool: string, a: Autonomy | null | undefined): boolean {
   if (!a || remainingSteps(a) <= 0) return false;
-  if (tool === "create_db_table") return a.scopes.includes("database"); // DDL is already limited to non-destructive statements
+  if (tool === "create_db_table" || tool === "setup_user_profiles") return a.scopes.includes("database"); // DDL is already limited to non-destructive statements
   if (tool === "deploy") return a.scopes.includes("publish");
   return false; // set_env (secrets), risky commands and everything else keep asking
 }

@@ -21,6 +21,7 @@ import {
   truncate,
   localPathBlock,
   validateDdl,
+  buildProfilesSql,
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
 import { addMemory, forgetMemory } from "@/lib/agentMemory";
@@ -246,6 +247,20 @@ export async function toolCreateDbTable(userId: string, args: any): Promise<Tool
   try {
     const result = await runSql(token, conn.supabase_project_ref!, check.statements.join(";\n") + ";");
     return { ok: true, creditsKind: "db", output: `Schema applied (${check.statements.length} statement(s)).${result ? "\n" + truncate(JSON.stringify(result), 1500) : ""}` };
+  } catch (e: any) {
+    return { ok: false, creditsKind: "db", output: `Database error: ${String(e?.message || e).slice(0, 800)}` };
+  }
+}
+
+export async function toolSetupUserProfiles(userId: string, args: any): Promise<ToolResult> {
+  const built = buildProfilesSql(args?.columns);
+  if (built.ok === false) return { ok: false, output: built.error };
+  const { conn, error } = await resolveBackend(userId, typeof args?.project_id === "string" ? args.project_id : undefined);
+  if (!conn) return { ok: false, output: error || "No database available." };
+  const token = await getValidAccessToken(conn);
+  try {
+    await runSql(token, conn.supabase_project_ref!, built.statements.join(";\n") + ";");
+    return { ok: true, creditsKind: "db", output: "Profiles are set up: public.profiles (row level security on; each user can read, create and edit only their own row) and a profile is created automatically when someone signs up. In the app, read/update the signed-in user's row with the public URL and anon key." };
   } catch (e: any) {
     return { ok: false, creditsKind: "db", output: `Database error: ${String(e?.message || e).slice(0, 800)}` };
   }
@@ -723,6 +738,9 @@ export async function executeTool(userId: string, name: string, args: any, secre
         break;
       case "create_db_table":
         result = await toolCreateDbTable(userId, args);
+        break;
+      case "setup_user_profiles":
+        result = await toolSetupUserProfiles(userId, args);
         break;
       case "get_logs":
         result = await toolGetLogs(userId, args);

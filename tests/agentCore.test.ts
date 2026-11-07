@@ -12,12 +12,13 @@ import {
   shouldSkipDeployPath,
   systemPrompt,
   validateDdl,
+  buildProfilesSql,
 } from "@/lib/agentCore";
 
 describe("tool schemas", () => {
   it("exposes the six core tools first, then the phase 2 tools", () => {
     expect(AGENT_TOOLS.map((t) => t.function.name)).toEqual([
-      "write_file", "read_file", "run_command", "deploy", "create_db_table", "get_logs",
+      "write_file", "read_file", "run_command", "deploy", "create_db_table", "setup_user_profiles", "get_logs",
       "edit_file", "list_dir", "search", "query_db", "list_tables", "set_env", "web_search", "fetch_url",
       "review_site", "update_plan", "ask_user", "generate_image", "read_pdf", "send_file", "remember", "forget", "request_autonomy", "connect_service", "database_status", "suggest_next",
     ]);
@@ -51,6 +52,7 @@ describe("approvals", () => {
   it("always gates deploy and create_db_table", () => {
     expect(needsApproval("deploy", { project: "x" })).toBe(true);
     expect(needsApproval("create_db_table", { sql: "create table a(id int)" })).toBe(true);
+    expect(needsApproval("setup_user_profiles", {})).toBe(true);
   });
   it("gates risky commands only", () => {
     expect(needsApproval("run_command", { cmd: "ls -la" })).toBe(false);
@@ -116,6 +118,35 @@ CREATE POLICY "update own" ON public.profiles FOR UPDATE TO authenticated USING 
   });
   it("rejects hiding a statement behind a comment", () => {
     expect(validateDdl("create table a(id int); /* x */ drop table a").ok).toBe(false);
+  });
+});
+
+describe("buildProfilesSql", () => {
+  it("builds the fixed profile setup with defaults", () => {
+    const r = buildProfilesSql(undefined);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const all = r.statements.join(";\n");
+      expect(all).toContain("references auth.users(id) on delete cascade");
+      expect(all).toContain("enable row level security");
+      expect(all).toContain("gysm_on_auth_user_created");
+      expect(all).toContain("security definer set search_path = public");
+      expect(all).toContain("full_name text");
+    }
+  });
+  it("accepts safe extra columns", () => {
+    const r = buildProfilesSql([{ name: "age", type: "integer" }, { name: "bio", type: "text" }]);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.statements.some((s) => s.includes("add column if not exists age integer"))).toBe(true);
+  });
+  it.each([
+    [[{ name: "x; drop table profiles", type: "text" }]],
+    [[{ name: "id", type: "text" }]],
+    [[{ name: "ok", type: "text default (select 1)" }]],
+    [[{ name: "a", type: "text" }, { name: "a", type: "text" }]],
+    ["not a list"],
+  ])("rejects %j", (cols) => {
+    expect(buildProfilesSql(cols).ok).toBe(false);
   });
 });
 

@@ -13,6 +13,7 @@ export type ToolName =
   | "run_command"
   | "deploy"
   | "create_db_table"
+  | "setup_user_profiles"
   | "get_logs"
   | "edit_file"
   | "list_dir"
@@ -119,6 +120,29 @@ export const AGENT_TOOLS = [
           project_id: { type: "string", description: "GYSM project id whose database to use. Optional when the user has exactly one connected database." },
         },
         required: ["sql"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "setup_user_profiles",
+      description:
+        "Set up per-user profiles on the user's own connected Supabase database in one safe step: a public.profiles table keyed to auth.users, row level security so each person only reads/edits their own row, and a fixed trigger that creates an empty profile when someone signs up. Use this instead of create_db_table for sign-up/profile needs. Takes only optional extra columns (name + type); no free-form SQL. The user must approve it.",
+      parameters: {
+        type: "object",
+        properties: {
+          columns: {
+            type: "array",
+            description: "Extra profile columns. Names are lowercase letters, digits, underscores. Types: text, integer, boolean, date, numeric, timestamptz.",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" }, type: { type: "string", enum: ["text", "integer", "boolean", "date", "numeric", "timestamptz"] } },
+              required: ["name", "type"],
+            },
+          },
+          project_id: { type: "string", description: "GYSM project id whose database to use. Optional when the user has exactly one connected database." },
+        },
       },
     },
   },
@@ -683,7 +707,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "set_env"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "set_env"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -721,7 +745,7 @@ How you work:
 - Use generate_image sparingly for real pictures a site needs (hero, banner, product); if the user attached their own images, use those first. Prefer CSS, gradients and SVG for decoration.
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
-- If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then build with list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
+- If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -778,6 +802,57 @@ export function needsApproval(tool: string, args: any): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Fixed SQL for setup_user_profiles. The only free input is a list of column
+// names/types, validated here, so nothing user- or model-written reaches the database.
+const PROFILE_TYPES: Record<string, string> = {
+  text: "text",
+  integer: "integer",
+  boolean: "boolean",
+  date: "date",
+  numeric: "numeric",
+  timestamptz: "timestamptz",
+};
+const PROFILE_RESERVED = new Set(["id", "created_at", "updated_at", "user", "order", "group", "table", "select", "from", "where", "check", "default", "primary", "references", "constraint", "column"]);
+
+export type ProfileSqlResult = { ok: true; statements: string[] } | { ok: false; error: string };
+
+export function buildProfilesSql(columns: unknown): ProfileSqlResult {
+  const raw = columns == null ? [] : columns;
+  if (!Array.isArray(raw)) return { ok: false, error: "columns must be a list of {name, type}." };
+  const cols = raw.length ? raw : [{ name: "full_name", type: "text" }, { name: "onboarding_complete", type: "boolean" }];
+  if (cols.length > 20) return { ok: false, error: "Too many columns (max 20)." };
+  const seen = new Set<string>();
+  const defs: string[] = [];
+  for (const c of cols as any[]) {
+    const name = String(c?.name ?? "");
+    const type = PROFILE_TYPES[String(c?.type ?? "").toLowerCase()];
+    if (!/^[a-z][a-z0-9_]{0,39}$/.test(name) || PROFILE_RESERVED.has(name)) return { ok: false, error: `Invalid column name: ${name.slice(0, 40)}` };
+    if (!type) return { ok: false, error: `Unsupported column type for ${name}. Use text, integer, boolean, date, numeric or timestamptz.` };
+    if (seen.has(name)) return { ok: false, error: `Duplicate column: ${name}` };
+    seen.add(name);
+    let def = `${name} ${type}`;
+    if (type === "boolean") def += " not null default false";
+    defs.push(def);
+  }
+  const create = `create table if not exists public.profiles (id uuid primary key references auth.users(id) on delete cascade, ${defs.join(", ")}, created_at timestamptz not null default now(), updated_at timestamptz not null default now())`;
+  const addCols = cols.map((c: any) => `alter table public.profiles add column if not exists ${c.name} ${PROFILE_TYPES[String(c.type).toLowerCase()]}${String(c.type).toLowerCase() === "boolean" ? " not null default false" : ""}`);
+  const policy = (name: string, cmd: string, using: string, check: string) =>
+    `do $p$ begin if not exists (select 1 from pg_policies where schemaname='public' and tablename='profiles' and policyname='${name}') then create policy "${name}" on public.profiles for ${cmd} to authenticated ${using}${check}; end if; end $p$`;
+  const statements = [
+    create,
+    ...addCols,
+    "alter table public.profiles enable row level security",
+    policy("Users can read their own profile", "select", "using (auth.uid() = id)", ""),
+    policy("Users can create their own profile", "insert", "", "with check (auth.uid() = id)"),
+    policy("Users can update their own profile", "update", "using (auth.uid() = id) ", "with check (auth.uid() = id)"),
+    "create or replace function public.gysm_handle_new_user() returns trigger language plpgsql security definer set search_path = public as $f$ begin insert into public.profiles (id) values (new.id) on conflict (id) do nothing; return new; end; $f$",
+    "revoke execute on function public.gysm_handle_new_user() from public, anon, authenticated",
+    "drop trigger if exists gysm_on_auth_user_created on auth.users",
+    "create trigger gysm_on_auth_user_created after insert on auth.users for each row execute function public.gysm_handle_new_user()",
+  ];
+  return { ok: true, statements };
+}
+
 // DDL guard for create_db_table. Whitelist of schema-only statements.
 
 const MAX_DDL_CHARS = 20_000;
@@ -981,6 +1056,8 @@ export function describeCall(tool: string, args: any): string {
       return `Publish "${String(args?.project ?? "?")}${args?.folder ? "/" + String(args.folder) : ""}" live on gysm.io${args?.name ? ` as ${String(args.name)}.gysm.io` : ""}`;
     case "create_db_table":
       return `Run schema SQL on your database`;
+    case "setup_user_profiles":
+      return `Set up user profiles on your database (profiles table, row-level security, auto-create on sign-up)`;
     case "get_logs":
       return `Get ${args?.source === "deployment" ? "deployment" : "activity"} logs`;
     case "edit_file":

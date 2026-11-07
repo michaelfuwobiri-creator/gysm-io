@@ -19,6 +19,7 @@ describe("autoApproves", () => {
   const grant = { scopes: ["database" as const], maxSteps: 10, used: 0 };
   it("covers only the granted scopes", () => {
     expect(autoApproves("create_db_table", grant)).toBe(true);
+    expect(autoApproves("setup_user_profiles", grant)).toBe(true);
     expect(autoApproves("deploy", grant)).toBe(false);
     expect(autoApproves("deploy", { ...grant, scopes: ["publish"] })).toBe(true);
   });
