@@ -19,6 +19,10 @@
   let shot = null; // { name, mime, data } waiting to be sent
   let lastBody = null;
   let approvalResolve = null;
+  // Autonomous mode: set only by the user pressing Allow on a card here. Lives in
+  // memory, so closing the panel or starting a new chat ends it.
+  let grant = null; // { all: bool, hosts: string[], maxSteps, used, scopes }
+  let pausedForTime = false;
 
   // ---------- small DOM helpers ----------
   function el(tag, cls, text) {
@@ -140,6 +144,86 @@
     } catch {
       /* start fresh */
     }
+  }
+
+  // ---------- autonomous mode ----------
+  function remaining() {
+    return grant ? Math.max(0, grant.maxSteps - grant.used) : 0;
+  }
+  function grantBody() {
+    return grant && remaining() > 0 ? { scopes: grant.scopes, maxSteps: grant.maxSteps, used: grant.used } : undefined;
+  }
+  function hostAllowed(host) {
+    if (!grant) return false;
+    return grant.all || grant.hosts.some((h) => host === h || host.endsWith("." + h));
+  }
+  function renderAuto() {
+    const bar = $("auto-bar");
+    if (!grant || remaining() <= 0) {
+      bar.hidden = true;
+      $("auto").hidden = false;
+      return;
+    }
+    $("auto").hidden = true;
+    bar.textContent = "";
+    bar.appendChild(el("span", "", `Working on its own · ${grant.used}/${grant.maxSteps} steps · ${grant.all ? "all sites" : grant.hosts.join(", ")}`));
+    bar.appendChild(button("Pause", "ghost", () => endGrant("Autonomous mode is off. I'll ask before each step.")));
+    bar.hidden = false;
+  }
+  function endGrant(msg) {
+    grant = null;
+    renderAuto();
+    if (msg) note(msg, "muted");
+  }
+  /** Asks the user to let the agent work on its own. Resolves true if they allowed it. */
+  async function askAutonomy(goal, maxSteps, scopes) {
+    const extra = (scopes || []).filter((x) => x === "publish" || x === "database");
+    const tab = await activeTab();
+    const host = tab && isWebUrl(tab.url || "") ? hostOf(tab.url) : "";
+    return new Promise((resolve) => {
+      const card = el("div", "card");
+      card.appendChild(el("div", "what", "Let GYSM work on its own?"));
+      if (goal) card.appendChild(el("div", "where", goal));
+      card.appendChild(el("div", "where", "It will click, type and open pages without asking each time. It will still stop and ask before anything that buys, pays, sends, posts, deletes or signs out, and it never fills passwords or card fields."));
+      if (extra.length) card.appendChild(el("div", "where", "It may also " + extra.map((x) => (x === "publish" ? "publish sites to gysm.io" : "add tables and security rules to your connected database")).join(" and ") + ". It can never delete data."));
+      const sel = el("select", "pick");
+      const opts = [];
+      if (host) opts.push(["site", `Only ${host} (and pages it opens there)`]);
+      opts.push(["all", "Any site I have allowed GYSM to use"]);
+      for (const [v, t] of opts) {
+        const o = el("option", "", t);
+        o.value = v;
+        sel.appendChild(o);
+      }
+      const steps = el("select", "pick");
+      for (const n of [10, 25, 50, 100]) {
+        const o = el("option", "", `Up to ${n} steps`);
+        o.value = String(n);
+        if (n === Math.min(100, Math.max(10, Math.round((maxSteps || 25) / 5) * 5)) || (n === 25 && !maxSteps)) o.selected = true;
+        steps.appendChild(o);
+      }
+      card.appendChild(sel);
+      card.appendChild(steps);
+      const btns = el("div", "btns");
+      const done = (ok) => {
+        approvalResolve = null;
+        card.classList.add("done");
+        btns.remove();
+        sel.disabled = true;
+        steps.disabled = true;
+        if (ok) {
+          grant = { all: sel.value === "all", hosts: host && sel.value === "site" ? [host] : [], maxSteps: Number(steps.value), used: 0, scopes: ["browser", ...extra] };
+          renderAuto();
+        }
+        card.appendChild(el("div", "where", ok ? "Allowed" : "Not now"));
+        resolve(ok);
+      };
+      btns.appendChild(button("Allow", "go", () => done(true)));
+      btns.appendChild(button("Not now", "", () => done(false)));
+      card.appendChild(btns);
+      approvalResolve = () => done(false);
+      add(card);
+    });
   }
 
   // ---------- banner / approvals ----------
@@ -317,8 +401,14 @@
         return reply(false, "That address can't be opened. Use a normal http(s) address.");
       }
       if (!tab) return reply(false, "There is no tab to use.");
-      const ok = await ask(`Open ${hostOf(url)}`, url, null, "Open it");
+      // Autonomous: only to a site the user allowed. Anywhere else still asks.
+      const auto = remaining() > 0 && hostAllowed(hostOf(url));
+      const ok = auto ? true : await ask(`Open ${hostOf(url)}`, url, null, "Open it");
       if (!ok) return reply(false, "", true);
+      if (auto) {
+        grant.used++;
+        renderAuto();
+      }
       const loaded = waitForLoad(tab.id);
       await chrome.tabs.update(tab.id, { url });
       await loaded;
@@ -340,8 +430,15 @@
         what = `Type into “${label}”${args.submit ? " and press Enter" : ""}`;
         detail = String(args.text || "").slice(0, 2000);
       }
-      const ok = await ask(what, `on ${d.host}`, detail, name === "browser_click" ? "Click" : "Type it");
+      // Autonomous: on an allowed site, and never for risky labels or Enter on a non-search field.
+      const auto = remaining() > 0 && hostAllowed(d.host) && !d.risky && !(name === "browser_type" && args.submit && !d.search);
+      const ok = auto ? true : await ask(what, `on ${d.host}`, detail, name === "browser_click" ? "Click" : "Type it");
       if (!ok) return reply(false, "", true);
+      if (auto) {
+        grant.used++;
+        renderAuto();
+        note(`${what} (on its own)`, "muted");
+      }
       const r = await withPermission(tab, name === "browser_click" ? "click" : "type", name === "browser_click" ? [id] : [id, String(args.text || ""), args.submit === true]);
       await new Promise((res) => setTimeout(res, 600));
       refreshChip();
@@ -410,7 +507,7 @@
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         signal: abort.signal,
-        body: JSON.stringify({ ...body, browser: true, messages: history }),
+        body: JSON.stringify({ ...body, browser: true, messages: history, autonomy: grantBody() }),
       });
     } catch (e) {
       if (!stopped) {
@@ -492,6 +589,23 @@
           add(a);
           break;
         }
+        case "autonomy_request": {
+          const goal = e.goal || "";
+          const ok = await askAutonomy(goal, e.maxSteps, e.scopes);
+          autonomyAnswer = ok;
+          break;
+        }
+        case "autonomy":
+          if (grant) {
+            grant.used = Math.max(grant.used, Number(e.used) || 0);
+            renderAuto();
+            if (e.pause) pausedForTime = true;
+            if (e.exhausted) endGrant("I used all the steps you allowed, so I've stopped.");
+          }
+          break;
+        case "connect":
+          note("This needs your Supabase account. Open gysm.io/agent to connect it, then come back.", "muted");
+          break;
         case "credits":
           if (e.balance) $("input").placeholder = `What should I do in this tab? (${e.balance} credits left)`;
           break;
@@ -508,6 +622,7 @@
       }
     };
     let proposal = null;
+    let autonomyAnswer = null;
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -527,6 +642,9 @@
       }
     } catch {
       if (!stopped) note("The connection dropped. Try again.", "error");
+    }
+    if (autonomyAnswer !== null && !stopped) {
+      return { text: autonomyAnswer ? "Autonomous mode is on. Go ahead." : "No, ask me before each step." };
     }
     if (proposal && !stopped) {
       if (proposal.secretInput) {
@@ -549,9 +667,12 @@
       while (next && !stopped) {
         const r = await streamOnce(next);
         if (!r || stopped) break;
-        if (r.decision) next = { decision: r.decision };
+        if (r.text) next = { text: r.text };
+        else if (r.decision) next = { decision: r.decision };
         else if (r.clientCall) next = await runClientTool(r.clientCall);
+        else if (pausedForTime && remaining() > 0) next = { text: "Continue where you left off." };
         else next = null;
+        pausedForTime = false;
       }
     } finally {
       setBusy(false);
@@ -620,8 +741,10 @@
     stopped = true;
     if (abort) abort.abort();
     if (approvalResolve) approvalResolve(false);
+    if (grant) grant = null;
+    renderAuto();
     setBusy(false);
-    note("Stopped.", "muted");
+    note("Stopped. Autonomous mode is off.", "muted");
   });
   $("new-chat").addEventListener("click", () => {
     if (busy) {
@@ -632,6 +755,8 @@
     }
     history = [];
     transcript = [];
+    grant = null;
+    renderAuto();
     log.querySelectorAll(":scope > :not(#empty)").forEach((n) => n.remove());
     $("empty").hidden = false;
     showPlan([]);
@@ -641,6 +766,7 @@
     save();
   });
   $("shot").addEventListener("click", () => void takeShot());
+  $("auto").addEventListener("click", () => void askAutonomy("", 25));
   $("shot-x").addEventListener("click", clearShot);
   document.querySelectorAll(".starters .chip").forEach((b) =>
     b.addEventListener("click", () => {
@@ -675,6 +801,7 @@
   }
 
   setBusy(false);
+  renderAuto();
   void restore().then(() => {
     void takePrefill();
     void refreshChip();

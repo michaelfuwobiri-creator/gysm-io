@@ -9,6 +9,8 @@
   const MAX_ELEMENTS = 150;
   const MAX_TEXT = 22000;
   const ATTR = "data-gysm-id";
+  // Buying, paying, sending, posting, deleting and signing out always need a person.
+  const RISKY_LABEL = /\b(delete|remove|erase|pay|buy|purchase|order|checkout|check out|place order|confirm|send|post|publish|submit|transfer|withdraw|donate|subscribe|unsubscribe|cancel|sign ?out|log ?out|deactivate|close account|reset|revoke|disconnect|authorize|allow|grant|accept|agree)\b/i;
 
   const INTERACTIVE =
     'a[href],button,input:not([type="hidden"]),textarea,select,summary,[contenteditable=""],[contenteditable="true"],' +
@@ -221,13 +223,18 @@
   function describe(id) {
     const el = find(id);
     if (!el) return STALE;
+    const label = labelOf(el);
+    const inForm = el.closest ? el.closest("form") : null;
     return {
       ok: true,
       output: describeEl(el),
-      label: labelOf(el),
+      label,
       kind: kindOf(el),
       secret: isSecretField(el),
       host: location.host,
+      // Things the extension never does on its own, even in autonomous mode.
+      risky: RISKY_LABEL.test(label) || (el.type === "submit" && !!inForm && !!inForm.querySelector('input[type="password"],[autocomplete^="cc-"]')),
+      search: (el.type || "").toLowerCase() === "search" || !!(el.closest && el.closest('[role="search"]')) || /search/i.test(label),
     };
   }
 

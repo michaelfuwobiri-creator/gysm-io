@@ -24,6 +24,8 @@ const SHOP = `<!doctype html><html><head><title>Shop</title></head><body>
   <textarea id="msg" aria-label="Message"></textarea>
   <button id="sub" type="submit">Subscribe</button>
 </form>
+<input id="q" type="search" aria-label="Search the shop"><input id="note" type="text" aria-label="Note">
+<button id="del" onclick="document.body.setAttribute('data-deleted','yes')">Delete account</button>
 <button id="other" onclick="document.body.setAttribute('data-clicked','yes')">Other</button>
 </body></html>`;
 const TWO = `<!doctype html><html><head><title>Pricing</title></head><body><h1>Pricing</h1><button>Buy</button></body></html>`;
@@ -244,6 +246,58 @@ const TWO = `<!doctype html><html><head><title>Pricing</title></head><body><h1>P
   await panel.locator(".card:not(.done) button.go").click(); // "This site"
   await panel.waitForSelector(".msg.ai >> text=got: URL: https://shop.test/two");
   assert.deepStrictEqual(await panel.evaluate(() => window.__perm.requested), [{ origins: ["https://shop.test/*"] }]);
+
+  // ---- autonomous mode ----
+  await ctx.unroute("https://www.gysm.io/api/agent");
+  const auto = { queue: [], seen: [] };
+  const readIds = (out) => ({ del: idOf(out, 'button "Delete account"'), other: idOf(out, 'button "Other"'), note: idOf(out, 'input text "Note"'), q: idOf(out, 'input search "Search the shop"') });
+  let ids2 = {};
+  await ctx.route("https://www.gysm.io/api/agent", (route) => {
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    const body = JSON.parse(route.request().postData() || "{}");
+    auto.seen.push(body);
+    if (body.clientResult && body.clientResult.toolCallId === "a1") ids2 = readIds(body.clientResult.output);
+    const next = auto.queue.shift();
+    route.fulfill({ status: 200, headers: { ...cors, "content-type": "application/x-ndjson" }, body: next ? next(body) : ev({ type: "text", text: "Finished." }, { type: "state", messages: [] }) });
+  });
+  const call = (id, name, args, write) => ev({ type: "client_tool", toolCallId: id, name, args, summary: name, write }, { type: "state", messages: [] });
+  await target.goto("https://shop.test/");
+  auto.queue = [
+    () => ev({ type: "autonomy_request", goal: "Tidy up the shop page", scopes: ["browser"], maxSteps: 25 }, { type: "state", messages: [] }),
+    () => call("a1", "browser_read", {}, false),
+    () => call("a2", "browser_click", { id: ids2.other }, true), // runs on its own
+    () => call("a3", "browser_click", { id: ids2.del }, true), // risky: must ask
+    () => call("a4", "browser_type", { id: ids2.note, text: "hello", submit: true }, true), // Enter on a non-search field: must ask
+    () => call("a5", "browser_type", { id: ids2.q, text: "socks", submit: false }, true), // runs on its own
+    () => call("a6", "browser_navigate", { url: "https://shop.test/two" }, true), // allowed site: on its own
+    () => call("a7", "browser_navigate", { url: "https://other.test/" }, true), // other site: must ask
+  ];
+  await panel.fill("#input", "tidy up");
+  await panel.click("#send");
+  await panel.locator(".card:not(.done) .what >> text=work on its own").waitFor();
+  await panel.locator(".card:not(.done) button.go").click();
+  // a2 ran without any approval card; a3 (Delete account) asks
+  await panel.locator(".card:not(.done) .what >> text=Delete").waitFor({ timeout: 8000 });
+  assert.strictEqual(await target.evaluate(() => document.body.getAttribute("data-clicked")), "yes", "ordinary click ran on its own");
+  assert.strictEqual(await target.evaluate(() => document.body.getAttribute("data-deleted")), null, "risky click waited for approval");
+  await panel.locator(".card:not(.done) button:not(.go)").click(); // decline
+  await panel.locator(".card:not(.done) .what >> text=Type into").waitFor({ timeout: 8000 }); // a4 asks (Enter on a non-search field)
+  await panel.locator(".card:not(.done) button:not(.go)").click();
+  await panel.locator(".card:not(.done) .what >> text=other.test").waitFor({ timeout: 8000 }); // a7 asks
+  assert.strictEqual(new URL(target.url()).pathname, "/two", "navigation inside the allowed site ran on its own");
+  assert.strictEqual(await target.evaluate(() => document.getElementById("q")?.value ?? "(gone)"), "(gone)"); // /two has no search box; a5 happened on /
+  await panel.locator(".card:not(.done) button:not(.go)").click();
+  await panel.waitForSelector(".msg.ai >> text=Finished");
+  const sent = auto.seen;
+  assert.ok(sent[1].text === "Autonomous mode is on. Go ahead." && sent[1].autonomy && sent[1].autonomy.scopes.includes("browser"), "grant is sent to the server");
+  assert.ok(sent[sent.length - 1].autonomy.used >= 3, "own steps are counted");
+  const bar = await panel.locator("#auto-bar").innerText();
+  assert.ok(/steps/.test(bar) && /shop\.test/.test(bar), "status bar shows the limits: " + bar);
+  const declined = sent.filter((b) => b.clientResult && b.clientResult.declined).map((b) => b.clientResult.toolCallId);
+  assert.deepStrictEqual(declined.sort(), ["a3", "a4", "a7"]);
+  // Pause ends it
+  await panel.click("#auto-bar button");
+  assert.strictEqual(await panel.locator("#auto-bar").isVisible(), false);
 
   // ---- screenshot attaches an image ----
   await panel.click("#new-chat");

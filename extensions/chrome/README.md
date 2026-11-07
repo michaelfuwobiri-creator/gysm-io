@@ -29,6 +29,17 @@ choose **Ask GYSM**.
 - Plan checklist, questions, file downloads and approvals for the agent's
   other tools (deploying a site, running commands), same as gysm.io/agent
 
+## Working on its own (asks first)
+
+Press **Work on its own** (or let the agent ask). A card lets you choose *only
+this site* or *any allowed site* and a step limit (10-100). While it is on,
+clicks, typing and moving between pages on those sites run without a prompt,
+and a bar shows the steps used with a **Stop/Pause** button. It still stops
+and asks before anything labelled buy, pay, order, send, post, publish, delete,
+sign out, allow/authorize and the like, before pressing Enter in a non-search
+field, and before opening a site you did not allow. It never fills password,
+card or one-time-code fields. Closing the panel, **Stop** or **New chat** ends it.
+
 ## Files
 
 - `manifest.json`: Manifest V3, side panel, host access to gysm.io; other sites

@@ -27,6 +27,7 @@
       <p class="fine">I can read, click, type, scroll and open pages in your current tab. You approve every click, entry and page change. I never type passwords or card numbers.</p>
     </div>
   </main>
+  <div id="auto-bar" class="auto-bar" hidden></div>
   <div id="plan" class="plan" hidden></div>
   <div id="chips" class="chips" hidden></div>
   <form id="composer" class="composer" autocomplete="off">
@@ -34,6 +35,7 @@
     <textarea id="input" rows="2" placeholder="What should I do in this tab?" aria-label="Message"></textarea>
     <div class="row">
       <button id="shot" type="button" class="ghost" title="Send a screenshot of this tab with your message">Screenshot</button>
+      <button id="auto" type="button" class="ghost" title="Let GYSM click, type and open pages on its own for a job. You choose the sites and the step limit.">Work on its own</button>
       <span class="grow"></span>
       <button id="stop" type="button" class="stop" hidden>Stop</button>
       <button id="send" type="submit" class="send">Send</button>
