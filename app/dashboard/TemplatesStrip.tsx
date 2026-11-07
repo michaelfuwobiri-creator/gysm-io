@@ -48,6 +48,7 @@ export default function TemplatesStrip({ templates }: { templates: TemplateStrip
                 >
                   <iframe
                     srcDoc={toThumbnailHtml(t.html)}
+                    loading="lazy"
                     className="w-full h-full border-0"
                     sandbox="allow-scripts allow-same-origin"
                     title={title}
