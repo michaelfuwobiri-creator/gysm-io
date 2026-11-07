@@ -841,7 +841,14 @@ export function validateDdl(input: unknown): DdlCheck {
     if (!ALLOWED_START.some((r) => r.test(s))) {
       return { ok: false, error: `Only CREATE TABLE, CREATE INDEX, ALTER TABLE, CREATE POLICY and COMMENT are allowed. Rejected: ${s.slice(0, 60)}` };
     }
-    if (FORBIDDEN_WORDS.test(s)) {
+    // "ON DELETE CASCADE" on a foreign key and "FOR INSERT/UPDATE/DELETE" on a
+    // policy are schema words, not data-changing statements; don't let them trip the check.
+    // Quoted identifiers (e.g. a policy named "update own") can't act as keywords.
+    const forCheck = s
+      .replace(/"[^"]*"/g, '""')
+      .replace(/\bon\s+(delete|update)\s+(cascade|restrict|no\s+action|set\s+null|set\s+default)\b/gi, " ")
+      .replace(/^(create\s+policy\s+("[^"]*"|\S+)\s+on\s+\S+\s+)(as\s+(permissive|restrictive)\s+)?for\s+(select|insert|update|delete|all)\b/i, "$1");
+    if (FORBIDDEN_WORDS.test(forCheck)) {
       return { ok: false, error: `Destructive or data-changing SQL isn't allowed. Rejected: ${s.slice(0, 60)}` };
     }
     const target = targetOf(s);

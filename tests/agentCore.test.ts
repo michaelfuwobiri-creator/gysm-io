@@ -95,6 +95,22 @@ describe("validateDdl", () => {
   ])("rejects %j", (q) => {
     expect(validateDdl(q).ok).toBe(false);
   });
+  it("accepts a profiles table tied to auth users, with ON DELETE CASCADE and insert/update policies", () => {
+    const sql = `CREATE TABLE public.profiles (id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE, full_name text NOT NULL DEFAULT '', age integer CHECK (age IS NULL OR age >= 18));
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "read own" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "create own" ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+CREATE POLICY "update own" ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);`;
+    const r = validateDdl(sql);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.statements).toHaveLength(5);
+  });
+  it("still rejects data-changing statements disguised with those words", () => {
+    expect(validateDdl("create table a (id int); delete from a").ok).toBe(false);
+    expect(validateDdl("create table a (id int default (select 1 from b where x in (delete))) ").ok).toBe(false);
+    expect(validateDdl("create policy p on t for all using (true); update t set x = 1").ok).toBe(false);
+    expect(validateDdl("create table auth.profiles (id uuid references auth.users(id) on delete cascade)").ok).toBe(false);
+  });
   it("ignores semicolons inside string literals and comments", () => {
     expect(validateDdl("create table a (x text default 'a;b'); -- drop table a").ok).toBe(true);
   });
