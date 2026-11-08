@@ -47,7 +47,7 @@ function DemoHtmlTab({ lead, pushToast }: { lead: LeadDetail; pushToast: (t: str
   if (!lead.lead.demo_project_id) {
     return (
       <div style={{ padding: "30px 4px", textAlign: "center", color: "var(--text-ghost)", fontSize: 12.5 }}>
-        No demo built yet. Finish the 12-question consultation, then hit &quot;Build Free Demo&quot; in the chat.
+        No demo built yet. Finish the short consultation, then hit &quot;Build Free Demo&quot; in the chat.
       </div>
     );
   }

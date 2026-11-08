@@ -44,11 +44,25 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
   } else if (channel === "email") {
     if (!lead.contact_email) throw new Error("Lead has no email on file for email outreach.");
     const resend = await getResend();
+    // Sent from the monitored support mailbox, with Reply-To set to it, so a
+    // reply lands where a human reads it. The footer discloses that this is
+    // an AI sales assistant, gives a one-line opt-out and the sender's
+    // postal address (CAN-SPAM requires one; set VOIIE_POSTAL_ADDRESS in
+    // Vercel). A STOP reply must be marked do-not-contact on the lead.
+    const postal = process.env.VOIIE_POSTAL_ADDRESS;
+    const footer = [
+      "",
+      "--",
+      "Sent by VOIIE, GYSM's AI sales assistant (https://www.gysm.io).",
+      "Not interested? Reply STOP and you won't hear from us again.",
+      ...(postal ? [postal] : []),
+    ].join("\n");
     await resend.emails.send({
-      from: "VOIIE <voiie@gysm.io>",
+      from: "GYSM <info@gysm.io>",
+      replyTo: "info@gysm.io",
       to: lead.contact_email,
       subject: `Free 10-minute website demo for ${lead.handle}`,
-      text: message,
+      text: `${message}\n${footer}`,
     });
   } else if (channel === "twitter") {
     const userId = await lookupUserIdByHandle(lead.handle);

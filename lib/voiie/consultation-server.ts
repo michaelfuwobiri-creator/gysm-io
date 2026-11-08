@@ -43,7 +43,7 @@ export async function saveReplyAndAdvance(leadId: string, currentIndex: number, 
     leadId,
     "outbound",
     "system",
-    nextQuestion ? nextQuestion.prompt : "That's everything I need — 12/12! Building your free demo now. ✨"
+    nextQuestion ? nextQuestion.prompt : "That's everything I need — thank you! Building your free demo now. ✨"
   );
 
   if (lead.status === "new" || lead.status === "contacted") await updateLeadStatus(leadId, "consulting");

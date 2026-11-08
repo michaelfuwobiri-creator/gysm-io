@@ -1,4 +1,5 @@
-// The 12-question consultation flow. This is the single source of truth
+// The 4-question consultation flow (kept short on purpose: people replying to a
+// cold DM drop off fast, and the AI fills in pages/features/copy itself). This is the single source of truth
 // for question order/copy -- both app/voiie (the chat UI) and the
 // WhatsApp/Twitter/Threads webhook handlers (driving the same flow over
 // chat) import from here, so the questions never drift out of sync
@@ -8,24 +9,9 @@
 import type { LeadAnswers, VoiieQuestion } from "@/types/voiie";
 
 export const VOIIE_QUESTIONS: VoiieQuestion[] = [
-  { key: "appType", short: "App type", type: "single", prompt: "What type of web app are you building?", options: ["Landing Page", "Booking Site", "SaaS Platform", "E-commerce", "Portfolio"] },
-  { key: "experience", short: "Existing site", type: "domain", prompt: "Are you a first-timer, or do you already have a website? Drop the link if so." },
   { key: "business", short: "Business", type: "text", prompt: "What's your business name, and what do you do — in one sentence?", placeholder: "e.g. Sara Dental Clinic — checkups, cleanings & cosmetic dentistry in Zagreb" },
   { key: "goal", short: "Goal", type: "single", prompt: "What's the main goal for the site?", options: ["Leads", "Bookings", "Sales", "Credibility"] },
-  { key: "pages", short: "Pages", type: "multi", prompt: "Which pages do you need?", options: ["Home", "About", "Services", "Booking", "Contact", "Pricing"] },
-  {
-    key: "features",
-    short: "Features",
-    type: "multi",
-    prompt: "Any special features?",
-    options: ["Stripe Payments", "Bookings", "Calendly", "Personal Info Forms", "WhatsApp"],
-    icons: { "Stripe Payments": "card", Bookings: "calendar", Calendly: "calendar", "Personal Info Forms": "form", WhatsApp: "whatsapp" },
-  },
-  { key: "assets", short: "Assets", type: "file", prompt: "Got a logo, brand colors, photos, or sites you like the look of? Drop them here." },
-  { key: "content", short: "Content", type: "single", prompt: "Who's writing the text? You, us, or should VOIIE draft it with AI?", options: ["I'll provide it", "You write it", "AI-written"] },
-  { key: "domain", short: "Domain", type: "text", prompt: "What domain name do you want — and do you already own it?", placeholder: "e.g. saradental.hr — not yet owned" },
-  { key: "timeline", short: "Timeline", type: "text", prompt: "What's your timeline, and roughly what budget did you have in mind?", placeholder: "e.g. Live in 2 weeks, $150-250/mo budget" },
-  { key: "integrations", short: "Integrations", type: "multi", prompt: "Anything we should hook up? Existing tools to integrate.", options: ["Instagram", "WhatsApp", "Stripe", "Google Calendar"] },
+  { key: "experience", short: "Existing site", type: "domain", prompt: "Do you already have a website or domain? Drop the link if so, or say \"no\"." },
   { key: "contact", short: "Delivery", type: "contact", prompt: "Last one — where should we send the free demo? WhatsApp number or email works.", placeholder: "+385... or name@email.com" },
 ];
 

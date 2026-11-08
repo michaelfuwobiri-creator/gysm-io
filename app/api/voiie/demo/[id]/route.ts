@@ -5,7 +5,7 @@ import { buildFreeDemo } from "@/lib/voiie/demo";
 import { sendDemoReadyTemplate } from "@/lib/voiie/whatsapp";
 
 /** Builds the free demo (via lib/ai/orchestrator.ts -- see lib/voiie/demo.ts
- *  for why) once the 12-question consultation is done, saves it as a
+ *  for why) once the consultation is done, saves it as a
  *  `projects` row, and -- if the lead gave a phone number -- sends the
  *  WhatsApp "demo ready" template with the live link. Same generous
  *  timeout budget app/api/generate/route.ts gives the same underlying

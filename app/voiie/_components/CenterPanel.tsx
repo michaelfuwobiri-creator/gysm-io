@@ -275,7 +275,7 @@ export function CenterPanel({
             </div>
             <span className={"status-pill status-" + lead.lead.status} style={{ marginTop: 2, display: "inline-block" }}>
               {lead.lead.status}
-              {lead.lead.status === "consulting" ? ` ${answered}/12` : ""}
+              {lead.lead.status === "consulting" ? ` ${answered}/${TOTAL_QUESTIONS}` : ""}
             </span>
           </div>
         </div>
@@ -299,7 +299,7 @@ export function CenterPanel({
             CONSULTATION PROGRESS
           </span>
           <span className="font-mono grad-fv-text" style={{ fontSize: 11, fontWeight: 700 }}>
-            {answered}/12 &middot; {pct}%
+            {answered}/{TOTAL_QUESTIONS} &middot; {pct}%
           </span>
         </div>
         <div className="progress-track">

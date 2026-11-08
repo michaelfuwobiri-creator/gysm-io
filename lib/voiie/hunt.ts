@@ -136,8 +136,13 @@ export async function huntClients(params: {
   }
 
   const query = params.query ?? DEFAULT_HUNT_QUERY;
-  const placesQuery = params.placesQuery ?? (DEFAULT_PLACES_QUERY || undefined);
-  const platforms = params.platforms ?? (["twitter", "threads"] as Platform[]);
+  // Fall back to the VOIIE_PLACES_QUERY env var (the daily cron already
+  // reads it) so the "Hunt Now" button also searches Google Places when no
+  // query is typed in. Before, it silently ran Twitter/Threads only, and
+  // Twitter's search now answers 402 (paid plan required), so it found 0.
+  const placesQuery = params.placesQuery ?? (process.env.VOIIE_PLACES_QUERY || DEFAULT_PLACES_QUERY || undefined);
+  const platforms =
+    params.platforms ?? (placesQuery ? (["places", "twitter", "threads"] as Platform[]) : (["twitter", "threads"] as Platform[]));
 
   const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
   const candidates = (await collectCandidates(query, platforms, placesQuery))
