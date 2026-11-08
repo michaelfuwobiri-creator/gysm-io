@@ -266,11 +266,11 @@ export function CenterPanel({
       <div style={{ height: 59, flexShrink: 0, background: "var(--panel-2)", borderBottom: "1px solid var(--border)", padding: "0 16px" }} className="flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="avatar-grad" style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>
-            {lead.lead.handle.replace("@", "")[0]?.toUpperCase() ?? "V"}
+            {(lead.lead.display_name || lead.lead.handle).replace("@", "")[0]?.toUpperCase() ?? "V"}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span style={{ fontSize: 13, fontWeight: 700 }}>{lead.lead.handle}</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{lead.lead.display_name || lead.lead.handle}</span>
               <meta.Icon style={{ width: 11, height: 11, color: meta.color }} />
             </div>
             <span className={"status-pill status-" + lead.lead.status} style={{ marginTop: 2, display: "inline-block" }}>
@@ -310,7 +310,7 @@ export function CenterPanel({
       <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-3" style={{ padding: 16 }}>
         {lead.messages.length === 0 && (
           <div style={{ fontSize: 12, color: "var(--text-ghost)", textAlign: "center", marginTop: 20 }}>
-            No conversation yet. Hunter hasn&apos;t reached out to {lead.lead.handle}.
+            No conversation yet. Hunter hasn&apos;t reached out to {lead.lead.display_name || lead.lead.handle}.
           </div>
         )}
         {lead.messages.map((m) =>

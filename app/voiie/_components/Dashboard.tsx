@@ -68,7 +68,7 @@ export function Dashboard({ initialLeads }: { initialLeads: VoiieLead[] }) {
   const filteredLeads = leads.filter((l) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return l.handle.toLowerCase().includes(q) || (l.signal ?? "").toLowerCase().includes(q);
+    return l.handle.toLowerCase().includes(q) || (l.display_name ?? "").toLowerCase().includes(q) || (l.signal ?? "").toLowerCase().includes(q);
   });
 
   const stats = {

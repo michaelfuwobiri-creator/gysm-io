@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       displayName: body?.displayName ?? null,
       bio: body?.bio ?? null,
       signal: body?.signal ?? "manually added",
+      contactEmail: typeof body?.contactEmail === "string" && body.contactEmail.includes("@") ? body.contactEmail.trim() : null,
+      contactPhone: typeof body?.contactPhone === "string" && body.contactPhone.trim() ? body.contactPhone.trim() : null,
     });
 
     if (!id) return Response.json({ error: "You already have a lead for that handle." }, { status: 409 });

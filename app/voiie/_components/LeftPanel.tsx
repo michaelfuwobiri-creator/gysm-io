@@ -112,11 +112,11 @@ export function LeftPanel({
                 className="avatar-grad"
                 style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 }}
               >
-                {lead.handle.replace("@", "")[0]?.toUpperCase() ?? "V"}
+                {(lead.display_name || lead.handle).replace("@", "")[0]?.toUpperCase() ?? "V"}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{lead.handle}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{lead.display_name || lead.handle}</span>
                   <meta.Icon style={{ width: 11, height: 11, color: meta.color, flexShrink: 0 }} />
                 </div>
                 <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
