@@ -6,14 +6,34 @@ import { getLeadUnscoped, addMessage, updateLeadStatus, getSettings } from "@/li
 import { sendWhatsAppText } from "@/lib/voiie/whatsapp";
 import { sendTwitterDM, lookupUserIdByHandle } from "@/lib/voiie/twitter";
 import { DEFAULT_OUTREACH_TEMPLATE } from "@/lib/voiie/constants";
-import { pickOutreachTemplate } from "@/lib/voiie/spintax";
-import { getResend } from "@/lib/email/resend";
+import { pickOutreachTemplate, pickPlacesTemplate } from "@/lib/voiie/spintax";
+import { sendVoiieEmail } from "@/lib/voiie/email";
+import { intakeUrl } from "@/lib/voiie/links";
 import type { OutreachChannel, VoiieLead } from "@/types/voiie";
 
 export const DEFAULT_TEMPLATE = DEFAULT_OUTREACH_TEMPLATE;
 
-export function renderTemplate(template: string, lead: Pick<VoiieLead, "handle" | "signal">): string {
-  return template.replace(/\{name\}/g, lead.handle).replace(/\{pain\}/g, lead.signal || "a website");
+/** Name to address the lead by: a Places lead's `handle` is a Google Place
+ *  ID (not something a human should be greeted with), so prefer the
+ *  business name when there is one. */
+export function leadLabel(lead: Pick<VoiieLead, "handle" | "display_name">): string {
+  return lead.display_name?.trim() || lead.handle;
+}
+
+export function renderTemplate(
+  template: string,
+  lead: Pick<VoiieLead, "handle" | "signal" | "display_name">,
+  link?: string
+): string {
+  let out = template
+    .replace(/\{name\}/g, leadLabel(lead))
+    .replace(/\{business\}/g, leadLabel(lead))
+    .replace(/\{pain\}/g, lead.signal || "a website")
+    .replace(/\{link\}/g, link ?? "");
+  // Every first touch carries the self-serve link (30-second form -> demo
+  // + pay link by email), so a reply is not needed to get started.
+  if (link && !template.includes("{link}")) out += `\n\nStart here (30 seconds, no signup): ${link}`;
+  return out;
 }
 
 /**
@@ -35,35 +55,30 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
   const settings = await getSettings(lead.owner_user_id);
   if (settings.kill_switch) throw new Error("Outreach is paused (kill switch is on).");
 
-  const effectiveTemplate = template ?? (settings.spintax_enabled ? pickOutreachTemplate() : DEFAULT_TEMPLATE);
-  const message = renderTemplate(effectiveTemplate, lead);
+  const effectiveTemplate =
+    template ??
+    (lead.platform === "places"
+      ? pickPlacesTemplate()
+      : settings.spintax_enabled
+        ? pickOutreachTemplate()
+        : DEFAULT_TEMPLATE);
+  const message = renderTemplate(effectiveTemplate, lead, intakeUrl(lead.id));
 
   if (channel === "whatsapp") {
     if (!lead.contact_phone) throw new Error("Lead has no phone number on file for WhatsApp outreach.");
     await sendWhatsAppText(lead.contact_phone, message);
   } else if (channel === "email") {
     if (!lead.contact_email) throw new Error("Lead has no email on file for email outreach.");
-    const resend = await getResend();
-    // Sent from the monitored support mailbox, with Reply-To set to it, so a
-    // reply lands where a human reads it. The footer discloses that this is
-    // an AI sales assistant, gives a one-line opt-out and the sender's
-    // postal address (CAN-SPAM requires one; set VOIIE_POSTAL_ADDRESS in
-    // Vercel). A STOP reply must be marked do-not-contact on the lead.
-    const postal = process.env.VOIIE_POSTAL_ADDRESS;
-    const footer = [
-      "",
-      "--",
-      "Sent by VOIIE, GYSM's AI sales assistant (https://www.gysm.io).",
-      "Not interested? Reply STOP and you won't hear from us again.",
-      ...(postal ? [postal] : []),
-    ].join("\n");
-    await resend.emails.send({
-      from: "GYSM <info@gysm.io>",
-      replyTo: "info@gysm.io",
-      to: lead.contact_email,
-      subject: `Free 10-minute website demo for ${lead.handle}`,
-      text: `${message}\n${footer}`,
+    // sendVoiieEmail adds the compliance footer (AI disclosure, postal
+    // address, unsubscribe link + List-Unsubscribe headers) and logs the
+    // message itself, so return early instead of double-logging below.
+    await sendVoiieEmail(lead, {
+      subject: `A free website demo for ${leadLabel(lead)}`,
+      body: message,
+      kind: "first_touch",
     });
+    if (lead.status === "new") await updateLeadStatus(leadId, "contacted");
+    return;
   } else if (channel === "twitter") {
     const userId = await lookupUserIdByHandle(lead.handle);
     if (!userId) throw new Error(`Could not resolve Twitter user id for ${lead.handle}.`);

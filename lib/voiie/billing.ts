@@ -11,6 +11,7 @@ import { getStripe, getPlanById, getPriceId, DEFAULT_LIVE_PRICE_IDS } from "@/li
 import { addCredits } from "@/lib/credits";
 import { sql } from "@/lib/db";
 import { addDomainToProject } from "@/lib/vercelDomains";
+import { notifyOwner } from "@/lib/voiie/notify";
 import { getLeadUnscoped, setPlanQuote, markConverted, createCustomer, createRenewal, getConsultationAnswers } from "@/lib/voiie/db";
 import type { LeadAnswers, VoiiePlanId } from "@/types/voiie";
 
@@ -57,7 +58,8 @@ export async function createRenewalCheckoutLink(params: { renewalId: string; cus
 export async function createVoiieCheckoutSession(leadId: string, planId: VoiiePlanId): Promise<{ url: string }> {
   const lead = await getLeadUnscoped(leadId);
   if (!lead) throw new Error("Lead not found.");
-  if (!lead.contact_email) throw new Error("This lead has no email on file -- collect one in the consultation before checkout.");
+  // No email on file is fine: Stripe Checkout collects one itself and the
+  // webhook reads it back from session.customer_details.email.
 
   const plan = getPlanById(planId);
   if (!plan) throw new Error(`Unknown VOIIE plan "${planId}".`);
@@ -71,7 +73,7 @@ export async function createVoiieCheckoutSession(leadId: string, planId: VoiiePl
       mode: "payment",
       payment_method_types: ["card"],
       line_items: [{ price, quantity: 1 }],
-      customer_email: lead.contact_email,
+      ...(lead.contact_email ? { customer_email: lead.contact_email } : {}),
       // source + leadId (not client_reference_id/userId, which the normal
       // gysm.io checkout path uses) is how the webhook tells a VOIIE
       // conversion apart from a regular plan purchase -- see the branch in
@@ -171,6 +173,7 @@ export async function convertLeadToCustomer(leadId: string, planId: string, emai
 
   // 5. Close the loop on the lead record.
   await markConverted(lead.id, clerkUserId);
+  await notifyOwner(`💰 PAID: ${lead.display_name || lead.handle} bought ${planId} (${email}).`);
 
   // 6. Production/renewal bookkeeping (voiie_customers + voiie_renewals --
   // see db/migrations/0017_voiie_v2.sql). Best-effort and non-fatal: the

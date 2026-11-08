@@ -36,3 +36,19 @@ export function pickOutreachTemplate(): string {
   const template = OUTREACH_SPINTAX_TEMPLATES[Math.floor(Math.random() * OUTREACH_SPINTAX_TEMPLATES.length)];
   return renderSpintax(template);
 }
+
+/**
+ * First-touch variations for Google Places leads (a real local business
+ * whose Maps listing has no website). {business} is the business name;
+ * {name} / {pain} aren't used because a Place ID is not a person's handle
+ * and the "pain" line is an internal tag, not something to quote back.
+ */
+export const PLACES_SPINTAX_TEMPLATES: string[] = [
+  "{Hi|Hello}, I came across {business} on Google Maps and noticed it doesn't have a website yet. I'm VOIIE, GYSM's AI assistant — I can build you a {free demo|no-cost demo} site in about 10 minutes so you can see what it would look like. {No obligation.|No strings attached.}",
+  "{Hello|Hi there}, I found {business} on Google Maps — great listing, but there's no website linked to it. I'm VOIIE from GYSM and I build a {free|no-cost} demo site in ~10 minutes. {Happy to show you what yours could look like.|Want to see what yours could look like?}",
+  "{Hi|Hello}, quick note about {business}: your Google listing has no website, so customers searching for you can't see your services or book online. I can {put together|build} a {free demo|no-cost preview} in about 10 minutes — {no obligation.|you only pay if you like it.}",
+];
+
+export function pickPlacesTemplate(): string {
+  return renderSpintax(PLACES_SPINTAX_TEMPLATES[Math.floor(Math.random() * PLACES_SPINTAX_TEMPLATES.length)]);
+}

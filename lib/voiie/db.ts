@@ -378,3 +378,81 @@ export async function listDueRenewals(daysAhead: number): Promise<DueRenewal[]> 
     contactEmail: row.contact_email,
   }));
 }
+
+// ============================================================================
+// Autopilot queries (lib/voiie/pipeline.ts + app/api/voiie/cron/autopilot).
+// All derived from existing columns -- no schema change.
+// ============================================================================
+
+/** Outbound emails logged today (UTC) across this operator's leads --
+ *  what the daily auto-send cap is checked against. */
+export async function countEmailsSentToday(ownerUserId: string): Promise<number> {
+  const rows = await sql`
+    select count(*)::int as n
+    from voiie_messages m join voiie_leads l on l.id = m.lead_id
+    where l.owner_user_id = ${ownerUserId} and m.direction = 'outbound' and m.channel = 'email'
+      and m.created_at >= date_trunc('day', now())
+  `;
+  return (rows[0] as any)?.n ?? 0;
+}
+
+/** Brand-new, emailable, contactable leads, oldest first. */
+export async function listLeadsReadyForFirstTouch(ownerUserId: string, limit: number): Promise<VoiieLead[]> {
+  const rows = await sql`
+    select * from voiie_leads
+    where owner_user_id = ${ownerUserId} and status = 'new' and do_not_contact = false
+      and contact_email is not null and contact_email <> ''
+    order by created_at asc
+    limit ${limit}
+  `;
+  return rows as unknown as VoiieLead[];
+}
+
+export interface EmailThreadSummary {
+  lead: VoiieLead;
+  emailsSent: number;
+  lastEmailAt: string;
+  lastInboundAt: string | null;
+  payNudges: number;
+}
+
+/** Leads that have been emailed, with how many we've sent, when the last
+ *  one went, and whether they've ever answered. `statuses` narrows which
+ *  lifecycle stage to look at. */
+export async function listEmailThreads(ownerUserId: string, statuses: string[]): Promise<EmailThreadSummary[]> {
+  const rows = await sql`
+    select l.*,
+      (select count(*)::int from voiie_messages m where m.lead_id = l.id and m.direction = 'outbound' and m.channel = 'email') as emails_sent,
+      (select max(m.created_at) from voiie_messages m where m.lead_id = l.id and m.direction = 'outbound' and m.channel = 'email') as last_email_at,
+      (select max(m.created_at) from voiie_messages m where m.lead_id = l.id and m.direction = 'inbound') as last_inbound_at,
+      (select count(*)::int from voiie_messages m where m.lead_id = l.id and m.channel = 'email' and m.meta->>'kind' = 'pay_nudge') as pay_nudges
+    from voiie_leads l
+    where l.owner_user_id = ${ownerUserId} and l.status = any(${statuses}) and l.do_not_contact = false
+      and l.contact_email is not null and l.contact_email <> ''
+  `;
+  return (rows as any[]).map((r) => {
+    const { emails_sent, last_email_at, last_inbound_at, pay_nudges, ...lead } = r;
+    return {
+      lead: lead as VoiieLead,
+      emailsSent: emails_sent ?? 0,
+      lastEmailAt: last_email_at ? new Date(last_email_at).toISOString() : "",
+      lastInboundAt: last_inbound_at ? new Date(last_inbound_at).toISOString() : null,
+      payNudges: pay_nudges ?? 0,
+    };
+  });
+}
+
+/** Leads whose intake is fully answered but whose demo never got built
+ *  (the visitor closed the tab mid-build, or the build errored). */
+export async function listLeadsAwaitingDemo(ownerUserId: string, limit: number): Promise<VoiieLead[]> {
+  const rows = await sql`
+    select l.* from voiie_leads l join voiie_consultations c on c.lead_id = l.id
+    where l.owner_user_id = ${ownerUserId} and c.completed_at is not null
+      and l.demo_project_id is null and l.do_not_contact = false
+      and l.status not in ('paid','converted','deployed','lost')
+      and c.completed_at > now() - interval '3 days'
+    order by c.completed_at asc
+    limit ${limit}
+  `;
+  return rows as unknown as VoiieLead[];
+}

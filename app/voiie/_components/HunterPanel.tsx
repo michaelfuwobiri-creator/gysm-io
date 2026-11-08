@@ -19,7 +19,7 @@ export function HunterPanel({
 }) {
   const [huntQuery, setHuntQuery] = useState(DEFAULT_HUNT_QUERY);
   const [placesQuery, setPlacesQuery] = useState(DEFAULT_PLACES_QUERY);
-  const [platforms, setPlatforms] = useState({ Twitter: true, Threads: true, Places: false });
+  const [platforms, setPlatforms] = useState({ Twitter: false, Threads: false, Places: true });
   const [scanning, setScanning] = useState(false);
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [channels, setChannels] = useState({ twitter: true, whatsapp: true, email: true });
