@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
 import { getLead } from "@/lib/voiie/db";
-import { sendOutreach, DEFAULT_TEMPLATE } from "@/lib/voiie/outreach";
+import { sendOutreach } from "@/lib/voiie/outreach";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await getUser();
@@ -16,7 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (channel !== "whatsapp" && channel !== "email" && channel !== "twitter") {
       return Response.json({ error: "channel must be whatsapp, email, or twitter." }, { status: 400 });
     }
-    const template = typeof body?.template === "string" && body.template.trim() ? body.template : DEFAULT_TEMPLATE;
+    // No explicit template -> let sendOutreach pick the right spintax set
+    // (weak-site / Places / social); forcing DEFAULT_TEMPLATE here used to
+    // send "saw you need <internal tag>" to every dashboard-triggered email.
+    const template = typeof body?.template === "string" && body.template.trim() ? body.template : undefined;
 
     await sendOutreach(lead.id, channel, template);
     return Response.json({ ok: true });
