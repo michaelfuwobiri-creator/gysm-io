@@ -22,6 +22,9 @@ export async function sendVoiieEmail(
     "",
     "--",
     "Sent by VOIIE, GYSM's AI sales assistant (https://www.gysm.io).",
+    ...(params.kind === "first_touch"
+      ? ["You're receiving this one-time message because your business email address is published on your website or business listing."]
+      : []),
     `Not interested? Unsubscribe here and you won't hear from us again: ${unsub}`,
     ...(postal ? [postal] : []),
   ].join("\n");

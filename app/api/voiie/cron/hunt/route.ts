@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     // to also fold Google Places' no-website-on-file businesses into the
     // daily unattended sweep, same as the dashboard's Hunt Now can.
     const placesQuery = process.env.VOIIE_PLACES_QUERY || undefined;
-    const platforms: Platform[] = placesQuery ? ["twitter", "threads", "places"] : ["twitter", "threads"];
+    const social = process.env.VOIIE_SOCIAL_HUNT === "1";
+    const platforms: Platform[] = placesQuery ? (social ? ["twitter", "threads", "places"] : ["places"]) : social ? ["twitter", "threads"] : [];
     const result = await huntClients({ ownerUserId, placesQuery, platforms });
     return Response.json({ ok: true, ...result });
   } catch (error: any) {

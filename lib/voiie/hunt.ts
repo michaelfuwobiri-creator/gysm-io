@@ -7,7 +7,9 @@
 import { countLeadsHuntedToday, createLeadIfNew, getSettings } from "@/lib/voiie/db";
 import { searchTweets } from "@/lib/voiie/twitter";
 import { searchThreads } from "@/lib/voiie/threads";
-import { searchBusinessesWithoutWebsite } from "@/lib/voiie/places";
+import { searchBusinessesWithoutWebsite, type PlaceLead } from "@/lib/voiie/places";
+import { auditSite } from "@/lib/voiie/site-contact";
+import { detectRegion, regionAllowsColdEmail } from "@/lib/voiie/compliance";
 import { DEFAULT_HUNT_QUERY, DEFAULT_PLACES_QUERY } from "@/lib/voiie/constants";
 import type { Platform } from "@/types/voiie";
 
@@ -20,6 +22,8 @@ interface Candidate {
   displayName?: string | null;
   bio?: string | null;
   contactPhone?: string | null;
+  contactEmail?: string | null;
+  tags?: string[];
 }
 
 const PAIN_PATTERNS: Array<{ re: RegExp; label: string }> = [
@@ -49,12 +53,50 @@ export function isLead(text: string): boolean {
   return needsSomething && aboutWeb && notHiringAgency;
 }
 
+/**
+ * "Reachable lead" mode. Places never returns an email, and a business with
+ * no website has none to read -- so for businesses that DO have a website we
+ * read the public contact email they published there and keep only the ones
+ * whose site is weak (not mobile-friendly / no HTTPS / stale / thin), where a
+ * free redesign demo is a relevant offer. Only regions where cold B2B email is
+ * enabled (VOIIE_COLD_EMAIL_REGIONS, default US) are audited, so no EU
+ * addresses are collected by default. Off with VOIIE_WEAK_SITE_MODE=off.
+ */
+async function weakSiteCandidates(withSite: PlaceLead[]): Promise<Candidate[]> {
+  if (process.env.VOIIE_WEAK_SITE_MODE === "off") return [];
+  const eligible = withSite
+    .filter((b) => b.websiteUri && regionAllowsColdEmail(detectRegion({ bio: b.address, contact_phone: b.phone })))
+    .slice(0, 12); // keeps the run well inside the 60s route budget
+  const out: Candidate[] = [];
+  for (let i = 0; i < eligible.length; i += 4) {
+    const batch = eligible.slice(i, i + 4);
+    const audits = await Promise.all(batch.map((b) => auditSite(b.websiteUri as string).catch(() => null)));
+    audits.forEach((a, idx) => {
+      const b = batch[idx];
+      if (!a || !a.weak || !a.email) return;
+      out.push({
+        handle: b.placeId,
+        platform: "places",
+        pain: `Outdated website (${a.reasons.join(", ")}) ${a.url}`,
+        displayName: b.name,
+        bio: b.address,
+        contactPhone: b.phone,
+        contactEmail: a.email,
+        tags: ["weak-site", "email-from-own-site"],
+      });
+    });
+  }
+  return out;
+}
+
 async function collectCandidates(query: string, platforms: Platform[], placesQuery?: string): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
 
   if (platforms.includes("places") && placesQuery) {
     try {
-      const businesses = await searchBusinessesWithoutWebsite(placesQuery, 20);
+      const all = await searchBusinessesWithoutWebsite(placesQuery, 20, "all");
+      const businesses = all.filter((b) => !b.websiteUri);
+      candidates.push(...(await weakSiteCandidates(all.filter((b) => b.websiteUri))));
       for (const b of businesses) {
         candidates.push({
           // Place ID, not a handle -- it's the stable, unique identifier
@@ -141,8 +183,16 @@ export async function huntClients(params: {
   // query is typed in. Before, it silently ran Twitter/Threads only, and
   // Twitter's search now answers 402 (paid plan required), so it found 0.
   const placesQuery = params.placesQuery ?? (process.env.VOIIE_PLACES_QUERY || DEFAULT_PLACES_QUERY || undefined);
+  // Twitter/X search answers 402 (paid plan) and Threads needs a token, so
+  // social hunting is opt-in: set VOIIE_SOCIAL_HUNT=1 to include them.
+  const social = process.env.VOIIE_SOCIAL_HUNT === "1";
   const platforms =
-    params.platforms ?? (placesQuery ? (["places", "twitter", "threads"] as Platform[]) : (["twitter", "threads"] as Platform[]));
+    params.platforms ??
+    (placesQuery
+      ? (social ? (["places", "twitter", "threads"] as Platform[]) : (["places"] as Platform[]))
+      : social
+        ? (["twitter", "threads"] as Platform[])
+        : ([] as Platform[]));
 
   const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
   const candidates = (await collectCandidates(query, platforms, placesQuery))
@@ -159,6 +209,8 @@ export async function huntClients(params: {
       displayName: c.displayName,
       bio: c.bio,
       contactPhone: c.contactPhone,
+      contactEmail: c.contactEmail,
+      tags: c.tags,
     });
     if (id) leadIds.push(id);
   }

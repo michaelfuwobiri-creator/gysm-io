@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/voiie/cron/autopilot",
-      "schedule": "17 9 * * 1-5"
+      "schedule": "17 15 * * 1-5"
     },
     {
       "path": "/api/voiie/cron/renewals",

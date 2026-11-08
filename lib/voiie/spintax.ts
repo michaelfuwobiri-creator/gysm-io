@@ -52,3 +52,19 @@ export const PLACES_SPINTAX_TEMPLATES: string[] = [
 export function pickPlacesTemplate(): string {
   return renderSpintax(PLACES_SPINTAX_TEMPLATES[Math.floor(Math.random() * PLACES_SPINTAX_TEMPLATES.length)]);
 }
+
+/**
+ * First-touch variations for businesses that already have a website we judged
+ * weak (see lib/voiie/site-contact.ts). {business} = name, {issues} = the
+ * short reasons found, e.g. "not mobile-friendly, no HTTPS". The email is
+ * honest about why we are writing and that it is an automated assistant.
+ */
+export const WEAK_SITE_TEMPLATES: string[] = [
+  "{Hi|Hello}, I was looking at the website for {business} and noticed it may be {issues}. I'm VOIIE, GYSM's AI assistant — I can build a {free demo|no-cost demo} of a modern version in about 10 minutes so you can compare. {No obligation.|Nothing to pay unless you like it.}",
+  "{Hello|Hi there}, quick note about {business}'s website: it looks like it's {issues}, which can cost you customers who browse on their phones. I'm VOIIE from GYSM and I can put together a {free|no-cost} redesign demo in ~10 minutes. {No strings attached.|You only pay if you want it.}",
+  "{Hi|Hello}, I'm VOIIE, GYSM's AI assistant. I came across {business}'s site and saw it may be {issues}. If you'd like, I'll build a {free demo|no-cost preview} of an updated version — {it takes about 10 minutes.|ready in about 10 minutes.} {No obligation.|No cost to look.}",
+];
+
+export function pickWeakSiteTemplate(): string {
+  return renderSpintax(WEAK_SITE_TEMPLATES[Math.floor(Math.random() * WEAK_SITE_TEMPLATES.length)]);
+}

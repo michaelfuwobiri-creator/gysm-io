@@ -13,6 +13,7 @@ import { intakeUrl } from "@/lib/voiie/links";
 import { createVoiieCheckoutSession } from "@/lib/voiie/billing";
 import { buildDemoAndDeliver } from "@/lib/voiie/pipeline";
 import { notifyOwner } from "@/lib/voiie/notify";
+import { coldEmailAllowed, postalAddressConfigured } from "@/lib/voiie/compliance";
 
 const DAY = 24 * 60 * 60 * 1000;
 const ageDays = (iso: string) => (Date.now() - new Date(iso).getTime()) / DAY;
@@ -71,6 +72,8 @@ export async function GET(req: NextRequest) {
   const cap = Math.max(0, parseInt(process.env.VOIIE_AUTOSEND_DAILY_CAP || "0", 10) || 0);
   if (cap === 0) {
     report.skipped = "autosend_off (set VOIIE_AUTOSEND_DAILY_CAP to enable cold sends)";
+  } else if (!postalAddressConfigured()) {
+    report.skipped = "VOIIE_POSTAL_ADDRESS not set -- CAN-SPAM requires a postal address in every cold email";
   } else {
     let budget = cap - (await countEmailsSentToday(owner));
 
@@ -78,6 +81,7 @@ export async function GET(req: NextRequest) {
     //     day 3, then day 8 (final), then mark lost after another 5 days.
     for (const t of await listEmailThreads(owner, ["contacted"])) {
       if (t.lastInboundAt) continue; // they replied -- a human should take it from here
+      if (!coldEmailAllowed(t.lead).ok) continue; // region not enabled for automated cold email
       const last = ageDays(t.lastEmailAt);
       try {
         if (t.emailsSent === 1 && last >= 3 && budget > 0) {
@@ -105,7 +109,8 @@ export async function GET(req: NextRequest) {
 
     // 3b. Fresh first touches with whatever budget is left.
     if (budget > 0) {
-      for (const lead of await listLeadsReadyForFirstTouch(owner, budget)) {
+      const ready = (await listLeadsReadyForFirstTouch(owner, budget * 5)).filter((l) => coldEmailAllowed(l).ok).slice(0, budget);
+      for (const lead of ready) {
         try {
           await sendOutreach(lead.id, "email");
           report.firstTouch++;

@@ -5,9 +5,11 @@ import {
   parseIncomingMessage,
   verifyTwilioSignature,
   parseTwilioIncoming,
+  sendWhatsAppText,
   type IncomingWhatsAppMessage,
 } from "@/lib/voiie/whatsapp";
-import { findLeadByContact, getConsultationAnswers } from "@/lib/voiie/db";
+import { findLeadByContact, getConsultationAnswers, setDoNotContact, addMessage } from "@/lib/voiie/db";
+import { isOptOutMessage } from "@/lib/voiie/compliance";
 import { saveReplyAndAdvance } from "@/lib/voiie/consultation-server";
 
 /** Meta's verification handshake when you (re-)register this URL in
@@ -73,6 +75,21 @@ export async function POST(req: NextRequest) {
       console.warn("[voiie/webhooks/whatsapp] no lead found for phone", incoming.from);
       return Response.json({ ok: true });
     }
+
+    // Inbound = proof of opt-in (unlocks WhatsApp replies) -- but STOP-type
+    // messages must opt the lead out, never be fed to the intake as an answer.
+    await addMessage(lead.id, "inbound", "whatsapp", incoming.text);
+    if (isOptOutMessage(incoming.text)) {
+      await setDoNotContact(lead.id, true);
+      await addMessage(lead.id, "inbound", "system", "Opted out via WhatsApp — marked do-not-contact.");
+      try {
+        await sendWhatsAppText(incoming.from, "You're unsubscribed from GYSM / VOIIE and won't receive more messages.");
+      } catch {
+        /* confirmation is best-effort */
+      }
+      return Response.json({ ok: true });
+    }
+    if (lead.do_not_contact) return Response.json({ ok: true });
 
     const state = await getConsultationAnswers(lead.id);
     await saveReplyAndAdvance(lead.id, state.currentQuestion, incoming.text);

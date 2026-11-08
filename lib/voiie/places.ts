@@ -22,6 +22,8 @@ export interface PlaceLead {
   /** Set when the listing's "website" is just a social / link-in-bio /
    *  free-page URL (e.g. their Facebook Page) rather than a real site. */
   socialUrl: string | null;
+  /** The real website on the listing (null when none / only a social page). */
+  websiteUri: string | null;
 }
 
 // Hosts that mean "this business has no real website, just a profile":
@@ -60,6 +62,7 @@ const FIELD_MASK = [
   "places.websiteUri",
   "places.rating",
   "places.primaryTypeDisplayName",
+  "places.businessStatus",
 ].join(",");
 
 /**
@@ -75,7 +78,13 @@ const FIELD_MASK = [
  * configured, matching lib/voiie/threads.ts's graceful-degrade pattern --
  * hunt.ts can run off Twitter/Threads alone if Places isn't set up yet.
  */
-export async function searchBusinessesWithoutWebsite(query: string, maxResults = 20): Promise<PlaceLead[]> {
+export async function searchBusinessesWithoutWebsite(
+  query: string,
+  maxResults = 20,
+  /** "all" also returns businesses WITH a real website (for the weak-site /
+   *  public-contact-email mode); one API call serves both modes. */
+  mode: "no-website" | "all" = "no-website"
+): Promise<PlaceLead[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey || !query.trim()) return [];
 
@@ -107,13 +116,15 @@ export async function searchBusinessesWithoutWebsite(query: string, maxResults =
       websiteUri?: string;
       rating?: number;
       primaryTypeDisplayName?: { text: string };
+      businessStatus?: string;
     }>;
   };
 
   return (json.places ?? [])
     // The actual "needs a website" filter: no websiteUri at all, OR only a
     // social / link-in-bio profile standing in for one.
-    .filter((p) => !p.websiteUri || isSocialOnlyUrl(p.websiteUri))
+    .filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY" && p.businessStatus !== "CLOSED_TEMPORARILY")
+    .filter((p) => mode === "all" || !p.websiteUri || isSocialOnlyUrl(p.websiteUri))
     .map((p) => ({
       placeId: p.id,
       name: p.displayName?.text ?? "Unknown business",
@@ -122,5 +133,6 @@ export async function searchBusinessesWithoutWebsite(query: string, maxResults =
       rating: p.rating ?? null,
       category: p.primaryTypeDisplayName?.text ?? "local business",
       socialUrl: p.websiteUri && isSocialOnlyUrl(p.websiteUri) ? p.websiteUri : null,
+      websiteUri: p.websiteUri && !isSocialOnlyUrl(p.websiteUri) ? p.websiteUri : null,
     }));
 }

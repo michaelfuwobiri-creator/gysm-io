@@ -32,6 +32,7 @@ export interface NewLeadCandidate {
    *  WhatsApp channel just has a head start on those leads). */
   contactPhone?: string | null;
   contactEmail?: string | null;
+  tags?: string[];
 }
 
 /** Inserts a hunted candidate as a new lead, or silently does nothing if
@@ -40,8 +41,8 @@ export interface NewLeadCandidate {
  *  lead id on insert, or null if it already existed. */
 export async function createLeadIfNew(ownerUserId: string, candidate: NewLeadCandidate): Promise<string | null> {
   const rows = await sql`
-    insert into voiie_leads (owner_user_id, platform, handle, display_name, bio, signal, contact_phone, contact_email)
-    values (${ownerUserId}, ${candidate.platform}, ${candidate.handle}, ${candidate.displayName ?? null}, ${candidate.bio ?? null}, ${candidate.signal ?? null}, ${candidate.contactPhone ?? null}, ${candidate.contactEmail ?? null})
+    insert into voiie_leads (owner_user_id, platform, handle, display_name, bio, signal, contact_phone, contact_email, tags)
+    values (${ownerUserId}, ${candidate.platform}, ${candidate.handle}, ${candidate.displayName ?? null}, ${candidate.bio ?? null}, ${candidate.signal ?? null}, ${candidate.contactPhone ?? null}, ${candidate.contactEmail ?? null}, ${candidate.tags ?? []})
     on conflict (owner_user_id, platform, lower(handle)) do nothing
     returning id
   `;
@@ -76,8 +77,13 @@ export async function getLeadUnscoped(id: string): Promise<VoiieLead | null> {
 
 export async function findLeadByContact(ownerUserId: string, phoneOrHandle: { phone?: string; handle?: string }): Promise<VoiieLead | null> {
   if (phoneOrHandle.phone) {
+    // Compare digits only: Places stores "+1 208-512-0535" while the
+    // WhatsApp webhook delivers "12085120535", so an exact match never hit.
+    const digits = phoneOrHandle.phone.replace(/\D/g, "");
     const rows = await sql`
-      select * from voiie_leads where owner_user_id = ${ownerUserId} and contact_phone = ${phoneOrHandle.phone} limit 1
+      select * from voiie_leads
+      where owner_user_id = ${ownerUserId} and regexp_replace(coalesce(contact_phone, ''), '[^0-9]', '', 'g') = ${digits}
+      limit 1
     `;
     if (rows[0]) return rows[0] as unknown as VoiieLead;
   }

@@ -2,11 +2,12 @@
 // lead over Email/WhatsApp/Twitter DM, log it on the lead's message
 // timeline, and flip status new -> contacted.
 
-import { getLeadUnscoped, addMessage, updateLeadStatus, getSettings } from "@/lib/voiie/db";
+import { getLeadUnscoped, addMessage, updateLeadStatus, getSettings, listMessages } from "@/lib/voiie/db";
 import { sendWhatsAppText } from "@/lib/voiie/whatsapp";
 import { sendTwitterDM, lookupUserIdByHandle } from "@/lib/voiie/twitter";
 import { DEFAULT_OUTREACH_TEMPLATE } from "@/lib/voiie/constants";
-import { pickOutreachTemplate, pickPlacesTemplate } from "@/lib/voiie/spintax";
+import { pickOutreachTemplate, pickPlacesTemplate, pickWeakSiteTemplate } from "@/lib/voiie/spintax";
+import { postalAddressConfigured } from "@/lib/voiie/compliance";
 import { sendVoiieEmail } from "@/lib/voiie/email";
 import { intakeUrl } from "@/lib/voiie/links";
 import type { OutreachChannel, VoiieLead } from "@/types/voiie";
@@ -28,6 +29,7 @@ export function renderTemplate(
   let out = template
     .replace(/\{name\}/g, leadLabel(lead))
     .replace(/\{business\}/g, leadLabel(lead))
+    .replace(/\{issues\}/g, lead.signal?.match(/\(([^)]+)\)/)?.[1] || "a bit dated")
     .replace(/\{pain\}/g, lead.signal || "a website")
     .replace(/\{link\}/g, link ?? "");
   // Every first touch carries the self-serve link (30-second form -> demo
@@ -57,7 +59,9 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
 
   const effectiveTemplate =
     template ??
-    (lead.platform === "places"
+    (lead.tags?.includes("weak-site")
+      ? pickWeakSiteTemplate()
+      : lead.platform === "places"
       ? pickPlacesTemplate()
       : settings.spintax_enabled
         ? pickOutreachTemplate()
@@ -65,10 +69,21 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
   const message = renderTemplate(effectiveTemplate, lead, intakeUrl(lead.id));
 
   if (channel === "whatsapp") {
+    // Meta's WhatsApp Business policy requires opt-in before any
+    // business-initiated message, and cold sends to scraped numbers get the
+    // sender number restricted. Only message people who wrote to us first.
+    const history = await listMessages(leadId);
+    if (!history.some((m) => m.direction === "inbound" && m.channel === "whatsapp")) {
+      throw new Error("WhatsApp needs opt-in: this lead has not messaged us on WhatsApp. Use email, or wait for them to reply.");
+    }
     if (!lead.contact_phone) throw new Error("Lead has no phone number on file for WhatsApp outreach.");
     await sendWhatsAppText(lead.contact_phone, message);
   } else if (channel === "email") {
     if (!lead.contact_email) throw new Error("Lead has no email on file for email outreach.");
+    // CAN-SPAM: every commercial email needs a valid postal address.
+    if (lead.platform !== "manual" && !postalAddressConfigured()) {
+      throw new Error("Set VOIIE_POSTAL_ADDRESS (a real mailing address) before emailing prospects -- CAN-SPAM requires it.");
+    }
     // sendVoiieEmail adds the compliance footer (AI disclosure, postal
     // address, unsubscribe link + List-Unsubscribe headers) and logs the
     // message itself, so return early instead of double-logging below.
