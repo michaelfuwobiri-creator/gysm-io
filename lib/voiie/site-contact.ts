@@ -63,11 +63,20 @@ export function extractEmails(html: string): string[] {
   return Array.from(found).filter((e) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !BAD_EMAIL.test(e) && !PLACEHOLDER_EMAIL.test(e));
 }
 
+const FREE_MAIL = /@(gmail|googlemail|yahoo|outlook|hotmail|live|aol|icloud|msn|proton|protonmail)\./i;
+
+/** Pick the address the business itself uses. Prefer one on the site's own
+ *  domain (role addresses first). Fall back to a free-mail address only when
+ *  that is all the site publishes (very common for small US trades). Never
+ *  pick a third-party business domain: that is usually the web agency's or a
+ *  partner's address from the footer, and mailing it is both off-target and
+ *  a spam-complaint risk. */
 function pickBestEmail(emails: string[], siteHost: string): string | null {
   if (!emails.length) return null;
   const host = siteHost.replace(/^www\./, "");
   const onDomain = emails.filter((e) => e.split("@")[1] === host || e.split("@")[1].endsWith("." + host));
-  const pool = onDomain.length ? onDomain : emails;
+  const pool = onDomain.length ? onDomain : emails.filter((e) => FREE_MAIL.test(e));
+  if (!pool.length) return null;
   const role = pool.find((e) => ROLE_LOCALPARTS.includes(e.split("@")[0]));
   return role ?? pool[0];
 }

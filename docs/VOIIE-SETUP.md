@@ -95,3 +95,12 @@ Replies are sent only when you press Send. Suggested replies are templates, not 
 ## Website change requests from leads
 
 A reply like "add my logo" / "add a booking calendar" on a lead whose demo exists is stored as a pending change (an attached image is kept as the logo). With `VOIIE_AUTOCHANGE=1`, `.github/workflows/voiie-changes.yml` (every ~10 min, same `CRON_SECRET` secret) applies it with the builder's edit pass (`editWebsite`), saves the new HTML to the demo project and emails the lead the updated link plus the pay link. Max 3 automatic changes per lead; every change keeps the previous HTML, so "Undo last change" in /voiie/inbox restores it. You can also type a change yourself in the inbox under any lead's demo and press Apply (optionally with a logo link). Attachment fetching uses Resend's Receiving attachments API and is best-effort: if it fails the request just arrives without the logo.
+
+
+## Status check 2026-11-09 (read-only: Vercel env names, runtime logs, public DNS)
+- Resend DNS for gysm.io is now in place: `resend._domainkey` DKIM TXT, `send` SPF TXT + MX (Resend's forge.rmta.net). DMARC is p=quarantine with relaxed alignment, so mail passes. Still confirm "Verified" in Resend and run the test in VOIIE-E2E-TEST.md (Gmail > Show original: SPF/DKIM/DMARC PASS).
+- Set in Vercel Production: VOIIE_POSTAL_ADDRESS, VOIIE_OWNER_USER_ID, VOIIE_AUTOSEND_DAILY_CAP=10 (Mike), VOIIE_HUNT_ROTATE=1, VOIIE_AUTOREPLY=1, VOIIE_AUTOCHANGE=1, VOIIE_REPLY_DOMAIN=estaujia.resend.app, RESEND_WEBHOOK_SECRET, TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM.
+- NOT set: TWILIO_DEMO_TEMPLATE_SID (WhatsApp template not created/approved yet), VOIIE_COLD_EMAIL_REGIONS (so only US leads are emailed, as intended).
+- STALE: STRIPE_VOIIE_STARTER/PRO/AGENCY_PRICE_ID point at inactive Stripe Prices. Checkout still works because billing.ts retries with DEFAULT_LIVE_PRICE_IDS (logged as an error each time). Fix: in Vercel set them to the active Prices price_1UByxqDE5QfMC9H1nWSHLHQM (Starter), price_1UByxsDE5QfMC9H1vpBrUsdu (Pro), price_1UByxtDE5QfMC9H1srTxLqVX (Agency) after confirming in Stripe that they are $79.99 / $199.99 / $499.99.
+- Unsubscribe link now needs one click on a confirm page (security scanners prefetch links); the List-Unsubscribe one-click header still unsubscribes instantly.
+- Site-contact emails: only the site's own domain, or a free-mail address if that is all it publishes. Third-party domains (web agency in the footer) are ignored.
