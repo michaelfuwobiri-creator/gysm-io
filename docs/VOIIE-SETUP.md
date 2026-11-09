@@ -76,3 +76,18 @@ Until both are done, anything you do while signed in as a different account is i
 Google's Maps Platform policies restrict caching/storing Places content (only place_id may be stored indefinitely;
 lat/lng 30 days) and say not to export or scrape it for use outside the service. VOIIE stores names/phones from
 Places. Get a read of the Service Specific Terms (cloud.google.com/maps-platform/terms/maps-service-terms) before scaling.
+
+## Reply inbox (email replies in the dashboard)
+
+Until this is set up, replies keep going to info@gysm.io and the inbox page (/voiie/inbox) only shows WhatsApp replies. Steps, in this order:
+
+1. Resend -> Domains -> gysm.io -> enable **Receiving**. Use a subdomain (e.g. `reply.gysm.io`) so your normal mail on gysm.io is untouched: add the MX record Resend shows for that subdomain at GoDaddy (name `reply`) and wait for "verified".
+2. Resend -> Webhooks -> Add: URL `https://www.gysm.io/api/voiie/webhooks/email`, event `email.received`. Copy its signing secret.
+3. Vercel env (Production): `RESEND_WEBHOOK_SECRET` = that signing secret, then `VOIIE_REPLY_DOMAIN` = `reply.gysm.io`. Redeploy. Set VOIIE_REPLY_DOMAIN last: from then on every email's Reply-To is `r-<leadId>@reply.gysm.io`.
+4. Test: email yourself a lead from the queue, reply from Gmail, and the reply should appear in /voiie/inbox within a minute and the lead flips to "replied" (the autopilot stops following up on it).
+
+Replies are sent only when you press Send. Suggested replies are templates, not auto-sent. A reply that says stop/unsubscribe marks the lead do-not-contact.
+
+## Round-the-clock hunting
+
+`VOIIE_HUNT_ROTATE=1` makes /api/voiie/cron/hunt sweep the next `VOIIE_HUNT_QUERIES_PER_RUN` (default 3) "trade in US town" searches from lib/voiie/hunt-rotation.ts, email-only. Vercel's own cron is daily, so `.github/workflows/voiie-hunt.yml` calls it hourly: add a GitHub repo secret `CRON_SECRET` with the same value as the Vercel env var. It stops on its own at the daily lead cap (Settings -> daily_hunt_limit) or the kill switch. Each search is billed by Google Places.

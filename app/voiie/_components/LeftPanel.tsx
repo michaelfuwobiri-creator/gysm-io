@@ -93,6 +93,9 @@ export function LeftPanel({
         <a href="/voiie/queue" style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 700, color: "var(--fuchsia)" }}>
           Outreach queue &rarr;
         </a>
+        <a href="/voiie/inbox" style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 700, color: "var(--fuchsia)" }}>
+          Reply inbox &rarr;
+        </a>
         <div className="relative">
           <Icon.search style={{ width: 14, height: 14, position: "absolute", left: 11, top: 11, color: "var(--text-ghost)" }} />
           <input

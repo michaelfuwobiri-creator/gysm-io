@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { huntClients } from "@/lib/voiie/hunt";
+import { queriesFromSlot } from "@/lib/voiie/hunt-rotation";
 import type { Platform } from "@/types/voiie";
 
 /** Vercel Cron hits this on a schedule (see vercel.json). Vercel signs
@@ -27,6 +28,30 @@ export async function GET(req: NextRequest) {
     const placesQuery = process.env.VOIIE_PLACES_QUERY || undefined;
     const social = process.env.VOIIE_SOCIAL_HUNT === "1";
     const platforms: Platform[] = placesQuery ? (social ? ["twitter", "threads", "places"] : ["places"]) : social ? ["twitter", "threads"] : [];
+    // VOIIE_HUNT_ROTATE=1: instead of one fixed query, sweep the next few
+    // "trade in town" searches from the rotation list, email-only (leads that
+    // publish a public address on a weak site -- the only ones we can email).
+    // Hit hourly by .github/workflows/voiie-hunt.yml; each slot advances with
+    // the clock so successive runs search new places. The daily lead cap and
+    // kill switch still stop it inside huntClients.
+    if (process.env.VOIIE_HUNT_ROTATE === "1") {
+      const perRun = Math.min(6, Math.max(1, parseInt(process.env.VOIIE_HUNT_QUERIES_PER_RUN || "3", 10) || 3));
+      const hourSlot = Math.floor(Date.now() / 3_600_000);
+      const queries = queriesFromSlot(hourSlot * perRun, perRun);
+      const runs = [];
+      let created = 0;
+      for (const q of queries) {
+        try {
+          const r = await huntClients({ ownerUserId, placesQuery: q, platforms: ["places"], emailOnly: true });
+          created += r.newLeadsCreated;
+          runs.push({ q, created: r.newLeadsCreated, skipped: r.skippedReason ?? null });
+          if (r.skippedReason) break; // kill switch or daily cap: stop this run
+        } catch (e: any) {
+          runs.push({ q, error: e.message });
+        }
+      }
+      return Response.json({ ok: true, rotate: true, created, runs });
+    }
     const result = await huntClients({ ownerUserId, placesQuery, platforms });
     return Response.json({ ok: true, ...result });
   } catch (error: any) {

@@ -463,3 +463,48 @@ export async function listLeadsAwaitingDemo(ownerUserId: string, limit: number):
   `;
   return rows as unknown as VoiieLead[];
 }
+
+
+/** Webhook-only lookup (no signed-in user): the lead a reply came from,
+ *  matched by the sender's email address, newest lead first. */
+export async function findLeadByEmailUnscoped(email: string): Promise<VoiieLead | null> {
+  const rows = await sql`
+    select * from voiie_leads where lower(contact_email) = lower(${email})
+    order by created_at desc limit 1
+  `;
+  return (rows[0] as unknown as VoiieLead) ?? null;
+}
+
+export interface InboxThread {
+  lead: VoiieLead;
+  lastInboundAt: string;
+  unanswered: boolean;
+  handled: boolean;
+}
+
+/** Leads that have written back on any channel, newest reply first.
+ *  `unanswered` = their last message is newer than our last outbound one. */
+export async function listInboxThreads(ownerUserId: string, limit = 100): Promise<InboxThread[]> {
+  const rows = await sql`
+    select l.*,
+      (select max(m.created_at) from voiie_messages m where m.lead_id = l.id and m.direction = 'inbound' and m.channel <> 'system') as last_inbound_at,
+      (select max(m.created_at) from voiie_messages m where m.lead_id = l.id and m.direction = 'outbound') as last_outbound_at
+    from voiie_leads l
+    where l.owner_user_id = ${ownerUserId}
+      and exists (select 1 from voiie_messages m where m.lead_id = l.id and m.direction = 'inbound' and m.channel <> 'system')
+    order by last_inbound_at desc
+    limit ${limit}
+  `;
+  return (rows as any[]).map((r) => {
+    const { last_inbound_at, last_outbound_at, ...lead } = r;
+    const inAt = new Date(last_inbound_at).getTime();
+    const outAt = last_outbound_at ? new Date(last_outbound_at).getTime() : 0;
+    const l = lead as VoiieLead;
+    return {
+      lead: l,
+      lastInboundAt: new Date(last_inbound_at).toISOString(),
+      unanswered: inAt > outAt,
+      handled: (l.tags ?? []).includes("inbox:handled"),
+    };
+  });
+}

@@ -6,13 +6,14 @@
 import { getResend } from "@/lib/email/resend";
 import { addMessage } from "@/lib/voiie/db";
 import { unsubscribeUrl } from "@/lib/voiie/links";
+import { replyAddressFor } from "@/lib/voiie/reply";
 import type { VoiieLead } from "@/types/voiie";
 
-export type EmailKind = "first_touch" | "follow_up" | "final_follow_up" | "demo_delivery" | "pay_nudge";
+export type EmailKind = "first_touch" | "follow_up" | "final_follow_up" | "demo_delivery" | "pay_nudge" | "reply";
 
 export async function sendVoiieEmail(
   lead: Pick<VoiieLead, "id" | "contact_email" | "handle" | "display_name">,
-  params: { subject: string; body: string; kind: EmailKind }
+  params: { subject: string; body: string; kind: EmailKind; inReplyTo?: string }
 ): Promise<void> {
   if (!lead.contact_email) throw new Error("Lead has no email on file.");
 
@@ -32,13 +33,14 @@ export async function sendVoiieEmail(
   const resend = await getResend();
   const { error } = await resend.emails.send({
     from: "GYSM <info@gysm.io>",
-    replyTo: "info@gysm.io",
+    replyTo: replyAddressFor(lead.id),
     to: lead.contact_email,
     subject: params.subject,
     text: `${params.body}\n${footer}`,
     headers: {
       "List-Unsubscribe": `<${unsub}>, <mailto:info@gysm.io?subject=unsubscribe>`,
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      ...(params.inReplyTo ? { "In-Reply-To": params.inReplyTo, References: params.inReplyTo } : {}),
     },
   });
   if (error) throw new Error(`Resend rejected the email: ${error.message}`);
