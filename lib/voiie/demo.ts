@@ -79,8 +79,8 @@ export async function buildFreeDemo(ownerUserId: string, answers: LeadAnswers, f
   }
 
   const rows = await sql`
-    insert into projects (user_id, prompt, html)
-    values (${ownerUserId}, ${prompt}, ${html})
+    insert into projects (user_id, prompt, html, title)
+    values (${ownerUserId}, ${prompt}, ${html}, ${(answers.business?.name || fallbackName || "Your free demo").slice(0, 80)})
     returning id
   `;
   const projectId = (rows[0] as any).id as string;
