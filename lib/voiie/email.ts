@@ -13,7 +13,7 @@ export type EmailKind = "first_touch" | "follow_up" | "final_follow_up" | "demo_
 
 export async function sendVoiieEmail(
   lead: Pick<VoiieLead, "id" | "contact_email" | "handle" | "display_name">,
-  params: { subject: string; body: string; kind: EmailKind; inReplyTo?: string }
+  params: { subject: string; body: string; kind: EmailKind; inReplyTo?: string; meta?: Record<string, unknown> }
 ): Promise<void> {
   if (!lead.contact_email) throw new Error("Lead has no email on file.");
 
@@ -45,5 +45,5 @@ export async function sendVoiieEmail(
   });
   if (error) throw new Error(`Resend rejected the email: ${error.message}`);
 
-  await addMessage(lead.id, "outbound", "email", params.body, { kind: params.kind });
+  await addMessage(lead.id, "outbound", "email", params.body, { kind: params.kind, ...(params.meta ?? {}) });
 }

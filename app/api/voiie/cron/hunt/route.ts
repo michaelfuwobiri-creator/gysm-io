@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { huntClients } from "@/lib/voiie/hunt";
 import { queriesFromSlot } from "@/lib/voiie/hunt-rotation";
+import { sendFirstTouchesNow } from "@/lib/voiie/autosend";
 import type { Platform } from "@/types/voiie";
 
 /** Vercel Cron hits this on a schedule (see vercel.json). Vercel signs
@@ -50,7 +51,10 @@ export async function GET(req: NextRequest) {
           runs.push({ q, error: e.message });
         }
       }
-      return Response.json({ ok: true, rotate: true, created, runs });
+      // Message the new leads right away (and any left over from quiet hours),
+      // inside the autopilot's own guards; see lib/voiie/autosend.ts.
+      const firstTouch = await sendFirstTouchesNow(ownerUserId);
+      return Response.json({ ok: true, rotate: true, created, runs, firstTouch });
     }
     const result = await huntClients({ ownerUserId, placesQuery, platforms });
     return Response.json({ ok: true, ...result });

@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { Webhook } from "svix";
 import { addMessage, findLeadByEmailUnscoped, getLeadUnscoped, setDoNotContact, setLeadTags, updateLeadStatus } from "@/lib/voiie/db";
 import { bareEmail, classifyReply, leadIdFromAddresses, stripQuoted } from "@/lib/voiie/reply";
-import { getResend } from "@/lib/email/resend";
+import { maybeAutoReply } from "@/lib/voiie/autoreply";
+import { notifyOwner } from "@/lib/voiie/notify";
 
 // Resend "email.received" webhook. Setup (see docs/VOIIE-SETUP.md):
 //   Resend -> Webhooks -> add https://www.gysm.io/api/voiie/webhooks/email,
@@ -76,6 +77,19 @@ export async function POST(req: NextRequest) {
       await setDoNotContact(lead.id, true);
       await addMessage(lead.id, "inbound", "system", "Opted out by email reply — marked do-not-contact.");
     }
+    const optedOut = classifyReply(body) === "stop";
+    let autoNote = "";
+    if (!optedOut) {
+      try {
+        const r = await maybeAutoReply(lead, body, { subject: d.subject ?? null, messageId });
+        autoNote = r.sent ? " (auto-replied)" : "";
+      } catch (e: any) {
+        console.error("[voiie/webhooks/email] auto-reply failed:", e.message);
+      }
+    }
+    try {
+      await notifyOwner(`VOIIE reply from ${lead.display_name?.trim() || lead.handle}${optedOut ? " [opted out]" : ""}${autoNote}: ${body.slice(0, 140)}`);
+    } catch { /* notification is best-effort */ }
     return Response.json({ ok: true });
   } catch (error: any) {
     console.error("[voiie/webhooks/email] failed:", error.message);
