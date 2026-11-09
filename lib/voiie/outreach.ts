@@ -14,6 +14,12 @@ import type { OutreachChannel, VoiieLead } from "@/types/voiie";
 
 export const DEFAULT_TEMPLATE = DEFAULT_OUTREACH_TEMPLATE;
 
+/** Short (5-6 words), names the business, no "free" (spam-filter word). The
+ *  autopilot's follow-ups reuse it as "Re: <subject>" so they thread. */
+export function firstTouchSubject(lead: Pick<VoiieLead, "handle" | "display_name">): string {
+  return `A website idea for ${leadLabel(lead)}`;
+}
+
 /** Name to address the lead by: a Places lead's `handle` is a Google Place
  *  ID (not something a human should be greeted with), so prefer the
  *  business name when there is one. */
@@ -88,7 +94,7 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
     // address, unsubscribe link + List-Unsubscribe headers) and logs the
     // message itself, so return early instead of double-logging below.
     await sendVoiieEmail(lead, {
-      subject: `A free website demo for ${leadLabel(lead)}`,
+      subject: firstTouchSubject(lead),
       body: message,
       kind: "first_touch",
     });

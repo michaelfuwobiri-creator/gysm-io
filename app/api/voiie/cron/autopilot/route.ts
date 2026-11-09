@@ -7,7 +7,7 @@ import {
   listLeadsAwaitingDemo,
   updateLeadStatus,
 } from "@/lib/voiie/db";
-import { sendOutreach, leadLabel } from "@/lib/voiie/outreach";
+import { sendOutreach, leadLabel, firstTouchSubject } from "@/lib/voiie/outreach";
 import { sendVoiieEmail } from "@/lib/voiie/email";
 import { intakeUrl } from "@/lib/voiie/links";
 import { createVoiieCheckoutSession } from "@/lib/voiie/billing";
@@ -86,8 +86,8 @@ export async function GET(req: NextRequest) {
       try {
         if (t.emailsSent === 1 && last >= 3 && budget > 0) {
           await sendVoiieEmail(t.lead, {
-            subject: `Re: A free website demo for ${leadLabel(t.lead)}`,
-            body: `Hi — just following up in case my last note got buried. It takes 30 seconds and you'll get a free demo site for ${leadLabel(t.lead)}:\n${intakeUrl(t.lead.id)}`,
+            subject: `Re: ${firstTouchSubject(t.lead)}`,
+            body: `Hi — following up in case my last note got buried. Answer four quick questions (about 30 seconds) and you get a free, mobile-friendly demo site for ${leadLabel(t.lead)}: homepage, services and a contact page, written from your answers. No signup, nothing to pay to look:\n${intakeUrl(t.lead.id)}`,
             kind: "follow_up",
           });
           budget--; report.followUps++;
