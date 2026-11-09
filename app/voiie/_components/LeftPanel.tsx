@@ -90,6 +90,9 @@ export function LeftPanel({
         <a href="/voiie/calls" style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 700, color: "var(--fuchsia)" }}>
           Call list (phone-only leads) &rarr;
         </a>
+        <a href="/voiie/queue" style={{ display: "block", marginBottom: 8, fontSize: 12, fontWeight: 700, color: "var(--fuchsia)" }}>
+          Outreach queue &rarr;
+        </a>
         <div className="relative">
           <Icon.search style={{ width: 14, height: 14, position: "absolute", left: 11, top: 11, color: "var(--text-ghost)" }} />
           <input
