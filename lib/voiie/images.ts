@@ -1,14 +1,16 @@
-// Business-relevant photos for VOIIE demos.
+// Business-relevant pictures for VOIIE demos.
 //
 // The shared site generator (lib/ai/orchestrator.ts) is told to use
 // picsum.photos placeholders, which serve RANDOM pictures: a bakery demo
 // could show a seaside or drum kit. For VOIIE demos we replace every picsum
-// URL after generation:
-//   - with real photos searched by the business's own trade (Pexels API,
-//     needs PEXELS_API_KEY; free, no attribution fee but Pexels asks for a
-//     visible credit, which the demo footer adds), or
-//   - when no key / no results, with a neutral gradient block -- never with
-//     an unrelated photo.
+// URL after generation with pictures GENERATED for the business's own trade
+// (OpenAI gpt-image-1 via the OPENAI_API_KEY that already runs the builder;
+// no stock-photo account needed). If generation fails or no key is set, the
+// slot becomes a neutral gradient block -- never an unrelated photo.
+// Cost: at most MAX_IMAGES low-quality JPEGs per demo, made only after a lead
+// has filled in the form.
+
+const MAX_IMAGES = 4;
 
 const TRADE_QUERIES: Array<[RegExp, string]> = [
   [/bak(ery|er)|panetter|pasticcer|pastry|patisserie|bread|cake|cupcake/i, "bakery fresh bread pastries"],
@@ -48,23 +50,58 @@ export function imageQuery(name: string, desc: string): string {
   return words.slice(0, 4).join(" ");
 }
 
-export async function searchPhotos(query: string, count = 12): Promise<string[]> {
-  const key = process.env.PEXELS_API_KEY;
-  if (!key || !query.trim()) return [];
+const SHOTS = [
+  "wide, welcoming hero shot of the business premises or workspace, natural light",
+  "a skilled worker doing the core work of this business, candid, no faces in close-up",
+  "close-up detail of the finished product or result this business delivers",
+  "tools, ingredients or materials typical of this business, neatly arranged",
+];
+
+async function generateOne(subject: string, shot: string): Promise<string | null> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
   try {
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 8000);
-    const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=${count}&orientation=landscape`, {
-      headers: { Authorization: key },
+    const t = setTimeout(() => ctl.abort(), 75000);
+    const res = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt: `Realistic professional photograph for a small business website: ${subject}. ${shot}. Photorealistic, natural lighting, no text, no logos, no watermarks, no captions.`,
+        size: "1536x1024",
+        quality: "low",
+        output_format: "jpeg",
+        output_compression: 70,
+        n: 1,
+      }),
       signal: ctl.signal,
     });
     clearTimeout(t);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn("[voiie/images] OpenAI image request failed", res.status);
+      return null;
+    }
     const data: any = await res.json();
-    return (data.photos ?? []).map((p: any) => p?.src?.large).filter((u: unknown): u is string => typeof u === "string");
-  } catch {
-    return [];
+    const b64 = data?.data?.[0]?.b64_json;
+    return typeof b64 === "string" && b64.length > 1000 ? `data:image/jpeg;base64,${b64}` : null;
+  } catch (e: any) {
+    console.warn("[voiie/images] image generation failed:", e?.message);
+    return null;
   }
+}
+
+/** Number of distinct placeholder images in the generated page (capped). */
+export function placeholderCount(html: string): number {
+  return Math.min(MAX_IMAGES, new Set(html.match(PICSUM) ?? []).size);
+}
+
+/** Generate up to `count` pictures of the business's trade, in parallel. Failed ones are dropped. */
+export async function generateTradePhotos(subject: string, count: number): Promise<string[]> {
+  const n = Math.min(MAX_IMAGES, Math.max(0, count));
+  if (!n || !subject.trim()) return [];
+  const results = await Promise.all(Array.from({ length: n }, (_, i) => generateOne(subject, SHOTS[i % SHOTS.length])));
+  return results.filter((r): r is string => !!r);
 }
 
 const PLACEHOLDER_SVG =
@@ -84,10 +121,4 @@ export function replacePlaceholderImages(html: string, photos: string[]): { html
     return next;
   });
   return { html: out, replaced: seen.size, usedPhotos: photos.length > 0 && seen.size > 0 };
-}
-
-/** Footer credit Pexels asks for, added only when its photos are used. */
-export function addPhotoCredit(html: string): string {
-  const credit = '<p style="text-align:center;font-size:11px;opacity:.6;margin:12px 0">Photos by <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p>';
-  return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${credit}</body>`) : html + credit;
 }

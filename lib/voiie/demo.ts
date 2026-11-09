@@ -23,7 +23,7 @@
 
 import { generateWebsite } from "@/lib/ai/orchestrator";
 import { sql } from "@/lib/db";
-import { imageQuery, searchPhotos, replacePlaceholderImages, addPhotoCredit } from "@/lib/voiie/images";
+import { imageQuery, generateTradePhotos, placeholderCount, replacePlaceholderImages } from "@/lib/voiie/images";
 import type { LeadAnswers } from "@/types/voiie";
 
 function esc(s: string) {
@@ -85,12 +85,14 @@ export async function buildFreeDemo(ownerUserId: string, answers: LeadAnswers, f
   }
 
   // The generator's placeholder photos are random (picsum): swap them for
-  // photos of the business's own trade, or a neutral block, never unrelated.
+  // pictures generated for the business's own trade, or a neutral block,
+  // never unrelated imagery.
   try {
-    const photos = await searchPhotos(imageQuery(answers.business?.name || fallbackName, answers.business?.desc || ""));
+    const subject = `${answers.business?.name || fallbackName}, ${answers.business?.desc || ""} (${imageQuery(answers.business?.name || fallbackName, answers.business?.desc || "")})`;
+    const photos = await generateTradePhotos(subject, placeholderCount(html));
     const swapped = replacePlaceholderImages(html, photos);
-    html = swapped.usedPhotos ? addPhotoCredit(swapped.html) : swapped.html;
-    if (swapped.replaced && !photos.length) console.warn("[voiie/demo] no relevant photos (PEXELS_API_KEY unset or no results); used neutral placeholders");
+    html = swapped.html;
+    if (swapped.replaced && !photos.length) console.warn("[voiie/demo] no trade pictures generated; used neutral placeholders");
   } catch (e: any) {
     console.error("[voiie/demo] image swap failed:", e.message);
   }
