@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth";
 import { addMessage, getLead, getSettings, listInboxThreads, listMessages, setDoNotContact, setLeadTags, updateLeadStatus } from "@/lib/voiie/db";
 import { sendVoiieEmail } from "@/lib/voiie/email";
 import { suggestReplies } from "@/lib/voiie/reply";
+import { applyChange, sendChangeDoneEmail, undoLastChange } from "@/lib/voiie/changes";
 
 // Reply inbox. GET lists every lead that has written back, with the thread
 // and suggested replies (templates -- shown, never sent). POST sends a reply
@@ -17,8 +18,15 @@ export async function GET() {
   for (const t of threads) {
     const messages = await listMessages(t.lead.id);
     const lastIn = [...messages].reverse().find((m) => m.direction === "inbound" && m.channel !== "system");
+    const pendingMsg = [...messages].reverse().find((m) => (m.meta as any)?.change_pending === true);
+    const applied = messages.filter((m) => (m.meta as any)?.change_applied === true && (m.meta as any)?.undone !== true);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
     items.push({
       id: t.lead.id,
+      demoUrl: t.lead.demo_project_id ? `${siteUrl}/publish/${t.lead.demo_project_id}` : null,
+      pendingChange: pendingMsg ? String((pendingMsg.meta as any)?.instruction ?? "") : null,
+      hasLogoAttached: !!(pendingMsg && (pendingMsg.meta as any)?.logo_data),
+      changesApplied: applied.length,
       name: t.lead.display_name?.trim() || t.lead.handle,
       email: t.lead.contact_email,
       phone: t.lead.contact_phone,
@@ -31,7 +39,7 @@ export async function GET() {
       canEmail: !!t.lead.contact_email && !t.lead.do_not_contact,
       suggestions: lastIn && !t.lead.do_not_contact ? suggestReplies(t.lead, lastIn.body) : [],
       messages: messages
-        .filter((m) => m.channel !== "system" || m.direction === "inbound")
+        .filter((m) => m.channel !== "system" || m.direction === "inbound" || (m.meta as any)?.change_applied === true)
         .slice(-12)
         .map((m) => ({ at: m.created_at, dir: m.direction, channel: m.channel, body: m.body.slice(0, 1500) })),
     });
@@ -66,6 +74,27 @@ export async function POST(req: NextRequest) {
       await addMessage(lead.id, "outbound", "system", "Marked do-not-contact from the inbox.");
       return Response.json({ ok: true });
     }
+    if (action === "apply-change") {
+      const instruction = String(body?.instruction ?? "").trim();
+      const logoUrl = String(body?.logoUrl ?? "").trim();
+      if (logoUrl && !/^https:\/\/\S+$/i.test(logoUrl)) return Response.json({ error: "Logo link must start with https://" }, { status: 400 });
+      // Use an attached logo from the pending request if there is one and no link was typed.
+      let logoDataUrl: string | null = null;
+      if (!logoUrl) {
+        const msgs = await listMessages(lead.id);
+        const pending = [...msgs].reverse().find((m) => (m.meta as any)?.change_pending === true && (m.meta as any)?.logo_data);
+        logoDataUrl = ((pending?.meta as any)?.logo_data as string | undefined) ?? null;
+      }
+      const res = await applyChange(lead.id, instruction, { logoUrl: logoUrl || null, logoDataUrl });
+      if (!res.ok) return Response.json({ error: res.error }, { status: 422 });
+      if (body?.notify === true) await sendChangeDoneEmail(lead);
+      return Response.json({ ok: true });
+    }
+    if (action === "undo-change") {
+      const res = await undoLastChange(lead.id);
+      if (!res.ok) return Response.json({ error: res.error ?? "Nothing to undo." }, { status: 422 });
+      return Response.json({ ok: true });
+    }
     if (action === "reply") {
       const text = String(body?.body ?? "").trim();
       if (!text) return Response.json({ error: "Write a message first." }, { status: 400 });
@@ -97,4 +126,5 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const maxDuration = 240;
 export const dynamic = "force-dynamic";

@@ -4,6 +4,7 @@ import { addMessage, findLeadByEmailUnscoped, getLeadUnscoped, setDoNotContact, 
 import { bareEmail, classifyReply, leadIdFromAddresses, stripQuoted } from "@/lib/voiie/reply";
 import { maybeAutoReply } from "@/lib/voiie/autoreply";
 import { notifyOwner } from "@/lib/voiie/notify";
+import { recordChangeRequest } from "@/lib/voiie/changes";
 
 // Resend "email.received" webhook. Setup (see docs/VOIIE-SETUP.md):
 //   Resend -> Webhooks -> add https://www.gysm.io/api/voiie/webhooks/email,
@@ -77,9 +78,18 @@ export async function POST(req: NextRequest) {
       await setDoNotContact(lead.id, true);
       await addMessage(lead.id, "inbound", "system", "Opted out by email reply — marked do-not-contact.");
     }
-    const optedOut = classifyReply(body) === "stop";
+    const intent = classifyReply(body);
+    const optedOut = intent === "stop";
     let autoNote = "";
-    if (!optedOut) {
+    if (intent === "change" && lead.demo_project_id && !lead.do_not_contact) {
+      // A change request on their demo: store it (with an attached logo when
+      // there is a small image) and let the processor / operator apply it --
+      // the edit takes a minute, far longer than a webhook may run.
+      let logo: string | null = null;
+      try { logo = await fetchLogoAttachment(emailId, d.attachments); } catch { /* optional */ }
+      await recordChangeRequest(lead.id, body, logo);
+      autoNote = process.env.VOIIE_AUTOCHANGE === "1" ? " (change queued, will auto-apply)" : " (change request waiting in inbox)";
+    } else if (!optedOut) {
       try {
         const r = await maybeAutoReply(lead, body, { subject: d.subject ?? null, messageId });
         autoNote = r.sent ? " (auto-replied)" : "";
@@ -95,6 +105,26 @@ export async function POST(req: NextRequest) {
     console.error("[voiie/webhooks/email] failed:", error.message);
     return Response.json({ ok: true }); // ack so Resend doesn't retry-storm
   }
+}
+
+/** First small image attachment on the email as a data: URL (<= 600 KB).
+ *  Best effort -- any failure just means the request arrives without a logo. */
+async function fetchLogoAttachment(emailId: string | undefined, attachments: any[] | undefined): Promise<string | null> {
+  if (!emailId || !process.env.RESEND_API_KEY || !Array.isArray(attachments)) return null;
+  const img = attachments.find((a) => /^image\/(png|jpe?g|webp|gif|svg\+xml)$/i.test(String(a?.content_type || "")));
+  if (!img?.id) return null;
+  const meta = await fetch(`https://api.resend.com/emails/receiving/${emailId}/attachments/${img.id}`, {
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+  });
+  if (!meta.ok) return null;
+  const j: any = await meta.json();
+  const url: string | undefined = j.download_url || j.url;
+  if (!url || !/^https:\/\//i.test(url)) return null;
+  const file = await fetch(url);
+  if (!file.ok) return null;
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (buf.length === 0 || buf.length > 600_000) return null;
+  return `data:${String(img.content_type).toLowerCase()};base64,${buf.toString("base64")}`;
 }
 
 export const dynamic = "force-dynamic";

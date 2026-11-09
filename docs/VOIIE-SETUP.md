@@ -91,3 +91,7 @@ Replies are sent only when you press Send. Suggested replies are templates, not 
 ## Round-the-clock hunting
 
 `VOIIE_HUNT_ROTATE=1` makes /api/voiie/cron/hunt sweep the next `VOIIE_HUNT_QUERIES_PER_RUN` (default 3) "trade in US town" searches from lib/voiie/hunt-rotation.ts, email-only. Vercel's own cron is daily, so `.github/workflows/voiie-hunt.yml` calls it hourly: add a GitHub repo secret `CRON_SECRET` with the same value as the Vercel env var. It stops on its own at the daily lead cap (Settings -> daily_hunt_limit) or the kill switch. Each search is billed by Google Places.
+
+## Website change requests from leads
+
+A reply like "add my logo" / "add a booking calendar" on a lead whose demo exists is stored as a pending change (an attached image is kept as the logo). With `VOIIE_AUTOCHANGE=1`, `.github/workflows/voiie-changes.yml` (every ~10 min, same `CRON_SECRET` secret) applies it with the builder's edit pass (`editWebsite`), saves the new HTML to the demo project and emails the lead the updated link plus the pay link. Max 3 automatic changes per lead; every change keeps the previous HTML, so "Undo last change" in /voiie/inbox restores it. You can also type a change yourself in the inbox under any lead's demo and press Apply (optionally with a logo link). Attachment fetching uses Resend's Receiving attachments API and is best-effort: if it fails the request just arrives without the logo.

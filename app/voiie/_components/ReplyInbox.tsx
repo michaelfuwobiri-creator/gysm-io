@@ -8,6 +8,7 @@ interface Thread {
   id: string; name: string; email: string | null; phone: string | null; status: string; doNotContact: boolean;
   lastInboundAt: string; unanswered: boolean; handled: boolean; lastChannel: string; canEmail: boolean;
   suggestions: Array<{ label: string; body: string }>; messages: Msg[];
+  demoUrl: string | null; pendingChange: string | null; hasLogoAttached: boolean; changesApplied: number;
 }
 interface InboxData { items: Thread[]; unanswered: number; killSwitch: boolean; replyDomainConfigured: boolean }
 
@@ -19,6 +20,8 @@ export function ReplyInbox() {
   const [note, setNote] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [changes, setChanges] = useState<Record<string, string>>({});
+  const [logos, setLogos] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try { setData(await apiGet<InboxData>("/api/voiie/inbox")); setError(null); } catch (e) { setError((e as Error).message); }
@@ -82,6 +85,33 @@ export function ReplyInbox() {
             </>
           ) : (
             <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{t.doNotContact ? "Opted out: no replies allowed." : "No email on file for this lead."}</div>
+          )}
+          {t.demoUrl && (
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                Their demo site · {t.changesApplied} change{t.changesApplied === 1 ? "" : "s"} applied ·{" "}
+                <a href={t.demoUrl} target="_blank" rel="noreferrer" style={{ color: "var(--fuchsia)" }}>open it</a>
+              </div>
+              {t.pendingChange && <div style={{ fontSize: 12, color: "#fbbf24", marginBottom: 4 }}>They asked for a change{t.hasLogoAttached ? " (logo attached)" : ""}. Edit the wording below if needed, then apply.</div>}
+              <textarea
+                value={changes[t.id] ?? t.pendingChange ?? ""}
+                onChange={(e) => setChanges((c) => ({ ...c, [t.id]: e.target.value }))}
+                placeholder="Describe a change to make to their site, e.g. add a Book now button in the header"
+                rows={2}
+                style={{ width: "100%", fontSize: 12.5, padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "#08080a", color: "var(--text)" }}
+              />
+              <input
+                value={logos[t.id] ?? ""}
+                onChange={(e) => setLogos((l) => ({ ...l, [t.id]: e.target.value }))}
+                placeholder="Logo image link (https://..., optional)"
+                style={{ width: "100%", fontSize: 12, padding: 6, borderRadius: 8, border: "1px solid var(--border)", background: "#08080a", color: "var(--text)", marginTop: 4 }}
+              />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                <button style={btn} disabled={busy === t.id || !(changes[t.id] ?? t.pendingChange ?? "").trim()} onClick={() => act({ action: "apply-change", id: t.id, instruction: changes[t.id] ?? t.pendingChange, logoUrl: logos[t.id] ?? "" }, "Change applied to the demo (takes about a minute).")}>Apply change</button>
+                <button style={btn} disabled={busy === t.id || !(changes[t.id] ?? t.pendingChange ?? "").trim() || !t.canEmail} onClick={() => act({ action: "apply-change", id: t.id, instruction: changes[t.id] ?? t.pendingChange, logoUrl: logos[t.id] ?? "", notify: true }, "Change applied and the updated link emailed.")}>Apply and email them</button>
+                {t.changesApplied > 0 && <button style={btn} disabled={busy === t.id} onClick={() => act({ action: "undo-change", id: t.id }, "Last change undone.")}>Undo last change</button>}
+              </div>
+            </div>
           )}
           <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
             {t.canEmail && <button style={{ ...btn, borderColor: "var(--fuchsia)" }} disabled={busy === t.id || !(drafts[t.id] ?? "").trim() || data.killSwitch} onClick={() => act({ action: "reply", id: t.id, body: drafts[t.id] }, `Reply sent to ${t.name}.`)}>Send reply</button>}

@@ -59,12 +59,13 @@ export function stripQuoted(text: string): string {
   return (t || (text || "").trim()).slice(0, 4000);
 }
 
-export type ReplyIntent = "stop" | "interested" | "price" | "question" | "not_now" | "other";
+export type ReplyIntent = "stop" | "interested" | "price" | "question" | "not_now" | "change" | "other";
 
 export function classifyReply(text: string): ReplyIntent {
   const t = (text || "").toLowerCase();
   if (/\b(stop|unsubscribe|remove me|do not contact|don'?t contact|take me off|no more emails?)\b/.test(t)) return "stop";
   if (/\b(not interested|no thanks|no thank you|already have|we are all set|we're all set|not looking)\b/.test(t)) return "not_now";
+  if (/\b(add|change|update|remove|replace|swap|make|include|put|can you|could you|i want|i'd like|we need|please)\b[\s\S]{0,80}\b(logo|colou?rs?|font|page|section|button|photos?|pictures?|images?|video|menu|booking|calendar|form|map|testimonials?|reviews?|gallery|hours|address|phone|text|headline|title|banner|chat|whatsapp|instagram|facebook|feature|header|footer|background|navbar|hero|icon|link|layout|theme)\b/i.test(t) || /\blogo\b/.test(t)) return "change";
   if (/\b(how much|price|pricing|cost|what do you charge|rates?)\b/.test(t)) return "price";
   if (/\b(yes|sure|interested|sounds good|go ahead|send it|send me|let'?s do it|please do|ok(ay)?)\b/.test(t)) return "interested";
   if (/\?/.test(t)) return "question";
@@ -97,8 +98,13 @@ export function suggestReplies(lead: Pick<VoiieLead, "id" | "handle" | "display_
     label: "Polite close",
     body: `Understood, thanks for letting me know. I won't email again. If you ever want a free sample, the link stays open: ${link}`,
   };
+  const changeOk: Suggestion = {
+    label: "Confirm the change",
+    body: `Happy to make that change. I'll update your demo and send you the new link shortly. Anything else you want adjusted at the same time?`,
+  };
   switch (intent) {
     case "stop": return [];
+    case "change": return [changeOk];
     case "not_now": return [thanks];
     case "price": return [price, start];
     case "interested": return [start, call];
