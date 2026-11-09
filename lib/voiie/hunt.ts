@@ -108,7 +108,7 @@ async function weakSiteCandidates(withSite: PlaceLead[], stats: HuntStats): Prom
   return out;
 }
 
-async function collectCandidates(query: string, platforms: Platform[], placesQuery: string | undefined, stats: HuntStats): Promise<Candidate[]> {
+async function collectCandidates(query: string, platforms: Platform[], placesQuery: string | undefined, stats: HuntStats, emailOnly = false): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
 
   if (platforms.includes("places") && placesQuery) {
@@ -119,7 +119,8 @@ async function collectCandidates(query: string, platforms: Platform[], placesQue
       stats.noWebsite = businesses.length;
       stats.withWebsite = all.length - businesses.length;
       candidates.push(...(await weakSiteCandidates(all.filter((b) => b.websiteUri), stats)));
-      for (const b of businesses) {
+      // emailOnly: keep just leads whose own site publishes an email (weak sites).
+      for (const b of emailOnly ? [] : businesses) {
         candidates.push({
           // Place ID, not a handle -- it's the stable, unique identifier
           // that db.ts's (owner_user_id, platform, lower(handle)) unique
@@ -187,6 +188,8 @@ export async function huntClients(params: {
    *  skips Places for this run rather than erroring. */
   placesQuery?: string;
   platforms?: Platform[];
+  /** Only keep leads that come with a public email address. */
+  emailOnly?: boolean;
 }): Promise<HuntResult> {
   const settings = await getSettings(params.ownerUserId);
 
@@ -219,7 +222,7 @@ export async function huntClients(params: {
 
   const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
   const stats = emptyStats();
-  const candidates = (await collectCandidates(query, platforms, placesQuery, stats))
+  const candidates = (await collectCandidates(query, platforms, placesQuery, stats, params.emailOnly === true))
     .filter((c) => !blacklist.has(normalizeHandle(c.handle)))
     .slice(0, remaining); // never create more leads than the daily cap has left
 
