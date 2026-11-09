@@ -104,3 +104,19 @@ A reply like "add my logo" / "add a booking calendar" on a lead whose demo exist
 - STALE: STRIPE_VOIIE_STARTER/PRO/AGENCY_PRICE_ID point at inactive Stripe Prices. Checkout still works because billing.ts retries with DEFAULT_LIVE_PRICE_IDS (logged as an error each time). Fix: in Vercel set them to the active Prices price_1UByxqDE5QfMC9H1nWSHLHQM (Starter), price_1UByxsDE5QfMC9H1vpBrUsdu (Pro), price_1UByxtDE5QfMC9H1srTxLqVX (Agency) after confirming in Stripe that they are $79.99 / $199.99 / $499.99.
 - Unsubscribe link now needs one click on a confirm page (security scanners prefetch links); the List-Unsubscribe one-click header still unsubscribes instantly.
 - Site-contact emails: only the site's own domain, or a free-mail address if that is all it publishes. Third-party domains (web agency in the footer) are ignored.
+
+## Worldwide hunting machine (added 2026-11-09)
+The hunt rotation (hourly via .github/workflows/voiie-hunt.yml, plus Vercel's daily cron) searches
+"<trade> in <town>" across every market listed in `VOIIE_COLD_EMAIL_REGIONS`, interleaving countries.
+Default is `US` only (unchanged). Supported markets: US, CA, AU, NZ. To switch a market on, set in Vercel:
+
+    VOIIE_COLD_EMAIL_REGIONS = US,CA,AU,NZ
+
+Only then are addresses collected and emailed for that country. Notes (NOT legal advice; verify before enabling):
+- Canada (CASL): consent can be implied when a business email is conspicuously published, the message is relevant
+  to the recipient's business, and the page has no "do not send" statement. Needs sender identity + postal address + unsubscribe (all in every email).
+- Australia (Spam Act 2003) and New Zealand (Unsolicited Electronic Messages Act 2007): consent can be inferred
+  from a conspicuously published work address when the message is relevant to their role; must identify the sender and carry a working unsubscribe.
+- UK is NOT included: PECR allows B2B email to companies but not to sole traders/partnerships, and most small trades are sole traders.
+- EU (incl. Italy/Germany/Spain): opt-in for marketing email; not enabled and no addresses are collected.
+Quiet hours use the lead's local time zone (email 8-20). Leads are daily-capped by Settings -> daily_hunt_limit; the kill switch stops everything.

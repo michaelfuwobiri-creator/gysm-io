@@ -24,13 +24,13 @@ const COUNTRY_NAMES: Record<string, string> = {
   "united kingdom": "GB", uk: "GB",
   germany: "DE", deutschland: "DE",
   france: "FR", spain: "ES", españa: "ES",
-  canada: "CA", australia: "AU", ireland: "IE", netherlands: "NL", portugal: "PT",
+  canada: "CA", australia: "AU", "new zealand": "NZ", ireland: "IE", netherlands: "NL", portugal: "PT",
   croatia: "HR", austria: "AT", switzerland: "CH", belgium: "BE",
 };
 
 const PHONE_PREFIXES: Array<[string, string]> = [
   ["39", "IT"], ["44", "GB"], ["49", "DE"], ["33", "FR"], ["34", "ES"], ["353", "IE"],
-  ["31", "NL"], ["351", "PT"], ["385", "HR"], ["43", "AT"], ["41", "CH"], ["32", "BE"], ["61", "AU"],
+  ["31", "NL"], ["351", "PT"], ["385", "HR"], ["43", "AT"], ["41", "CH"], ["32", "BE"], ["61", "AU"], ["64", "NZ"],
 ];
 
 export function detectRegion(lead: Pick<VoiieLead, "bio" | "contact_phone">): string | null {

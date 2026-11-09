@@ -97,7 +97,7 @@ export function computeReach(
   return { ...base, channel: "none", contact: null, confidence: "low", source: "no contact data", whatsappLocked };
 }
 
-const TZ: Record<string, string> = { US: "America/Chicago", IT: "Europe/Rome" };
+const TZ: Record<string, string> = { US: "America/Chicago", IT: "Europe/Rome", CA: "America/Toronto", AU: "Australia/Sydney", NZ: "Pacific/Auckland", GB: "Europe/London" };
 
 /** Quiet hours in the lead's region (Illinois-centred for the US).
  *  Calls: 9-17 Mon-Fri. Email: 8-20 any day. */
