@@ -62,18 +62,37 @@ export function isLead(text: string): boolean {
  * enabled (VOIIE_COLD_EMAIL_REGIONS, default US) are audited, so no EU
  * addresses are collected by default. Off with VOIIE_WEAK_SITE_MODE=off.
  */
-async function weakSiteCandidates(withSite: PlaceLead[]): Promise<Candidate[]> {
+export interface HuntStats {
+  placesReturned: number;
+  noWebsite: number;
+  withWebsite: number;
+  regionSkipped: number;
+  audited: number;
+  unreachable: number;
+  weak: number;
+  emailFound: number;
+  weakWithEmail: number;
+}
+
+const emptyStats = (): HuntStats => ({ placesReturned: 0, noWebsite: 0, withWebsite: 0, regionSkipped: 0, audited: 0, unreachable: 0, weak: 0, emailFound: 0, weakWithEmail: 0 });
+
+async function weakSiteCandidates(withSite: PlaceLead[], stats: HuntStats): Promise<Candidate[]> {
   if (process.env.VOIIE_WEAK_SITE_MODE === "off") return [];
-  const eligible = withSite
-    .filter((b) => b.websiteUri && regionAllowsColdEmail(detectRegion({ bio: b.address, contact_phone: b.phone })))
-    .slice(0, 12); // keeps the run well inside the 60s route budget
+  const regionOk = withSite.filter((b) => b.websiteUri && regionAllowsColdEmail(detectRegion({ bio: b.address, contact_phone: b.phone })));
+  stats.regionSkipped = withSite.length - regionOk.length;
+  const eligible = regionOk.slice(0, 12); // keeps the run well inside the 60s route budget
+  stats.audited = eligible.length;
   const out: Candidate[] = [];
   for (let i = 0; i < eligible.length; i += 4) {
     const batch = eligible.slice(i, i + 4);
     const audits = await Promise.all(batch.map((b) => auditSite(b.websiteUri as string).catch(() => null)));
     audits.forEach((a, idx) => {
       const b = batch[idx];
-      if (!a || !a.weak || !a.email) return;
+      if (!a) { stats.unreachable++; return; }
+      if (a.weak) stats.weak++;
+      if (a.email) stats.emailFound++;
+      if (!a.weak || !a.email) return;
+      stats.weakWithEmail++;
       out.push({
         handle: b.placeId,
         platform: "places",
@@ -89,14 +108,17 @@ async function weakSiteCandidates(withSite: PlaceLead[]): Promise<Candidate[]> {
   return out;
 }
 
-async function collectCandidates(query: string, platforms: Platform[], placesQuery?: string): Promise<Candidate[]> {
+async function collectCandidates(query: string, platforms: Platform[], placesQuery: string | undefined, stats: HuntStats): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
 
   if (platforms.includes("places") && placesQuery) {
     try {
       const all = await searchBusinessesWithoutWebsite(placesQuery, 20, "all");
       const businesses = all.filter((b) => !b.websiteUri);
-      candidates.push(...(await weakSiteCandidates(all.filter((b) => b.websiteUri))));
+      stats.placesReturned = all.length;
+      stats.noWebsite = businesses.length;
+      stats.withWebsite = all.length - businesses.length;
+      candidates.push(...(await weakSiteCandidates(all.filter((b) => b.websiteUri), stats)));
       for (const b of businesses) {
         candidates.push({
           // Place ID, not a handle -- it's the stable, unique identifier
@@ -147,6 +169,7 @@ export interface HuntResult {
   newLeadsCreated: number;
   leadIds: string[];
   skippedReason?: "kill_switch" | "daily_limit_reached";
+  stats?: HuntStats;
 }
 
 /** Handle without the leading @, lowercased -- how both the blacklist and
@@ -195,7 +218,8 @@ export async function huntClients(params: {
         : ([] as Platform[]));
 
   const blacklist = new Set((settings.blacklist ?? []).map(normalizeHandle));
-  const candidates = (await collectCandidates(query, platforms, placesQuery))
+  const stats = emptyStats();
+  const candidates = (await collectCandidates(query, platforms, placesQuery, stats))
     .filter((c) => !blacklist.has(normalizeHandle(c.handle)))
     .slice(0, remaining); // never create more leads than the daily cap has left
 
@@ -215,5 +239,5 @@ export async function huntClients(params: {
     if (id) leadIds.push(id);
   }
 
-  return { scanned: candidates.length, newLeadsCreated: leadIds.length, leadIds };
+  return { scanned: candidates.length, newLeadsCreated: leadIds.length, leadIds, stats };
 }
