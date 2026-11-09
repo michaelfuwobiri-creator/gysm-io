@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { addMessage, getLead, setDoNotContact, setLeadTags, updateLeadStatus } from "@/lib/voiie/db";
 import { detectRegion } from "@/lib/voiie/compliance";
 import { intakeUrl } from "@/lib/voiie/links";
+import { whatsappUsLink } from "@/lib/voiie/reach";
 import type { VoiieLead } from "@/types/voiie";
 
 // Call list: businesses VOIIE found that have a phone number but no email.
@@ -44,7 +45,7 @@ export async function GET() {
         link: callTag === "call:interested" ? intakeUrl(l.id) : null,
       };
     });
-    return Response.json({ leads });
+    return Response.json({ leads, whatsappUs: whatsappUsLink() });
   } catch (error: any) {
     console.error("[voiie/call-list] failed:", error.message);
     return Response.json({ error: "Failed to load the call list." }, { status: 500 });

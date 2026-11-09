@@ -4,6 +4,7 @@ import { getUser } from "@/lib/auth";
 import { getLead } from "@/lib/voiie/db";
 import { intakeUrl } from "@/lib/voiie/links";
 import { leadLabel } from "@/lib/voiie/outreach";
+import { whatsappUsLink } from "@/lib/voiie/reach";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export default async function CardPage({ params }: { params: { id: string } }) {
   if (!lead) notFound();
   const url = intakeUrl(lead.id);
   const qr = await QRCode.toDataURL(url, { margin: 1, width: 360 });
+  const wa = whatsappUsLink();
+  const waQr = wa ? await QRCode.toDataURL(wa, { margin: 1, width: 240 }) : null;
   return (
     <div style={{ background: "#fff", color: "#111", minHeight: "100%", padding: 24, overflowY: "auto" }}>
       <div style={{ maxWidth: 480, margin: "0 auto", border: "2px solid #111", borderRadius: 12, padding: 24, textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
@@ -23,6 +26,12 @@ export default async function CardPage({ params }: { params: { id: string } }) {
         <div style={{ fontSize: 26, fontWeight: 800, margin: "6px 0 14px" }}>{leadLabel(lead)}</div>
         <img src={qr} alt="QR code to start" width={260} height={260} style={{ margin: "0 auto" }} />
         <div style={{ fontSize: 15, marginTop: 12 }}>Scan to answer 4 quick questions (30 seconds). We build the sample and email it to you. No cost to look, no obligation.</div>
+        {waQr && (
+          <div style={{ marginTop: 14 }}>
+            <img src={waQr} alt="QR code to message us on WhatsApp" width={120} height={120} style={{ margin: "0 auto" }} />
+            <div style={{ fontSize: 12 }}>Or message us on WhatsApp</div>
+          </div>
+        )}
         <div style={{ fontSize: 11, color: "#555", marginTop: 14 }}>
           From Mike at GYSM (gysm.io). Questions or to opt out of any contact: info@gysm.io
         </div>

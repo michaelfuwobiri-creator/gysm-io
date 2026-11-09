@@ -114,3 +114,12 @@ export function quietHours(region: string | null, kind: "call" | "email", now: D
   }
   return { quiet: false };
 }
+
+/** wa.me link that makes the OWNER message our WhatsApp number first (their
+ *  opt-in; opens the 24h reply window so the intake bot can answer).
+ *  Null when no WhatsApp sender number is configured. */
+export function whatsappUsLink(): string | null {
+  const digits = (process.env.TWILIO_WHATSAPP_FROM || "").replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent("Hi! I'd like my free website sample.")}`;
+}

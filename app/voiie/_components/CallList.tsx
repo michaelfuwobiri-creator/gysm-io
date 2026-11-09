@@ -27,13 +27,15 @@ const SCRIPT = `Hi, is this the owner of {name}? My name is Mike, I'm a local we
 
 export function CallList() {
   const [leads, setLeads] = useState<CallLead[] | null>(null);
+  const [waUs, setWaUs] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const d = await apiGet<{ leads: CallLead[] }>("/api/voiie/call-list");
+      const d = await apiGet<{ leads: CallLead[]; whatsappUs: string | null }>("/api/voiie/call-list");
       setLeads(d.leads);
+      setWaUs(d.whatsappUs);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -99,6 +101,12 @@ export function CallList() {
           </div>
           {l.link && (
             <div style={{ marginTop: 10, fontSize: 11.5 }}>
+              {waUs && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: "var(--text-faint)" }}>Prefer WhatsApp? Ask them to message our number first (their opt-in, then the bot answers):</div>
+                  <input readOnly value={waUs} onFocus={(e) => e.currentTarget.select()} style={{ width: "100%", marginTop: 4, padding: 6, background: "#08080a", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11 }} />
+                </div>
+              )}
               <div style={{ color: "var(--text-faint)" }}>They said yes. Give them this link (read out, or text it from your own phone):</div>
               <input readOnly value={l.link} onFocus={(e) => e.currentTarget.select()} style={{ width: "100%", marginTop: 4, padding: 6, background: "#08080a", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11 }} />
               <a href={`sms:${digits(l.phone)}?&body=${encodeURIComponent(`Hi, it's Mike following our call. Here's your free website sample for ${l.name}: ${l.link}`)}`} style={{ display: "inline-block", marginTop: 6, color: "var(--fuchsia)" }}>
