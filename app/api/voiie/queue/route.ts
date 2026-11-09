@@ -128,7 +128,10 @@ export async function POST(req: NextRequest) {
         const q = quietHours(reach.region, "email");
         if (q.quiet) { results.push({ id, ok: false, error: q.why }); continue; }
         try {
-          await sendOutreach(lead.id, "email");
+          // Same template family as the preview, so the email matches what
+          // the operator approved (Places / weak-site wording, never the
+          // social "saw your post" copy).
+          await sendOutreach(lead.id, "email", lead.tags?.includes("weak-site") ? pickWeakSiteTemplate() : pickPlacesTemplate());
           results.push({ id, ok: true });
         } catch (e: any) {
           results.push({ id, ok: false, error: e.message });
