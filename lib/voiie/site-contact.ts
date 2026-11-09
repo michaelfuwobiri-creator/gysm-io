@@ -48,6 +48,8 @@ async function robotsAllows(origin: string): Promise<boolean> {
 
 const ROLE_LOCALPARTS = ["info", "contact", "hello", "office", "sales", "booking", "bookings", "reservations", "enquiries", "inquiries", "mail", "admin", "support", "contatti"];
 const BAD_EMAIL = /(\.(png|jpe?g|gif|svg|webp|css|js)$|sentry|wixpress|example\.|your-?email|domain\.com|@2x)/i;
+// Template placeholders left in site themes (john@company.com, name@email.com, ...).
+const PLACEHOLDER_EMAIL = /(^(john|jane|name|yourname|your|user|username|email|test|someone|you)(\.|@|\+)|@(company|email|mail|yourcompany|yourdomain|website|mysite|site|test|sample|business|address)\.(com|net|org)$)/i;
 
 function decodeEntities(s: string): string {
   return s.replace(/&#64;|&commat;/gi, "@").replace(/&amp;/g, "&").replace(/&#46;/g, ".").replace(/%40/g, "@");
@@ -58,7 +60,7 @@ export function extractEmails(html: string): string[] {
   const found = new Set<string>();
   for (const m of Array.from(body.matchAll(/mailto:([^"'?\s>]+)/gi))) found.add(m[1].trim().toLowerCase());
   for (const m of Array.from(body.matchAll(/[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi))) found.add(m[0].toLowerCase());
-  return Array.from(found).filter((e) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !BAD_EMAIL.test(e));
+  return Array.from(found).filter((e) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(e) && !BAD_EMAIL.test(e) && !PLACEHOLDER_EMAIL.test(e));
 }
 
 function pickBestEmail(emails: string[], siteHost: string): string | null {
