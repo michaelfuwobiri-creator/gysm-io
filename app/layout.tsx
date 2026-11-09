@@ -60,7 +60,7 @@ const organizationJsonLd = {
   logo: `${siteUrl}/icons/icon-512.png`,
   description:
     "GYSM is an AI app builder: describe an app in plain English and get a working web app with a live preview, a code view and a public link.",
-  sameAs: [],
+  sameAs: ["https://www.tiktok.com/@gysm_io", "https://www.facebook.com/share/19vKhCnBqu/", "https://www.instagram.com/gysm_io"],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
