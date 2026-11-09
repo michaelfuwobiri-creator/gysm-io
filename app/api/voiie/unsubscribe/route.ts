@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { getLeadUnscoped, setDoNotContact, addMessage } from "@/lib/voiie/db";
-import { verifyLeadSig } from "@/lib/voiie/links";
+import { acceptLeadLink } from "@/lib/voiie/links";
 
 async function unsubscribe(id: string | null, sig: string | null): Promise<boolean> {
-  if (!id || !verifyLeadSig(id, sig)) return false;
+  if (!id || !acceptLeadLink(id, sig)) return false;
   const lead = await getLeadUnscoped(id);
   if (!lead) return false;
   if (!lead.do_not_contact) {
@@ -30,7 +30,7 @@ const page = (ok: boolean) =>
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
   const sig = req.nextUrl.searchParams.get("sig");
-  if (!id || !verifyLeadSig(id, sig)) return page(false);
+  if (!id || !acceptLeadLink(id, sig)) return page(false);
   const action = `/api/voiie/unsubscribe?id=${encodeURIComponent(id)}&sig=${encodeURIComponent(sig!)}`;
   return new Response(
     `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribe</title>

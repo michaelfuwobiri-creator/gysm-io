@@ -23,6 +23,7 @@
 
 import { generateWebsite } from "@/lib/ai/orchestrator";
 import { sql } from "@/lib/db";
+import { imageQuery, searchPhotos, replacePlaceholderImages, addPhotoCredit } from "@/lib/voiie/images";
 import type { LeadAnswers } from "@/types/voiie";
 
 function esc(s: string) {
@@ -53,6 +54,11 @@ function answersToPrompt(answers: LeadAnswers, fallbackName: string): string {
   ];
   if (featureLines.length) lines.push(`Also include: ${featureLines.join("; ")}.`);
   if (answers.timeline) lines.push(`Context from the client: ${answers.timeline}.`);
+  lines.push(
+    `Everything on the page -- headline, services, section copy and every image -- must be about this exact kind of business (${bizDesc}) and nothing else. ` +
+      "Never use scenery, instruments, products or services unrelated to it. " +
+      "Do not invent prices, street addresses, phone numbers, awards or customer testimonials; write realistic generic copy for this trade instead and leave contact details as clearly marked placeholders."
+  );
   lines.push("This is a free demo built to win the client's business -- make it look premium and fully realized, not a placeholder.");
 
   return lines.join(" ");
@@ -76,6 +82,17 @@ export async function buildFreeDemo(ownerUserId: string, answers: LeadAnswers, f
   } else {
     console.error("[voiie/demo] orchestrator generation failed, using deterministic template fallback:", result.error);
     html = buildTemplateFallback(answers, fallbackName);
+  }
+
+  // The generator's placeholder photos are random (picsum): swap them for
+  // photos of the business's own trade, or a neutral block, never unrelated.
+  try {
+    const photos = await searchPhotos(imageQuery(answers.business?.name || fallbackName, answers.business?.desc || ""));
+    const swapped = replacePlaceholderImages(html, photos);
+    html = swapped.usedPhotos ? addPhotoCredit(swapped.html) : swapped.html;
+    if (swapped.replaced && !photos.length) console.warn("[voiie/demo] no relevant photos (PEXELS_API_KEY unset or no results); used neutral placeholders");
+  } catch (e: any) {
+    console.error("[voiie/demo] image swap failed:", e.message);
   }
 
   const rows = await sql`

@@ -26,6 +26,17 @@ export function verifyLeadSig(leadId: string, sig: string | null | undefined): b
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Links in sent emails must NEVER stop working (no expiry, and not when a
+ *  signing secret is rotated). A lead id is a random v4 UUID (122 bits), so it
+ *  is already an unguessable capability token on its own; the HMAC is extra.
+ *  Accept a valid signature, or any well-formed lead id (the caller still
+ *  looks the lead up and 404s if it doesn't exist). */
+export function acceptLeadLink(leadId: string, sig: string | null | undefined): boolean {
+  return verifyLeadSig(leadId, sig) || UUID.test(leadId);
+}
+
 function site(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 }
