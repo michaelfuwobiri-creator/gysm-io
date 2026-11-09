@@ -7,6 +7,9 @@
 /** Resolves every {a|b|c} group in `input` to one randomly-chosen option. */
 export function renderSpintax(input: string): string {
   return input.replace(/\{([^{}]+)\}/g, (_match, group: string) => {
+    // A group with no "|" is a placeholder ({business}, {name}, {link}...)
+    // filled in later by renderTemplate -- leave it alone.
+    if (!group.includes("|")) return _match;
     const options = group.split("|");
     return options[Math.floor(Math.random() * options.length)];
   });
