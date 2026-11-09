@@ -23,7 +23,7 @@ const OUTCOMES: Array<[string, string]> = [
   ["wrong-number", "Wrong number"],
 ];
 
-const SCRIPT = `Hi, is this the owner of {name}? My name is Mike, I'm a local web designer. I noticed {name} doesn't have a website listed on Google, so I built a free sample homepage for you. Can I send you the link so you can look at it? There's no cost and no obligation to look. (If yes: read out or text the link below. If no: thank them and mark Not interested.)`;
+const SCRIPT = `Hi, is this the owner of {name}? My name is Mike, I'm a local web designer. I noticed {name} doesn't have a website listed on Google, so I'd like to make you a free sample homepage. Can I send you a short link where you tell me a bit about the business and I build it? There's no cost for the sample and no obligation. (If yes: read out or text the link below. If no: thank them and mark Not interested.)`;
 
 export function CallList() {
   const [leads, setLeads] = useState<CallLead[] | null>(null);
