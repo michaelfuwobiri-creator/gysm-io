@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: "VOIIE_OWNER_USER_ID not configured" }, { status: 500 });
   }
 
+  console.log("[voiie/cron/hunt] run started", { rotate: process.env.VOIIE_HUNT_ROTATE === "1", at: new Date().toISOString() });
   try {
     // VOIIE_PLACES_QUERY (e.g. "plumbers in Austin, TX") is optional --
     // unset, this sweep just runs Twitter/Threads same as before. Set it
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
       // Message the new leads right away (and any left over from quiet hours),
       // inside the autopilot's own guards; see lib/voiie/autosend.ts.
       const firstTouch = await sendFirstTouchesNow(ownerUserId);
+      console.log("[voiie/cron/hunt] run done", { created, firstTouchSent: firstTouch.sent, firstTouchSkipped: firstTouch.skipped, errors: firstTouch.errors.length });
       return Response.json({ ok: true, rotate: true, created, runs, firstTouch });
     }
     const result = await huntClients({ ownerUserId, placesQuery, platforms });

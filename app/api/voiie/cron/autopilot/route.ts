@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  console.log("[voiie/cron/autopilot] run done", { ...report, errors: report.errors.length });
   if (report.firstTouch + report.followUps + report.payNudges + report.demosFinished + report.markedLost > 0) {
     await notifyOwner(
       `Autopilot: ${report.firstTouch} new emails, ${report.followUps} follow-ups, ${report.payNudges} pay reminders, ${report.demosFinished} demos finished${report.errors.length ? `, ${report.errors.length} errors` : ""}.`
