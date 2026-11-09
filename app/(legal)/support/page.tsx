@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM — Support" };
+export const metadata = { title: "GYSM — Support", alternates: { canonical: "/support" } };
 
 export default function SupportPage() {
   return (

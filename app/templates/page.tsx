@@ -3,6 +3,12 @@ import { sql } from "@/lib/db";
 import TemplatesGallery from "./TemplatesGallery";
 import AppShell from "../components/AppShell";
 
+export const metadata = {
+  title: "Website and App Templates | GYSM",
+  description: "Start from a ready-made website or app template and let GYSM's AI customize it for your business.",
+  alternates: { canonical: "/templates" },
+};
+
 // Queries real projects flagged is_template = true in Neon, per
 // db/migrations/0001_init.sql. Display name comes from the `name` column
 // (0004_project_extras.sql, reused rather than duplicated -- see

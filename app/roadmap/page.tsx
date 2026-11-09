@@ -8,6 +8,7 @@ import RoadmapAdminForm from "./RoadmapAdminForm";
 export const metadata: Metadata = {
   title: "Roadmap | GYSM",
   description: "What's planned, in progress, and shipped on GYSM -- vote on what you want built next.",
+  alternates: { canonical: "/roadmap" },
 };
 export const dynamic = "force-dynamic";
 

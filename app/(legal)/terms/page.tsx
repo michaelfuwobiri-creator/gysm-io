@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM — Terms of Service" };
+export const metadata = { title: "GYSM — Terms of Service", alternates: { canonical: "/terms" } };
 
 export default function TermsPage() {
   return (

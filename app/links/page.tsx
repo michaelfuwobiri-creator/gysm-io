@@ -9,6 +9,7 @@ import CookiePreferencesLink from "../components/CookiePreferencesLink";
 export const metadata = {
   title: "Site Links | GYSM",
   description: "Every page on GYSM in one place.",
+  alternates: { canonical: "/links" },
 };
 
 const SECTIONS = [

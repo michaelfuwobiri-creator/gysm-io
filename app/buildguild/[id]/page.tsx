@@ -4,6 +4,24 @@ import CommentSection from "./CommentSection";
 import ShareButton from "@/app/components/ShareButton";
 import RemixButton from "./RemixButton";
 
+export async function generateMetadata({ params }: { params: { id: string } }) {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID.test(params.id)) return { robots: { index: false } };
+  try {
+    const rows = await sql`select title, tagline from projects where id = ${params.id} and is_public = true limit 1`;
+    const row = rows[0] as { title: string | null; tagline: string | null } | undefined;
+    if (!row) return { robots: { index: false } };
+    const title = row.title?.trim() ? `${row.title.trim()} — built with GYSM` : "App built with GYSM";
+    return {
+      title,
+      description: row.tagline?.trim() || "An app published on GYSM's BuildGuild. See the live preview and how it was built.",
+      alternates: { canonical: `/buildguild/${params.id}` },
+    };
+  } catch {
+    return {};
+  }
+}
+
 // Public detail view for one published BuildGuild app: full live preview
 // plus the discussion thread (see CommentSection, which talks to
 // /api/projects/[id]/comments). Only rows with is_public = true are

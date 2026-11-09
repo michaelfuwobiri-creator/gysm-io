@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Changelog | GYSM",
   description: "What's shipped on GYSM recently.",
+  alternates: { canonical: "/changelog" },
 };
 
 // Plain code array, not a DB table -- changelog entries are dev-authored

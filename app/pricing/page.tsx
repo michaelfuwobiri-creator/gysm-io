@@ -20,6 +20,7 @@ const PricingBanners = dynamic(() => import("./PricingBanners"), { ssr: false })
 export const metadata: Metadata = {
   title: "Pricing | GYSM",
   description: "One simple plan for the GYSM AI website builder: €20 a month, cancel anytime.",
+  alternates: { canonical: "/pricing" },
 };
 
 // Server Component reading straight from lib/stripe.ts PRICING_PLANS.

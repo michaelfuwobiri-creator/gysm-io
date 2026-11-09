@@ -5,6 +5,12 @@ import SubmitBuildModal from "./SubmitBuildModal";
 import FeaturedApps from "./FeaturedApps";
 import MobileNavMenu from "../components/MobileNavMenu";
 
+export const metadata = {
+  title: "BuildGuild: Apps and Websites Built with GYSM",
+  description: "Browse apps and websites that founders built with GYSM's AI builder, and see how they were made.",
+  alternates: { canonical: "/buildguild" },
+};
+
 // BuildGuild -- public gallery of every app users have opted to publish
 // (projects.is_public = true, set via POST /api/projects/[id]/publish).
 // No auth required to browse; publishing and commenting require sign-in

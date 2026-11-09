@@ -7,6 +7,7 @@ import FeedbackClient from "./FeedbackClient";
 export const metadata: Metadata = {
   title: "Feedback | GYSM",
   description: "Tell us what to build next on GYSM -- post an idea, upvote what you want most.",
+  alternates: { canonical: "/feedback" },
 };
 export const dynamic = "force-dynamic";
 

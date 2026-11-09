@@ -1,4 +1,4 @@
-export const metadata = { title: "GYSM — Refund Policy" };
+export const metadata = { title: "GYSM — Refund Policy", alternates: { canonical: "/refund" } };
 
 export default function RefundPage() {
   return (
