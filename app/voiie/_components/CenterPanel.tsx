@@ -235,6 +235,24 @@ export function CenterPanel({
     }
   };
 
+  const [startLink, setStartLink] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const startConsultation = async () => {
+    if (!lead) return;
+    setStarting(true);
+    try {
+      const r = await apiPost<{ link: string }>(`/api/voiie/consultation/${lead.lead.id}`, { start: true });
+      setStartLink(r.link);
+      onAnswered();
+      onLeadsChanged();
+      pushToast("Consultation started. No demo is built until they answer.", "fuchsia");
+    } catch (err) {
+      pushToast((err as Error).message, "cyan");
+    } finally {
+      setStarting(false);
+    }
+  };
+
   const buildDemo = async () => {
     if (!lead) return;
     setBuilding(true);
@@ -308,6 +326,41 @@ export function CenterPanel({
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-3" style={{ padding: 16 }}>
+        {!isComplete && !lead.lead.demo_project_id && (
+          <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, background: "var(--panel-1)", fontSize: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Consultation first, demo later</div>
+            <div style={{ color: "var(--text-faint)", lineHeight: 1.5 }}>
+              Starts the 4-question consultation. Nothing is sent and no demo is built until the questions are answered.
+              {lead.lead.contact_phone && !lead.lead.contact_email ? " This lead has a phone number but no email, so call them yourself." : ""}
+            </div>
+            {lead.lead.contact_phone && (
+              <a href={`tel:${lead.lead.contact_phone.replace(/[^0-9+]/g, "")}`} style={{ display: "inline-block", marginTop: 6, fontWeight: 700, color: "var(--fuchsia)" }}>
+                Call {lead.lead.contact_phone}
+              </a>
+            )}
+            <div style={{ marginTop: 8 }}>
+              <button
+                onClick={startConsultation}
+                disabled={starting}
+                className="grad-fv"
+                style={{ height: 34, padding: "0 16px", borderRadius: 9999, color: "#fff", fontWeight: 700, fontSize: 12 }}
+              >
+                {starting ? "Starting..." : startLink ? "Refresh link" : "Start consultation"}
+              </button>
+            </div>
+            {startLink && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ color: "var(--text-faint)" }}>Give the owner this link (read out, or text it from your own phone). It does not expire:</div>
+                <input readOnly value={startLink} onFocus={(e) => e.currentTarget.select()} style={{ width: "100%", marginTop: 4, padding: 6, background: "#08080a", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 11 }} />
+                {lead.lead.contact_phone && (
+                  <a href={`sms:${lead.lead.contact_phone.replace(/[^0-9+]/g, "")}?&body=${encodeURIComponent(`Hi, it's Mike. A few quick questions about ${lead.lead.display_name || "your business"}: ${startLink}`)}`} style={{ display: "inline-block", marginTop: 6, color: "var(--fuchsia)" }}>
+                    Open text message on this device
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {lead.messages.length === 0 && (
           <div style={{ fontSize: 12, color: "var(--text-ghost)", textAlign: "center", marginTop: 20 }}>
             No conversation yet. Hunter hasn&apos;t reached out to {lead.lead.display_name || lead.lead.handle}.

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getUser } from "@/lib/auth";
-import { getLead, getConsultationAnswers, updateLeadContact } from "@/lib/voiie/db";
+import { getLead, getConsultationAnswers, updateLeadContact, updateLeadStatus, addMessage } from "@/lib/voiie/db";
+import { intakeUrl } from "@/lib/voiie/links";
 import { saveReplyAndAdvance } from "@/lib/voiie/consultation-server";
 import { getQuestionAt } from "@/lib/voiie/consultation";
 
@@ -34,6 +35,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!lead) return Response.json({ error: "Lead not found." }, { status: 404 });
 
     const body = await req.json();
+
+    // "Start consultation": opens the consultation on this lead with NO demo
+    // and sends nothing to anyone. Moves new/contacted -> consulting, logs the
+    // first question, and returns the signed intake link for the operator to
+    // give the owner by hand (read out, own-phone text, own WhatsApp). The demo
+    // is built later, only after the 4 questions are answered.
+    if (body?.start === true) {
+      if (lead.do_not_contact) return Response.json({ error: "This lead is marked do-not-contact." }, { status: 400 });
+      if (lead.status === "new" || lead.status === "contacted") {
+        await updateLeadStatus(lead.id, "consulting");
+        const first = getQuestionAt(0);
+        await addMessage(
+          lead.id,
+          "outbound",
+          "system",
+          `Consultation started (no demo yet). First question: ${first?.prompt ?? ""}`
+        );
+      }
+      return Response.json({ ok: true, link: intakeUrl(lead.id) });
+    }
+
     const reply = (body?.reply ?? "").toString();
     if (!reply.trim()) return Response.json({ error: "Reply text is required." }, { status: 400 });
 
