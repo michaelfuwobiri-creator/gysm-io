@@ -19,6 +19,7 @@ export function HunterPanel({
 }) {
   const [huntQuery, setHuntQuery] = useState(DEFAULT_HUNT_QUERY);
   const [placesQuery, setPlacesQuery] = useState(DEFAULT_PLACES_QUERY);
+  const [huntMode, setHuntMode] = useState<"email" | "call" | "both">("both");
   const [platforms, setPlatforms] = useState({ Twitter: false, Threads: false, Places: true });
   const [scanning, setScanning] = useState(false);
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
@@ -69,6 +70,7 @@ export function HunterPanel({
         query: huntQuery,
         placesQuery,
         platforms: platformList,
+        mode: huntMode,
       });
       onHunted();
       if (result.skippedReason === "kill_switch") {
@@ -184,6 +186,27 @@ export function HunterPanel({
             />
             <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-dim)", opacity: 0.7 }}>
               Finds real local businesses in this area with no website on file &mdash; needs GOOGLE_PLACES_API_KEY configured.
+            </div>
+          </div>
+        )}
+
+        {platforms.Places && (
+          <div style={{ marginTop: 14 }}>
+            <div className="field-label" style={{ marginBottom: 6 }}>Hunt for</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {([["email", "Email only"], ["call", "Call only"], ["both", "Both"]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => setHuntMode(k)}
+                  className={huntMode === k ? "grad-fv" : ""}
+                  style={{ flex: 1, height: 30, borderRadius: 9999, fontSize: 11.5, fontWeight: 700, border: "1px solid var(--border)", color: huntMode === k ? "#fff" : "var(--text-dim)", background: huntMode === k ? undefined : "#0a0a0d" }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 10, color: "var(--text-dim)", opacity: 0.7 }}>
+              {huntMode === "email" ? "Businesses whose own website shows an email. These can get the automatic consultation invite." : huntMode === "call" ? "Businesses with a phone number and no website. They go to the Call list; nothing is sent." : "Everything: emailable leads plus phone-only leads."}
             </div>
           </div>
         )}

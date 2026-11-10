@@ -14,11 +14,13 @@ export async function POST(req: NextRequest) {
   let placesQuery: string | undefined;
   let platforms: ("twitter" | "threads" | "places")[] | undefined;
   let emailOnly = false;
+  let mode: "email" | "call" | "both" | undefined;
   try {
     const body = await req.json().catch(() => ({}));
     if (typeof body?.query === "string" && body.query.trim()) query = body.query.trim();
     if (typeof body?.placesQuery === "string" && body.placesQuery.trim()) placesQuery = body.placesQuery.trim();
     emailOnly = body?.emailOnly === true;
+    if (body?.mode === "email" || body?.mode === "call" || body?.mode === "both") mode = body.mode;
     if (Array.isArray(body?.platforms)) {
       platforms = body.platforms.filter((p: unknown) => p === "twitter" || p === "threads" || p === "places");
     }
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await huntClients({ ownerUserId: user.id, query, placesQuery, platforms, emailOnly });
+    const result = await huntClients({ ownerUserId: user.id, query, placesQuery, platforms, emailOnly, mode });
     return Response.json(result);
   } catch (error: any) {
     console.error("[voiie/hunt] failed:", error.message);
