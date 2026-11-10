@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       // Message the new leads right away (and any left over from quiet hours),
       // inside the autopilot's own guards; see lib/voiie/autosend.ts.
       const firstTouch = await sendFirstTouchesNow(ownerUserId);
-      console.log("[voiie/cron/hunt] run done", { created, firstTouchSent: firstTouch.sent, firstTouchSkipped: firstTouch.skipped, errors: firstTouch.errors.length });
+      console.log("[voiie/cron/hunt] run done", { created, firstTouchSent: firstTouch.sent, firstTouchSkipped: firstTouch.skipped, considered: firstTouch.considered, blocked: firstTouch.blocked, errors: firstTouch.errors });
       return Response.json({ ok: true, rotate: true, created, runs, firstTouch });
     }
     const result = await huntClients({ ownerUserId, placesQuery, platforms });

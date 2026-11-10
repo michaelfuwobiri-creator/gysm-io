@@ -403,8 +403,12 @@ export async function countEmailsSentToday(ownerUserId: string): Promise<number>
   return (rows[0] as any)?.n ?? 0;
 }
 
-/** Brand-new, emailable, contactable leads, oldest first. */
-export async function listLeadsReadyForFirstTouch(ownerUserId: string, limit: number): Promise<VoiieLead[]> {
+/** Brand-new, emailable, contactable leads, oldest first. Callers filter by
+ *  region/quiet hours afterwards, so always read a deep window (>= 300): a
+ *  backlog of un-emailable old leads (e.g. non-US) at the head of the queue
+ *  must not starve newer leads that can be sent. */
+export async function listLeadsReadyForFirstTouch(ownerUserId: string, wanted: number): Promise<VoiieLead[]> {
+  const limit = Math.max(wanted, 300);
   const rows = await sql`
     select * from voiie_leads
     where owner_user_id = ${ownerUserId} and status = 'new' and do_not_contact = false

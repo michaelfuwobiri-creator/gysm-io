@@ -9,7 +9,7 @@ import { coldEmailAllowed, detectRegion, postalAddressConfigured } from "@/lib/v
 import { quietHours } from "@/lib/voiie/reach";
 import { sendOutreach } from "@/lib/voiie/outreach";
 
-export interface FirstTouchReport { sent: number; skipped: string | null; errors: string[] }
+export interface FirstTouchReport { sent: number; skipped: string | null; errors: string[]; considered?: number; blocked?: Record<string, number> }
 
 export async function sendFirstTouchesNow(ownerUserId: string, maxThisRun = 10): Promise<FirstTouchReport> {
   const report: FirstTouchReport = { sent: 0, skipped: null, errors: [] };
@@ -23,10 +23,15 @@ export async function sendFirstTouchesNow(ownerUserId: string, maxThisRun = 10):
   if (budget <= 0) return { ...report, skipped: "daily_cap_reached" };
 
   const ready = await listLeadsReadyForFirstTouch(ownerUserId, budget * 5);
+  report.considered = ready.length;
+  const blocked: Record<string, number> = {};
+  const block = (why: string) => { blocked[why] = (blocked[why] ?? 0) + 1; };
+  report.blocked = blocked;
   for (const lead of ready) {
     if (budget <= 0) break;
-    if (!coldEmailAllowed(lead).ok) continue;
-    if (quietHours(detectRegion(lead) ?? "US", "email").quiet) continue;
+    const gate = coldEmailAllowed(lead);
+    if (!gate.ok) { block((gate.reason ?? "not allowed").replace(/\(allowed:.*\)/, "").trim()); continue; }
+    if (quietHours(detectRegion(lead) ?? "US", "email").quiet) { block("quiet hours"); continue; }
     try {
       await sendOutreach(lead.id, "email");
       report.sent++;
