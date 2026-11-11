@@ -20,6 +20,36 @@ type Entry = {
 
 const ENTRIES: Entry[] = [
   {
+    date: "2026-11-07",
+    title: "Custom domains for Agent sites",
+    body: "Tell the Agent to connect your own domain and it serves your published site there, with DNS guidance and a status check. Like deploys and database changes, it asks for your approval before it connects a domain.",
+  },
+  {
+    date: "2026-11-06",
+    title: "More in the Agent: memory, plans, questions, files, PDFs and images",
+    body: "The Agent can now remember things you ask it to across chats (with a panel to view and clear them), show its task plan as a live checklist, ask you multiple-choice questions, take images and files you attach, read PDFs, create images, and hand you files as downloads. A Stop button cancels a running prompt.",
+  },
+  {
+    date: "2026-11-06",
+    title: "The GYSM Agent is now the builder",
+    body: "The classic one-page builder has been retired and the old /builder address now opens the Agent, carrying over an existing build, template or prompt. The Agent writes files and runs commands in your own cloud sandbox, shows a live preview, and publishes to a name.gysm.io address. Deploys and database changes always wait for your approval.",
+  },
+  {
+    date: "2026-10-25",
+    title: "Report and block on BuildGuild",
+    body: "Signed-in users can report a published build and block other users on BuildGuild, and the terms now cover reporting and blocking. This follows App Store guideline 1.2 for apps with user-generated content.",
+  },
+  {
+    date: "2026-10-22",
+    title: "GYSM Agent launched",
+    body: "A new Agent workspace where you give a goal and it writes files, runs commands, sets up database tables on a Supabase project you connect, and deploys. Risky steps stop and ask first.",
+  },
+  {
+    date: "2026-10-07",
+    title: "Security centre",
+    body: "A new page under Settings lists your builds with exposed-key findings first, then quality issues, and \"Scan all builds\" re-runs the check on older builds. The scan is free.",
+  },
+  {
     date: "2026-08-23",
     title: "Deploy any build to your own Vercel account",
     body: "Every project's \"...\" menu on the dashboard now has \"Deploy to Vercel\" -- downloads your build as a ready-to-deploy folder and opens vercel.com/new so you can drag it straight onto your own account. GYSM never sees your Vercel login.",
