@@ -15,6 +15,13 @@ GYSM uses a two-model AI pipeline (a structure/content pass followed by a visual
 - [Best AI app builders compared](https://www.gysm.io/best-ai-app-builder): GYSM, Lovable, Bolt, v0, Base44 and Replit side by side, from each product's own pricing page, with GYSM's limits stated.
 - [Lovable alternative](https://www.gysm.io/alternatives/lovable), [Bolt alternative](https://www.gysm.io/alternatives/bolt), [Replit alternative](https://www.gysm.io/alternatives/replit): one-to-one comparisons.
 
+## Free idea planner, OpenAPI and MCP
+
+- [Idea planner](https://www.gysm.io/blueprint): describe an app, store or site in plain English and get an instant, free build plan (page sections, features, suggested data, integrations, honest limits) plus a link that opens the GYSM builder with a refined prompt. No sign-up, no AI call, nothing is stored.
+- Use-case plans: [online store](https://www.gysm.io/build/online-store), [restaurant](https://www.gysm.io/build/restaurant), [coaching](https://www.gysm.io/build/coaching), [portfolio](https://www.gysm.io/build/portfolio), [event page](https://www.gysm.io/build/event-page), [nonprofit](https://www.gysm.io/build/nonprofit).
+- Plan endpoint: `POST https://www.gysm.io/api/blueprint` with `{"idea": "..."}` (or `{"niche": "...", "payments": "stripe|thirdweb|both"}` for an online-store plan). Free, no key, creates nothing. Description: https://www.gysm.io/openapi.json
+- MCP server (Streamable HTTP, JSON-RPC): `https://www.gysm.io/api/mcp`. Read-only tools: plan_app, plan_online_store, list_use_cases, compare_ai_app_builders, get_build_link. build_app only runs when the caller supplies their own GYSM API key (`Authorization: Bearer gysm_live_...`) and uses that account's plan credits; without a key it returns a link to build in the browser.
+
 ## API access
 
 GYSM has a public API for generating apps outside the browser UI: `POST https://www.gysm.io/api/v1/generate` with a JSON body `{"prompt": "..."}` and an `Authorization: Bearer gysm_live_...` header. An optional `"tier": "best"` field switches the generation model from the default fast tier to the flagship tier, which uses more of the plan's usage allowance. API keys are created at https://www.gysm.io/settings/api-keys (signed-in users only). Each call counts toward the account's plan usage, like a build made in the app, and returns the generated app's HTML plus a public share URL.
