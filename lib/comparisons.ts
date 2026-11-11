@@ -110,15 +110,18 @@ export function getRival(slug: string): Rival | undefined {
  *  comparison that names them. */
 export const GYSM_FACTS = {
   output:
-    "One complete, self-contained web page per build, with a live preview, a code view you can copy, a downloadable project folder and a public share link",
-  codeExport: "Download the project, or connect a GitHub repo with a token you paste in, push your build and pull edits back (index.html only)",
-  backend: "Connect your own Supabase project and run the generated database schema against it",
-  hosting: "Publish to a public page, install it as a web app, or attach your own custom domain",
+    "The GYSM Agent builds multi-file sites in your own cloud sandbox: it writes files, runs commands and shows a live preview, then publishes to a name.gysm.io address",
+  codeExport:
+    "Download a project folder from the dashboard and deploy it to your own Vercel account, or have the Agent hand you the files it creates as downloads. GitHub sync is not available in the interface today",
+  backend:
+    "The Agent can create tables in a Supabase project you connect, and it asks for your approval before it changes your database",
+  hosting:
+    "Publish to a name.gysm.io address, attach your own custom domain through the Agent (it asks first), or deploy a downloaded folder to your own Vercel account",
   teams: "Organizations, API keys, a public generation API and an audit log",
   extras: "A sandboxed AI shell, a media factory, a template marketplace and BuildGuild, a public gallery of published apps",
   limits: [
-    "Each build is a single HTML page, not a multi-file project, and there is no in-product multi-file code editor yet.",
-    "GitHub sync covers the build's single index.html, not a multi-file repository.",
+    "There is no in-product code editor: you direct the Agent in chat rather than editing files by hand.",
+    "There is no GitHub sync in the interface today.",
     "There is no managed database or auth: you connect a Supabase project of your own.",
   ],
 };

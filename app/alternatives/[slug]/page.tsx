@@ -30,15 +30,15 @@ export default function Page({ params }: { params: { slug: string } }) {
   const faqs = [
     {
       q: `What is the difference between GYSM and ${rival.name}?`,
-      a: `GYSM turns a plain-English description into a complete web page you can preview, copy, download, push to GitHub and publish. ${rival.name} lists: ${rival.listed.join("; ")}. GYSM currently produces a single HTML page per build and does not have an in-product multi-file code editor.`,
+      a: `GYSM's Agent builds a multi-file site from a plain-English goal in your own cloud sandbox, shows a live preview and publishes it to a name.gysm.io address. ${rival.name} lists: ${rival.listed.join("; ")}. GYSM does not have an in-product code editor or GitHub sync in its interface today.`,
     },
     {
       q: `How much does ${rival.name} cost compared with GYSM?`,
       a: `${rival.name}: ${rival.pricing} (as listed on ${CHECKED_ON}). GYSM: ${gysmPriceSummary()}. Prices change, so check each product's own pricing page.`,
     },
     {
-      q: `Can I move a GYSM project to GitHub?`,
-      a: `Yes. You can download the project, or connect a GitHub repo with a token you paste in. Push sends your build as a commit and Pull loads the repo's index.html back in as a new version. Sync covers a single index.html, not a multi-file repository.`,
+      q: `Can I take a GYSM project somewhere else?`,
+      a: `You can download a project folder from the dashboard and deploy it to your own Vercel account, and the Agent can hand you the files it creates as downloads. GitHub sync is not available in the GYSM interface today.`,
     },
   ];
 
@@ -69,8 +69,8 @@ export default function Page({ params }: { params: { slug: string } }) {
         {rival.name} alternative: GYSM vs {rival.name}
       </h1>
       <p className="mt-4 text-[16px] text-black/70 max-w-[680px]">
-        GYSM is an AI app builder: describe an app in plain English and get a working web page back, which you can
-        preview, copy, download, push to GitHub and publish. This page compares it with {rival.name} using each
+        GYSM is an AI app builder: describe what you want in plain English and its Agent builds the site in your own
+        cloud sandbox, with a live preview, and publishes it to a name.gysm.io address. This page compares it with {rival.name} using each
         product&apos;s own pages, checked {CHECKED_ON}, and says where {rival.name} is the better fit.
       </p>
 
