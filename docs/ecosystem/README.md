@@ -17,7 +17,7 @@ Directory rules change often. Treat every requirement below as "verify on the cu
 
 1. Test locally: `claude mcp add --transport http gysm https://www.gysm.io/api/mcp`, then ask Claude to plan a candle store. Check each tool is called and the answers look right.
 2. Connector listing: submit the remote MCP server at the connectors directory. The planning tools need no sign-in, so a no-auth listing is possible. If you want `build_app` to work from chat with no pasted key, you need OAuth (see "Decisions" below).
-3. Plugin listing: put `integrations/claude-plugin/` in its own public GitHub repo, fix the `REPLACE_ME` values, then submit or install via marketplace.
+3. Plugin listing: done. `integrations/claude-plugin/` is mirrored in the public repo michaelfuwobiri-creator/gysm-claude-plugin; keep the two in sync, then submit or install via marketplace.
 4. Prepare: privacy policy URL, terms URL, support URL, 3 to 5 example prompts, tool descriptions (already written in `lib/mcp/server.ts`), and a short description that states the limits.
 
 ## 2. ChatGPT (OpenAI)

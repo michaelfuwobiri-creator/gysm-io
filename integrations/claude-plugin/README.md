@@ -9,7 +9,7 @@ Connects Claude to the GYSM MCP server so it can plan, and on request build, web
 ## Install (Claude Code)
 
 ```
-/plugin marketplace add REPLACE_ME/gysm-claude-plugin
+/plugin marketplace add michaelfuwobiri-creator/gysm-claude-plugin
 /plugin install gysm@gysm-claude-plugin
 ```
 
@@ -19,9 +19,6 @@ or just add the server: `claude mcp add --transport http gysm https://www.gysm.i
 
 Create a key at https://www.gysm.io/settings/api-keys and send it as `Authorization: Bearer gysm_live_...` when adding the connector. Without a key the tool builds nothing and returns a link instead.
 
-## Publishing checklist
+## Publishing status
 
-1. Copy this folder into its own PUBLIC GitHub repo (the plugin bundle must be public to be listed).
-2. Replace every `REPLACE_ME` and the repository URL in `.claude-plugin/plugin.json`.
-3. Add a `.claude-plugin/marketplace.json` if you want `/plugin marketplace add` to work from the same repo.
-4. Submit through the Claude connectors directory form (see docs/ecosystem/README.md). Re-check the current requirements there before submitting.
+This folder is mirrored in the public repo https://github.com/michaelfuwobiri-creator/gysm-claude-plugin, which is what `/plugin marketplace add` installs from. Keep the two in sync when either changes. The next step is the Claude connectors directory submission (see docs/ecosystem/README.md); re-check the current requirements there before submitting.

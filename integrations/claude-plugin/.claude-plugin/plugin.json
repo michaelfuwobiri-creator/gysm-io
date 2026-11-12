@@ -4,7 +4,7 @@
   "description": "Plan and build web apps and online stores from plain English with GYSM. Free planning tools, no sign-in needed; building uses your own GYSM account.",
   "author": { "name": "GYSM", "url": "https://www.gysm.io" },
   "homepage": "https://www.gysm.io",
-  "repository": "https://github.com/REPLACE_ME/gysm-claude-plugin",
+  "repository": "https://github.com/michaelfuwobiri-creator/gysm-claude-plugin",
   "license": "MIT",
   "keywords": ["app-builder", "no-code", "online-store", "web-app", "planning"]
 }
