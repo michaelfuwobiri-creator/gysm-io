@@ -10,10 +10,10 @@ declare global {
   }
 }
 
-// Loads Shopify App Bridge (which supplies the session token), then lets the
+// Uses Shopify App Bridge (loaded in page.tsx; it supplies the session token), then lets the
 // merchant describe their store. The server turns it into DRAFT products and
 // unpublished pages in this store; nothing goes live without the merchant.
-export default function ShopifyApp({ apiKey }: { apiKey: string }) {
+export default function ShopifyApp({ configured }: { configured: boolean }) {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [shop, setShop] = useState("");
   const [niche, setNiche] = useState("");
@@ -24,23 +24,19 @@ export default function ShopifyApp({ apiKey }: { apiKey: string }) {
   const [error, setError] = useState("");
 
   async function token(): Promise<string> {
+    // App Bridge is server-rendered in page.tsx; give it a moment to attach.
+    for (let i = 0; i < 40 && !window.shopify; i++) await new Promise((r) => setTimeout(r, 100));
     if (!window.shopify) throw new Error("Open this app from your Shopify admin.");
     return window.shopify.idToken();
   }
 
   useEffect(() => {
-    if (!apiKey) {
+    if (!configured) {
       setState("error");
       setError("This app is not configured yet.");
       return;
     }
-    const meta = document.createElement("meta");
-    meta.name = "shopify-api-key";
-    meta.content = apiKey;
-    document.head.appendChild(meta);
-    const s = document.createElement("script");
-    s.src = "https://cdn.shopify.com/shopifycloud/app-bridge.js";
-    s.onload = async () => {
+    (async () => {
       try {
         const t = await token();
         const r = await fetch("/api/shopify/session", { method: "POST", headers: { authorization: `Bearer ${t}` } });
@@ -52,13 +48,9 @@ export default function ShopifyApp({ apiKey }: { apiKey: string }) {
         setError(e?.message || "Could not connect to your store.");
         setState("error");
       }
-    };
-    s.onerror = () => {
-      setError("Could not load Shopify. Open this app from your Shopify admin.");
-      setState("error");
-    };
-    document.head.appendChild(s);
-  }, [apiKey]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configured]);
 
   async function build() {
     setBusy(true);
