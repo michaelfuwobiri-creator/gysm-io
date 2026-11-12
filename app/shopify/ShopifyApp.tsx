@@ -22,6 +22,7 @@ export default function ShopifyApp({ configured }: { configured: boolean }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
+  const [planUrl, setPlanUrl] = useState("");
 
   async function token(): Promise<string> {
     // App Bridge is server-rendered in page.tsx; give it a moment to attach.
@@ -56,6 +57,7 @@ export default function ShopifyApp({ configured }: { configured: boolean }) {
     setBusy(true);
     setError("");
     setResult(null);
+    setPlanUrl("");
     try {
       const t = await token();
       const list = products
@@ -73,6 +75,7 @@ export default function ShopifyApp({ configured }: { configured: boolean }) {
         body: JSON.stringify({ niche, products: list, currency }),
       });
       const j = await r.json();
+      if (r.status === 402 && j.planUrl) setPlanUrl(j.planUrl);
       if (!r.ok) throw new Error(j.error || "Something went wrong.");
       setResult(j);
     } catch (e: any) {
@@ -115,6 +118,13 @@ export default function ShopifyApp({ configured }: { configured: boolean }) {
               </button>
             </div>
             {error && <p style={{ color: "#d72c0d", fontSize: 14 }}>{error}</p>}
+            {planUrl && (
+              <p>
+                <a href={planUrl} target="_top" style={{ color: "#005bd3", fontSize: 14, fontWeight: 600 }}>
+                  Choose a plan
+                </a>
+              </p>
+            )}
           </div>
 
           {result && (

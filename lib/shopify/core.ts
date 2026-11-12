@@ -150,3 +150,18 @@ export const SHOPIFY_LAUNCH_CHECKLIST = [
   "Show your business name, address and contact details, and show prices with any VAT or sales tax that applies where you sell",
   "Set the products you want to sell to Active and make sure they are available on your Online Store",
 ];
+
+const ACTIVE_SUB = `query { currentAppInstallation { activeSubscriptions { name status } } }`;
+
+/** True when the shop has an ACTIVE paid subscription to this app (Shopify App Pricing). */
+export async function hasActiveSubscription(shop: string, accessToken: string, fetchImpl: FetchLike = fetch): Promise<boolean> {
+  const d: any = await adminGraphql(shop, accessToken, ACTIVE_SUB, {}, fetchImpl);
+  const subs: { status?: string }[] = d?.currentAppInstallation?.activeSubscriptions || [];
+  return subs.some((s) => s.status === "ACTIVE");
+}
+
+/** Shopify's hosted plan-selection page for this app in the merchant's admin. */
+export function planSelectionUrl(shop: string, appHandle = "gysm"): string {
+  const handle = shop.replace(/\.myshopify\.com$/, "");
+  return `https://admin.shopify.com/store/${handle}/charges/${appHandle}/pricing_plans`;
+}

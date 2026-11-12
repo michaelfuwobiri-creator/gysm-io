@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { describe, expect, it, vi } from "vitest";
 import { makeStoreBlueprint } from "@/lib/blueprint";
-import { SHOPIFY_LAUNCH_CHECKLIST, adminGraphql, exchangeToken, normalizeShop, parsePrice, planToShopifyDrafts, verifySessionToken, verifyWebhookHmac } from "@/lib/shopify/core";
+import { SHOPIFY_LAUNCH_CHECKLIST, adminGraphql, hasActiveSubscription, planSelectionUrl, exchangeToken, normalizeShop, parsePrice, planToShopifyDrafts, verifySessionToken, verifyWebhookHmac } from "@/lib/shopify/core";
 
 const SECRET = "test-secret";
 const CLIENT = "client-123";
@@ -106,5 +106,18 @@ describe("launch checklist", () => {
     expect(SHOPIFY_LAUNCH_CHECKLIST.length).toBeGreaterThanOrEqual(5);
     expect(text).toMatch(/Settings > Payments/);
     expect(text).not.toMatch(/payment link|Generate the page/i);
+  });
+});
+
+describe("Shopify App Pricing helpers", () => {
+  it("detects an active subscription", async () => {
+    const mk = (status: string) => vi.fn(async () => new Response(JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: [{ name: "GYSM", status }] } } }), { status: 200 }));
+    expect(await hasActiveSubscription("demo.myshopify.com", "t", mk("ACTIVE") as any)).toBe(true);
+    expect(await hasActiveSubscription("demo.myshopify.com", "t", mk("CANCELLED") as any)).toBe(false);
+    const none = vi.fn(async () => new Response(JSON.stringify({ data: { currentAppInstallation: { activeSubscriptions: [] } } }), { status: 200 }));
+    expect(await hasActiveSubscription("demo.myshopify.com", "t", none as any)).toBe(false);
+  });
+  it("builds the hosted plan selection URL", () => {
+    expect(planSelectionUrl("demo.myshopify.com")).toBe("https://admin.shopify.com/store/demo/charges/gysm/pricing_plans");
   });
 });

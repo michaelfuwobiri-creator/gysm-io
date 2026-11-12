@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeStoreBlueprint } from "@/lib/blueprint";
-import { adminGraphql, planToShopifyDrafts, SHOPIFY_LAUNCH_CHECKLIST } from "@/lib/shopify/core";
+import { adminGraphql, hasActiveSubscription, planSelectionUrl, planToShopifyDrafts, SHOPIFY_LAUNCH_CHECKLIST } from "@/lib/shopify/core";
 import { authenticateShop, recordBuild, shopifyConfig } from "@/lib/shopify/store";
 
 // "Build my store": turns a plain-English store description into DRAFT
@@ -50,6 +50,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not connect to your store." }, { status: 502 });
   }
   if (!auth) return NextResponse.json({ error: "Invalid session." }, { status: 401 });
+
+  // Paid plans (Shopify App Pricing) are off until SHOPIFY_REQUIRE_PLAN=true, so
+  // the app stays free until the plan exists in the app listing.
+  if (process.env.SHOPIFY_REQUIRE_PLAN === "true") {
+    try {
+      if (!(await hasActiveSubscription(auth.shop, auth.accessToken))) {
+        return NextResponse.json({ error: "Choose a plan to build your store drafts.", planUrl: planSelectionUrl(auth.shop) }, { status: 402 });
+      }
+    } catch (e) {
+      console.error("shopify subscription check failed", e);
+      return NextResponse.json({ error: "Could not check your plan. Try again." }, { status: 502 });
+    }
+  }
 
   const plan = makeStoreBlueprint({ niche: body.niche, products: body.products, currency: body.currency }, { source: "shopify", medium: "app" });
   const drafts = planToShopifyDrafts(plan);
