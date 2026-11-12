@@ -41,6 +41,13 @@ export default function CookieConsent() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // The embedded Shopify admin app (/shopify) is a tool inside the merchant's
+    // Shopify admin, not a public page, so no banner is shown there. No consent
+    // is recorded either, so the consent-gated analytics stay off in that frame.
+    if (window.location.pathname === "/shopify" || window.location.pathname.startsWith("/shopify/")) {
+      setVisible(false);
+      return;
+    }
     if (readConsent() !== null) {
       setVisible(false);
       return;
