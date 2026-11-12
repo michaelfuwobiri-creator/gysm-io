@@ -30,6 +30,12 @@ const nextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       {
+        // The embedded Shopify app (app/shopify) is loaded in an iframe by the
+        // merchant's Shopify admin, so it must allow Shopify as a frame ancestor.
+        source: "/shopify",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors https://*.myshopify.com https://admin.shopify.com;" }],
+      },
+      {
         source: "/screenshots/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
