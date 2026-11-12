@@ -148,6 +148,7 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <ProductsNavMenu />
             <a href="/buildguild" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">BuildGuild</a>
+            <a href="/blueprint" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Idea planner</a>
             <a href="/templates" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">{t("nav.templates")}</a>
             <a href="/connectors" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Connectors</a>
             <a href="/marketplace" className="text-[13px] font-medium opacity-60 hidden md:block mr-2">Marketplace</a>
@@ -159,6 +160,7 @@ export default function Page() {
                 { href: "/agent", label: "AI Builder", description: "Describe your app in plain English -- GYSM builds it." },
                 { href: "/builder-blocks", label: "Lego Builder", badge: "Beta", description: "Drag and drop real blocks -- auth, payments, forms -- to build an app." },
                 { href: "/buildguild", label: "BuildGuild" },
+                { href: "/blueprint", label: "Idea planner", description: "Free: turn an idea into a build plan in seconds." },
                 { href: "/templates", label: t("nav.templates") },
                 { href: "/connectors", label: "Connectors" },
                 { href: "/marketplace", label: "Marketplace" },
