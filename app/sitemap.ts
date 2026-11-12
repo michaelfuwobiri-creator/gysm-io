@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { sql } from "@/lib/db";
+import { LANDING_USE_CASES } from "@/lib/blueprint";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
 
@@ -14,6 +15,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/build/dating-app`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${siteUrl}/build/saas`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${siteUrl}/build/booking-app`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${siteUrl}/blueprint`, changeFrequency: "monthly", priority: 0.7 },
+    // Data-driven use-case pages (app/build/[slug], content in lib/blueprint.ts)
+    ...LANDING_USE_CASES.map((u) => ({ url: `${siteUrl}${u.path}`, changeFrequency: "monthly" as const, priority: 0.6 })),
     { url: `${siteUrl}/buildguild`, changeFrequency: "hourly", priority: 0.8 },
     { url: `${siteUrl}/roadmap`, changeFrequency: "daily", priority: 0.5 },
     { url: `${siteUrl}/feedback`, changeFrequency: "daily", priority: 0.5 },

@@ -1,0 +1,343 @@
+// GYSM's remote MCP server (Model Context Protocol), stateless JSON mode.
+//
+// Mounted at POST /api/mcp (app/api/mcp/route.ts). It is deliberately
+// dependency-free: a small JSON-RPC 2.0 handler for the three MCP methods a
+// tools-only server needs (initialize, tools/list, tools/call) plus ping, so
+// it can be unit-tested without a framework and cannot be broken by an SDK
+// upgrade. It speaks the Streamable HTTP transport in its simplest legal form:
+// every POST gets one application/json response, GET returns 405 (no
+// server-initiated SSE stream), and there are no sessions.
+//
+// What it exposes (all free, read-only planning tools that need no sign-in,
+// which is what makes the server listable in public directories):
+//   plan_app, plan_online_store, list_use_cases, compare_ai_app_builders,
+//   get_build_link
+// plus one write tool, build_app, that only works when the CALLER passes
+// their own GYSM API key (Authorization: Bearer gysm_live_...). It forwards
+// to the existing /api/v1/generate endpoint, so credits, plan limits and key
+// verification stay exactly where they already live. Without a key it does
+// nothing except explain how to continue in the builder.
+
+import {
+  LANDING_USE_CASES,
+  USE_CASES,
+  SITE_URL,
+  buildDeepLink,
+  cleanText,
+  makeBlueprint,
+  makeStoreBlueprint,
+} from "@/lib/blueprint";
+import { CHECKED_ON, GYSM_FACTS, RIVALS } from "@/lib/comparisons";
+
+export const SUPPORTED_PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
+const SERVER_VERSION = "1.0.0";
+
+type Json = Record<string, unknown>;
+type RpcRequest = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Json };
+type RpcResponse = { jsonrpc: "2.0"; id: string | number | null; result?: unknown; error?: { code: number; message: string; data?: unknown } };
+
+export type McpContext = {
+  /** GYSM API key from the Authorization header, if the caller sent one. */
+  apiKey?: string;
+  /** Injected in tests. Defaults to global fetch. */
+  fetchImpl?: typeof fetch;
+};
+
+type ToolResult = { content: { type: "text"; text: string }[]; structuredContent?: unknown; isError?: boolean };
+
+type Tool = {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: Json;
+  annotations: { title: string; readOnlyHint: boolean; destructiveHint: boolean; idempotentHint: boolean; openWorldHint: boolean };
+  run: (args: Json, ctx: McpContext) => Promise<ToolResult> | ToolResult;
+};
+
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
+
+function ok(text: string, structured?: unknown): ToolResult {
+  return { content: [{ type: "text", text }], ...(structured !== undefined ? { structuredContent: structured } : {}) };
+}
+function fail(text: string): ToolResult {
+  return { content: [{ type: "text", text }], isError: true };
+}
+
+function bullets(items: string[]): string {
+  return items.map((i) => `- ${i}`).join("\n");
+}
+
+const TOOLS: Tool[] = [
+  {
+    name: "plan_app",
+    title: "Plan a web app from an idea",
+    description:
+      "Turn a plain-English app idea into a build plan: matched use case, page sections, features, a suggested data model, integrations, honest limits, a refined build prompt and a link that opens the GYSM builder with that prompt. Free and instant: it makes no AI call, creates nothing and changes nothing. It is a plan, not a generated app.",
+    inputSchema: {
+      type: "object",
+      properties: { idea: { type: "string", description: "What the app should do and who it is for, in plain English (max 600 characters).", maxLength: 600 } },
+      required: ["idea"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Plan a web app from an idea", ...READ_ONLY },
+    run: (args) => {
+      const idea = cleanText(args.idea);
+      if (!idea) return fail("Please describe the app idea in a sentence or two.");
+      const bp = makeBlueprint(idea, { source: "mcp", medium: "plan_app" });
+      const text = [
+        `Matched use case: ${bp.useCase.name}${bp.useCase.matched ? "" : " (no close match, using a generic plan)"}`,
+        `For: ${bp.audience}`,
+        "",
+        "Sections:",
+        bullets(bp.sections),
+        "",
+        "Features:",
+        bullets(bp.features),
+        "",
+        "Suggested data model (only stored if the user connects their own Supabase project):",
+        bullets(bp.data.map((d) => `${d.table}: ${d.fields.join(", ")}`)),
+        "",
+        "Integrations:",
+        bullets(bp.integrations),
+        "",
+        "Limits to be upfront about:",
+        bullets(bp.limits),
+        "",
+        `Refined build prompt: ${bp.buildPrompt}`,
+        `Open in the GYSM builder: ${bp.buildLink}`,
+        "",
+        bp.note,
+      ].join("\n");
+      return ok(text, bp);
+    },
+  },
+  {
+    name: "plan_online_store",
+    title: "Plan an online store page",
+    description:
+      "Plan a small online store: page sections, product features, checkout options (Stripe Payment Links and/or thirdweb card-or-crypto checkout, both set up in the seller's own accounts), a compliance checklist, a launch checklist, honest limits and a link that opens the GYSM builder with a ready-made prompt. Free and instant: it makes no AI call and creates nothing. GYSM generates a single storefront page, not a full Shopify replacement.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        niche: { type: "string", description: "What the store sells, e.g. 'handmade candles' (max 160 characters).", maxLength: 160 },
+        products: {
+          type: "array",
+          maxItems: 12,
+          description: "Optional product names, or objects with name and price.",
+          items: { anyOf: [{ type: "string", maxLength: 80 }, { type: "object", properties: { name: { type: "string", maxLength: 80 }, price: { type: "string", maxLength: 24 } }, required: ["name"], additionalProperties: false }] },
+        },
+        currency: { type: "string", description: "ISO currency code such as EUR, USD or GBP. Defaults to EUR." },
+        payments: { type: "string", enum: ["stripe", "thirdweb", "both"], description: "Which checkout option to plan for. Defaults to stripe." },
+      },
+      required: ["niche"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Plan an online store page", ...READ_ONLY },
+    run: (args) => {
+      if (!cleanText(args.niche, 160)) return fail("Please say what the store sells, for example 'handmade candles'.");
+      const bp = makeStoreBlueprint(args, { source: "mcp", medium: "plan_online_store" });
+      const text = [
+        `Store: ${bp.niche} (${bp.currency})`,
+        bp.products.length ? `Products: ${bp.products.map((p) => (p.price ? `${p.name} (${p.price})` : p.name)).join("; ")}` : "Products: none given, the page will use placeholders",
+        "",
+        "Page sections:",
+        bullets(bp.sections),
+        "",
+        "Checkout options:",
+        ...bp.checkout.flatMap((c) => [`${c.option}: ${c.howItWorks}`, "  The seller does:", ...c.youDoYourself.map((y) => `  - ${y}`)]),
+        "",
+        "Compliance checklist (general information, not legal advice):",
+        bullets(bp.compliance),
+        "",
+        "Launch checklist:",
+        bullets(bp.launchChecklist),
+        "",
+        "Limits to be upfront about:",
+        bullets(bp.limits),
+        "",
+        `Build prompt: ${bp.buildPrompt}`,
+        `Open in the GYSM builder: ${bp.buildLink}`,
+        "",
+        bp.note,
+      ].join("\n");
+      return ok(text, bp);
+    },
+  },
+  {
+    name: "list_use_cases",
+    title: "List supported use cases",
+    description: "List the kinds of sites and apps GYSM plans well (online store, restaurant, coaching, portfolio, event page, nonprofit, booking, SaaS and more) with an example prompt and a page for each. Read-only.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "List supported use cases", ...READ_ONLY },
+    run: () => {
+      const items = USE_CASES.map((u) => ({ slug: u.slug, name: u.name, audience: u.audience, examplePrompt: u.examplePrompt, page: u.path ? `${SITE_URL}${u.path}` : null }));
+      const text = items.map((u) => `${u.name}: ${u.audience}\n  Example: ${u.examplePrompt}${u.page ? `\n  Page: ${u.page}` : ""}`).join("\n");
+      return ok(text, { useCases: items });
+    },
+  },
+  {
+    name: "compare_ai_app_builders",
+    title: "Compare AI app builders",
+    description:
+      "Sourced comparison of GYSM against Lovable, Bolt, v0, Base44 and Replit: pricing and allowances as listed on each product's own pricing page on the stated check date, plus what GYSM does and does not do. Facts may have changed since the check date, so confirm on the source pages. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: { rival: { type: "string", description: "Optional: only this rival (lovable, bolt, v0, base44 or replit)." } },
+      additionalProperties: false,
+    },
+    annotations: { title: "Compare AI app builders", ...READ_ONLY },
+    run: (args) => {
+      const want = typeof args.rival === "string" ? args.rival.toLowerCase().trim() : "";
+      const rivals = want ? RIVALS.filter((r) => r.slug === want || r.name.toLowerCase() === want) : RIVALS;
+      if (want && rivals.length === 0) return fail(`Unknown rival "${cleanText(want, 40)}". Try: ${RIVALS.map((r) => r.slug).join(", ")}.`);
+      const lines = [
+        `Facts below were read from each product's own pages on ${CHECKED_ON}. They may have changed since; check the sources.`,
+        "",
+        "GYSM:",
+        `- Output: ${GYSM_FACTS.output}`,
+        `- Backend: ${GYSM_FACTS.backend}`,
+        `- Hosting: ${GYSM_FACTS.hosting}`,
+        `- Limits: ${GYSM_FACTS.limits.join(" ")}`,
+        "",
+        ...rivals.flatMap((r) => [`${r.name}:`, `- Pricing: ${r.pricing}`, `- Allowance: ${r.allowance}`, ...(r.listed.length ? [`- Listed: ${r.listed.join("; ")}`] : []), `- Source: ${r.sources.map((s) => s.url).join(", ")}`, ""]),
+        `Full comparison: ${SITE_URL}/best-ai-app-builder`,
+      ];
+      return ok(lines.join("\n"), { checkedOn: CHECKED_ON, gysm: GYSM_FACTS, rivals: rivals.map((r) => ({ slug: r.slug, name: r.name, pricing: r.pricing, allowance: r.allowance, listed: r.listed, sources: r.sources })) });
+    },
+  },
+  {
+    name: "get_build_link",
+    title: "Get a link that opens the builder",
+    description: "Return a link that opens the GYSM builder with a prompt already filled in. The user signs in and presses build themselves. Creates nothing and spends nothing.",
+    inputSchema: {
+      type: "object",
+      properties: { prompt: { type: "string", description: "The build prompt to pre-fill (max 1800 characters).", maxLength: 1800 } },
+      required: ["prompt"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Get a link that opens the builder", ...READ_ONLY },
+    run: (args) => {
+      const prompt = cleanText(args.prompt, 1800);
+      if (!prompt) return fail("Please provide the prompt to pre-fill.");
+      const url = buildDeepLink(prompt, { source: "mcp", medium: "get_build_link" });
+      return ok(`Open this link to continue in the GYSM builder: ${url}`, { url });
+    },
+  },
+  {
+    name: "build_app",
+    title: "Build the app in your GYSM account",
+    description:
+      "Generate the app now in the caller's own GYSM account and return its live link. Requires the caller's GYSM API key (created at gysm.io/settings/api-keys) sent as an Authorization bearer header. This creates a project in that account and uses that account's plan credits, so only call it when the user has asked to build now. Without a key it creates nothing and returns a link to continue in the builder.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "What to build (max 1800 characters). Use the build prompt from plan_app or plan_online_store.", maxLength: 1800 },
+        tier: { type: "string", enum: ["fast", "best"], description: "Model tier. 'best' uses more of the plan's allowance. Defaults to fast." },
+      },
+      required: ["prompt"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Build the app in your GYSM account", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    run: async (args, ctx) => {
+      const prompt = cleanText(args.prompt, 1800);
+      if (!prompt) return fail("Please provide the prompt to build.");
+      if (!ctx.apiKey) {
+        const url = buildDeepLink(prompt, { source: "mcp", medium: "build_app_nokey" });
+        return ok(`Nothing was built: no GYSM API key was provided with this connection. To build, open this link, sign in and press build: ${url}\n(To build straight from chat, create an API key at ${SITE_URL}/settings/api-keys and add it to this connector as a bearer token.)`, { built: false, url });
+      }
+      const f = ctx.fetchImpl ?? fetch;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 280_000);
+      try {
+        // Always our own origin: the caller's key is never sent anywhere else.
+        const res = await f(`${SITE_URL}/api/v1/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${ctx.apiKey}` },
+          body: JSON.stringify({ prompt, tier: args.tier === "best" ? "best" : "fast" }),
+          signal: ctrl.signal,
+        });
+        const data = (await res.json().catch(() => ({}))) as Json;
+        if (res.status === 401) return fail("GYSM did not accept that API key. Create a new one at " + SITE_URL + "/settings/api-keys.");
+        if (res.status === 402) return fail("Nothing was built: this account has no usage left right now. Check the plan at " + SITE_URL + "/pricing.");
+        if (!res.ok) return fail(`The build did not complete (status ${res.status}). ${typeof data.error === "string" ? cleanText(data.error, 300) : "Please try again."}`);
+        const url = typeof data.url === "string" ? data.url : null;
+        return ok(`Built. Live link: ${url ?? "(saved to your GYSM dashboard)"}`, { built: true, projectId: data.projectId ?? null, url });
+      } catch (err) {
+        return fail(err instanceof Error && err.name === "AbortError" ? "The build took too long and was stopped. Open your GYSM dashboard to see whether it finished." : "Could not reach GYSM to build. Please try again.");
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  },
+];
+
+const INSTRUCTIONS =
+  "GYSM turns a plain-English description into a working single-page web app with a live preview. Use plan_app or plan_online_store first to shape the idea (free, instant, no sign-in). Use get_build_link to hand the user a link, or build_app only when the user asks to build now and has connected their own GYSM API key. GYSM builds one self-contained page per build with no managed database or sign-in: be upfront about that, and never promise results the plan does not state.";
+
+function rpcError(id: RpcResponse["id"], code: number, message: string): RpcResponse {
+  return { jsonrpc: "2.0", id, error: { code, message } };
+}
+
+async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse | null> {
+  const id = msg.id ?? null;
+  const isNotification = msg.id === undefined;
+  if (msg.jsonrpc !== "2.0" || typeof msg.method !== "string") return isNotification ? null : rpcError(id, -32600, "Invalid request");
+  const params = (msg.params && typeof msg.params === "object" ? msg.params : {}) as Json;
+
+  if (isNotification) return null; // notifications/initialized, notifications/cancelled, ...
+
+  switch (msg.method) {
+    case "initialize": {
+      const asked = typeof params.protocolVersion === "string" ? params.protocolVersion : "";
+      const protocolVersion = (SUPPORTED_PROTOCOLS as readonly string[]).includes(asked) ? asked : SUPPORTED_PROTOCOLS[0];
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: {
+          protocolVersion,
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: "gysm", title: "GYSM App and Store Builder", version: SERVER_VERSION },
+          instructions: INSTRUCTIONS,
+        },
+      };
+    }
+    case "ping":
+      return { jsonrpc: "2.0", id, result: {} };
+    case "tools/list":
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: { tools: TOOLS.map((t) => ({ name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations })) },
+      };
+    case "tools/call": {
+      const name = typeof params.name === "string" ? params.name : "";
+      const tool = TOOLS.find((t) => t.name === name);
+      if (!tool) return rpcError(id, -32602, `Unknown tool: ${cleanText(name, 60)}`);
+      const args = (params.arguments && typeof params.arguments === "object" && !Array.isArray(params.arguments) ? params.arguments : {}) as Json;
+      try {
+        return { jsonrpc: "2.0", id, result: await tool.run(args, ctx) };
+      } catch (err) {
+        console.error("[mcp] tool failed:", name, err instanceof Error ? err.message : err);
+        return { jsonrpc: "2.0", id, result: fail("Something went wrong running that tool. Please try again.") };
+      }
+    }
+    default:
+      return rpcError(id, -32601, `Method not found: ${cleanText(msg.method, 60)}`);
+  }
+}
+
+/** Handle one parsed POST body (a single message or a batch). */
+export async function handleMcpBody(body: unknown, ctx: McpContext = {}): Promise<{ status: number; body?: unknown }> {
+  if (Array.isArray(body)) {
+    if (body.length === 0) return { status: 400, body: rpcError(null, -32600, "Empty batch") };
+    if (body.length > 20) return { status: 400, body: rpcError(null, -32600, "Batch too large") };
+    const out = (await Promise.all(body.map((m) => handleOne((m ?? {}) as RpcRequest, ctx)))).filter((r): r is RpcResponse => r !== null);
+    return out.length ? { status: 200, body: out } : { status: 202 };
+  }
+  if (!body || typeof body !== "object") return { status: 400, body: rpcError(null, -32600, "Invalid request") };
+  const res = await handleOne(body as RpcRequest, ctx);
+  return res ? { status: 200, body: res } : { status: 202 };
+}
+
+export const MCP_TOOL_NAMES = TOOLS.map((t) => t.name);
+export { LANDING_USE_CASES };

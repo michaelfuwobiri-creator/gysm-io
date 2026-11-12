@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gysm": {
+      "type": "http",
+      "url": "https://www.gysm.io/api/mcp"
+    }
+  }
+}

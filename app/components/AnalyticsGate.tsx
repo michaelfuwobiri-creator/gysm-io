@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import Script from "next/script";
 import { CONSENT_EVENT, readConsent, type ConsentState } from "./CookieConsent";
+import { captureAttribution } from "@/lib/analytics/attribution";
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
@@ -47,7 +48,10 @@ export default function AnalyticsGate() {
   }, []);
 
   useEffect(() => {
-    if (analyticsOn) initPostHog();
+    if (analyticsOn) {
+      initPostHog();
+      captureAttribution();
+    }
   }, [analyticsOn]);
 
   if (!analyticsOn) return null;
