@@ -4,7 +4,7 @@ What exists in this repo after the growth pack:
 
 | Surface | Where | What it does |
 |---|---|---|
-| MCP server | `POST /api/mcp` | Six tools. Five are free, read-only planning tools. `build_app` forwards to `/api/v1/generate` with the caller's own key. |
+| MCP server | `POST /api/mcp` | Six tools. Five are free, read-only planning tools. `build_app` forwards to `/api/v1/generate` with the caller's own key, and is only listed in `tools/list` when a key is sent, so keyless directory listings show five tools that all work. |
 | Plan API | `POST /api/blueprint` | Same plan engine over plain HTTP. Free, no key, creates nothing. |
 | OpenAPI 3.1 | `/openapi.json` | For a custom GPT Action or any agent framework. |
 | Discovery | `/llms.txt`, `/sitemap.xml` | AI assistants and search engines can find the planner, use-case pages and endpoints. |

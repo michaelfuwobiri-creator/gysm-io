@@ -307,7 +307,19 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
       return {
         jsonrpc: "2.0",
         id,
-        result: { tools: TOOLS.map((t) => ({ name: t.name, title: t.title, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations })) },
+        // build_app is only listed when the caller sent their own GYSM key. A
+        // keyless connection (for example a directory listing) sees only the
+        // free planning tools, all of which work without sign-in. A direct
+        // tools/call to build_app without a key still returns the sign-in link.
+        result: {
+          tools: TOOLS.filter((t) => t.name !== "build_app" || Boolean(ctx.apiKey)).map((t) => ({
+            name: t.name,
+            title: t.title,
+            description: t.description,
+            inputSchema: t.inputSchema,
+            annotations: t.annotations,
+          })),
+        },
       };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";

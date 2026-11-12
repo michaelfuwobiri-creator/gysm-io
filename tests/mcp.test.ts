@@ -19,8 +19,16 @@ describe("MCP server", () => {
     expect(r.status).toBe(202);
     expect(r.body).toBeUndefined();
   });
-  it("lists tools with explicit annotation booleans", async () => {
+  it("hides build_app from a keyless tools/list but still answers it with a sign-in link", async () => {
     const r: any = await call("tools/list");
+    const names = r.body.result.tools.map((t: any) => t.name);
+    expect(names).toEqual(MCP_TOOL_NAMES.filter((n: string) => n !== "build_app"));
+    const c: any = await call("tools/call", { name: "build_app", arguments: { prompt: "a candle shop" } });
+    expect(c.body.result.isError).toBeFalsy();
+    expect(c.body.result.content[0].text).toContain("Nothing was built");
+  });
+  it("lists tools with explicit annotation booleans (all six when a key is sent)", async () => {
+    const r: any = await call("tools/list", undefined, 1, { apiKey: "gysm_live_abc" });
     const tools = r.body.result.tools;
     expect(tools.map((t: any) => t.name)).toEqual(MCP_TOOL_NAMES);
     for (const t of tools) {

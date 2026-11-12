@@ -3,7 +3,7 @@
 Connects Claude to the GYSM MCP server so it can plan, and on request build, web apps and online stores from plain English.
 
 - Server: `https://www.gysm.io/api/mcp` (Streamable HTTP, stateless, no sign-in for the planning tools)
-- Tools: `plan_app`, `plan_online_store`, `list_use_cases`, `compare_ai_app_builders`, `get_build_link` (all read-only), and `build_app` (needs the caller's own GYSM API key; uses that account's credits)
+- Tools: `plan_app`, `plan_online_store`, `list_use_cases`, `compare_ai_app_builders`, `get_build_link` (all read-only), and `build_app` (listed only when you connect with your own GYSM API key; uses that account's credits)
 - Skill: `plan-and-build-with-gysm` tells Claude when to plan, when to build and what never to claim.
 
 ## Install (Claude Code)
