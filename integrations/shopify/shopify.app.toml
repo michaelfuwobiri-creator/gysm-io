@@ -21,8 +21,8 @@ api_version = "2026-10"
 
   [[webhooks.subscriptions]]
   topics = ["app/uninstalled"]
-  uri = "/api/shopify/webhooks"
+  uri = "https://www.gysm.io/api/shopify/webhooks"
 
   [[webhooks.subscriptions]]
   compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
-  uri = "/api/shopify/webhooks"
+  uri = "https://www.gysm.io/api/shopify/webhooks"
