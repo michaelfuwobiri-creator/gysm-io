@@ -1,0 +1,28 @@
+# Shopify app configuration for GYSM (managed installation + token exchange).
+# Deploy with the Shopify CLI from this folder:  shopify app deploy
+# Replace client_id with the Client ID shown in the Dev Dashboard (Settings).
+# The Client ID is public; the Client secret is NOT stored here -- set it only as
+# SHOPIFY_API_SECRET in Vercel.
+client_id = "REPLACE_WITH_CLIENT_ID"
+name = "GYSM"
+application_url = "https://www.gysm.io/shopify"
+embedded = true
+
+[access_scopes]
+# Only what the app uses today: draft products (productCreate / variant price)
+# and starter pages (pageCreate). Ask for more only when a feature needs it.
+scopes = "read_products,write_products,read_content,write_content"
+
+[auth]
+redirect_urls = ["https://www.gysm.io/api/shopify/callback"]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "/api/shopify/webhooks"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "/api/shopify/webhooks"

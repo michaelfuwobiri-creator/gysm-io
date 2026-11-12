@@ -20,6 +20,7 @@ const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)'
 // there risks blocking other tenants' real deliveries, not just abuse.
 const isRateLimitExempt = createRouteMatcher([
   '/api/webhooks(.*)',
+  '/api/shopify/webhooks(.*)',
   '/api/billing/webhook(.*)',
   '/api/voiie/webhooks(.*)',
   '/api/voiie/cron(.*)',
