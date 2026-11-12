@@ -7,6 +7,13 @@ export const metadata: Metadata = {
   description:
     "Describe your app, store or site in plain English and get an instant build plan: page sections, features, data model and a ready-to-use prompt. Free, no sign-up, then build it with GYSM.",
   alternates: { canonical: "https://www.gysm.io/blueprint" },
+  openGraph: {
+    title: "Free App Idea Planner | GYSM",
+    description: "Describe your app, store or site in plain English and get an instant build plan. Free, no sign-up.",
+    url: "https://www.gysm.io/blueprint",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", title: "Free App Idea Planner | GYSM", description: "Describe your app, store or site in plain English and get an instant build plan. Free, no sign-up." },
 };
 
 export default function Page() {

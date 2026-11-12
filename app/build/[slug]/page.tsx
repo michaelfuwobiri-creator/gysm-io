@@ -22,7 +22,7 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   if (!u || !u.landing) return {};
   const title = `${u.headline} | GYSM`;
   const description = `${u.summary} Free instant plan, no sign-up. Built with GYSM, the AI app builder.`;
-  return { title, description, alternates: { canonical: `${SITE_URL}${u.path}` }, openGraph: { title, description, url: `${SITE_URL}${u.path}`, type: "website" } };
+  return { title, description, alternates: { canonical: `${SITE_URL}${u.path}` }, openGraph: { title, description, url: `${SITE_URL}${u.path}`, type: "website" }, twitter: { card: "summary_large_image", title, description } };
 }
 
 export default function Page({ params }: { params: { slug: string } }) {
