@@ -10,5 +10,14 @@ export const metadata: Metadata = {
 };
 
 export default function ShopifyPage() {
-  return <ShopifyApp apiKey={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || ""} />;
+  const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY || "";
+  return (
+    <>
+      {/* App Bridge reads this meta tag when its script runs, so the tag and the
+          script are server-rendered here, in this order, as plain tags. */}
+      <meta name="shopify-api-key" content={apiKey} />
+      <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" />
+      <ShopifyApp configured={Boolean(apiKey)} />
+    </>
+  );
 }
