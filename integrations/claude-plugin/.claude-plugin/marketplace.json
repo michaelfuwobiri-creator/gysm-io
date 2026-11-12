@@ -1,7 +1,17 @@
 {
   "name": "gysm-claude-plugin",
-  "owner": { "name": "GYSM", "url": "https://www.gysm.io" },
+  "owner": {
+    "name": "GYSM",
+    "url": "https://www.gysm.io"
+  },
   "plugins": [
-    { "name": "gysm", "source": "./", "description": "Plan and build web apps and online stores from plain English with GYSM." }
-  ]
+    {
+      "name": "gysm",
+      "source": "./",
+      "description": "Plan and build web apps and online stores from plain English with GYSM."
+    }
+  ],
+  "metadata": {
+    "description": "GYSM plugin for Claude: plan and build web apps and online stores from plain English."
+  }
 }
