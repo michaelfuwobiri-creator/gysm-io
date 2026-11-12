@@ -140,3 +140,13 @@ export function planToShopifyDrafts(plan: StoreBlueprint): { products: DraftProd
   ];
   return { products, pages };
 }
+
+/** What a merchant should do after the drafts exist, written for Shopify admin. */
+export const SHOPIFY_LAUNCH_CHECKLIST = [
+  "Open each draft product and add your own photos, a real description and the final price",
+  "Set your shipping rates and tax settings in Shopify (Settings > Shipping and delivery, and Taxes and duties)",
+  "Turn on a payment provider in Shopify (Settings > Payments) and place a test order",
+  "Fill in the Shipping and returns, About us and Contact pages with your real details, then publish them",
+  "Show your business name, address and contact details, and show prices with any VAT or sales tax that applies where you sell",
+  "Set the products you want to sell to Active and make sure they are available on your Online Store",
+];

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { describe, expect, it, vi } from "vitest";
 import { makeStoreBlueprint } from "@/lib/blueprint";
-import { adminGraphql, exchangeToken, normalizeShop, parsePrice, planToShopifyDrafts, verifySessionToken, verifyWebhookHmac } from "@/lib/shopify/core";
+import { SHOPIFY_LAUNCH_CHECKLIST, adminGraphql, exchangeToken, normalizeShop, parsePrice, planToShopifyDrafts, verifySessionToken, verifyWebhookHmac } from "@/lib/shopify/core";
 
 const SECRET = "test-secret";
 const CLIENT = "client-123";
@@ -97,5 +97,14 @@ describe("planToShopifyDrafts", () => {
   it("escapes HTML in the niche", () => {
     const d = planToShopifyDrafts(makeStoreBlueprint({ niche: "<script>x</script>" }));
     expect(d.pages[1].body).not.toContain("<script>");
+  });
+});
+
+describe("launch checklist", () => {
+  it("is written for Shopify admin, not for the single-page builder", () => {
+    const text = SHOPIFY_LAUNCH_CHECKLIST.join(" ");
+    expect(SHOPIFY_LAUNCH_CHECKLIST.length).toBeGreaterThanOrEqual(5);
+    expect(text).toMatch(/Settings > Payments/);
+    expect(text).not.toMatch(/payment link|Generate the page/i);
   });
 });

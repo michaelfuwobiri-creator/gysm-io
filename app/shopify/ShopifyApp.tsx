@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Result = { created: { products: number; pages: number }; problems: string[]; checklist: string[]; compliance: string[] };
+type Result = { created: { products: number; pages: number }; problems: string[]; checklist: string[] };
 
 declare global {
   interface Window {
