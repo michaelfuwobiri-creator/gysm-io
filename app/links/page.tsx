@@ -16,6 +16,7 @@ const SECTIONS = [
   {
     title: "Product",
     links: [
+      { href: "/blueprint", label: "Free idea planner" },
       { href: "/templates", label: "Templates" },
       { href: "/connectors", label: "Connectors" },
       { href: "/marketplace", label: "Marketplace" },
