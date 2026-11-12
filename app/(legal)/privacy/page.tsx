@@ -4,7 +4,7 @@ export default function PrivacyPage() {
   return (
     <article>
       <h1 className="text-[32px] font-black tracking-tight mb-1">Privacy Policy</h1>
-      <p className="text-[13px] opacity-50 mb-8">Last updated November 6, 2026</p>
+      <p className="text-[13px] opacity-50 mb-8">Last updated November 12, 2026</p>
 
       <div className="space-y-6 text-[15px] leading-relaxed opacity-80">
         <p>
@@ -64,6 +64,31 @@ export default function PrivacyPage() {
             If you choose to publish a build to BuildGuild, our public showcase, that app and the
             details you add (title, description, screenshots) become visible to other users and
             visitors. Anything you don&apos;t want public should stay unpublished.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-[18px] font-bold text-black mb-2">Idea planner, MCP server and Claude plugin</h2>
+          <p>
+            The free idea planner on gysm.io and the GYSM MCP server (used by AI assistants such as
+            Claude and ChatGPT, and by the GYSM Claude plugin) turn a description you type into a
+            build plan. No sign-in is needed. The text you send is processed to produce the plan by
+            our own code; we do not send it to AI model providers, store it in our database, or
+            link it to an account. Like any website, our hosting provider keeps standard technical
+            logs (such as IP address and request time). If you opted in to analytics, we also record
+            anonymous planner events (for example which example idea you tapped) and where your
+            visit first came from.
+          </p>
+          <p className="mt-3">
+            The assistant you use (for example Claude or ChatGPT) handles your conversation under
+            its own provider&apos;s terms and privacy policy; GYSM receives only what the assistant
+            sends to a tool.
+          </p>
+          <p className="mt-3">
+            The build tool works only if you connect your own GYSM API key. We use that key only to
+            authenticate the request to GYSM&apos;s own API. The project it creates belongs to your
+            account and is covered by the rest of this policy, including &quot;AI models we use&quot;. Without a key,
+            nothing is built and you receive a link to continue in the builder.
           </p>
         </section>
 
