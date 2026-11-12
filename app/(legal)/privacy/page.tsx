@@ -68,6 +68,29 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2 className="text-[18px] font-bold text-black mb-2">GYSM for Shopify</h2>
+          <p>
+            If you install the GYSM app in a Shopify store, we receive your store&apos;s
+            myshopify.com address and, once you open the app, an access token that Shopify issues
+            to the app for that store. We keep the token encrypted and use it only to create the
+            draft products and unpublished pages you ask for. The permissions the app requests are
+            limited to products and pages (content).
+          </p>
+          <p className="mt-3">
+            The store description, product names and prices you type into the app are used to
+            create those drafts. We do not store them, and we do not send them to AI model
+            providers. We keep a count of how many times the app was used in your store.
+          </p>
+          <p className="mt-3">
+            GYSM does not read, store or use your customers&apos; or orders&apos; personal data.
+            When you uninstall the app we delete the stored access token, and when Shopify tells us
+            to erase a shop&apos;s data we delete the remaining record for that store. To ask about
+            your data, contact us at the support address on this site. Your use of Shopify is
+            covered by Shopify&apos;s own terms and privacy policy.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-[18px] font-bold text-black mb-2">Idea planner, MCP server and Claude plugin</h2>
           <p>
             The free idea planner on gysm.io and the GYSM MCP server (used by AI assistants such as

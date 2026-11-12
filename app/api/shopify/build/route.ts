@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { makeStoreBlueprint } from "@/lib/blueprint";
-import { adminGraphql, planToShopifyDrafts } from "@/lib/shopify/core";
+import { adminGraphql, planToShopifyDrafts, SHOPIFY_LAUNCH_CHECKLIST } from "@/lib/shopify/core";
 import { authenticateShop, recordBuild, shopifyConfig } from "@/lib/shopify/store";
 
 // "Build my store": turns a plain-English store description into DRAFT
@@ -91,5 +91,5 @@ export async function POST(req: NextRequest) {
   } catch {
     // Counter only; never fail the build over it.
   }
-  return NextResponse.json({ created, problems, checklist: plan.launchChecklist, compliance: plan.compliance });
+  return NextResponse.json({ created, problems, checklist: SHOPIFY_LAUNCH_CHECKLIST });
 }
