@@ -3,6 +3,7 @@ import WelcomeEmail from "./templates/WelcomeEmail";
 import BuildFailedEmail from "./templates/BuildFailedEmail";
 import PaymentFailedEmail from "./templates/PaymentFailedEmail";
 import WeeklySummaryEmail from "./templates/WeeklySummaryEmail";
+import StoreOrderEmail, { type StoreOrderEmailProps } from "./templates/StoreOrderEmail";
 
 const FROM = "GYSM <hello@gysm.io>";
 
@@ -71,5 +72,21 @@ export async function sendWeeklySummaryEmail(
     });
   } catch (error: any) {
     console.error("[email] failed to send weekly summary email:", error.message);
+  }
+}
+
+/** GYSM Stores: tells the seller about a paid order. Never throws. */
+export async function sendStoreOrderEmail(to: string, props: StoreOrderEmailProps): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    const resend = await getResend();
+    await resend.emails.send({
+      from: FROM,
+      to,
+      subject: `New order on ${props.storeName}: ${props.total}`,
+      react: <StoreOrderEmail {...props} />,
+    });
+  } catch (error: any) {
+    console.error("[email] failed to send store order email:", error.message);
   }
 }

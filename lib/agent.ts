@@ -13,6 +13,7 @@ import {
   MAX_LOCAL_READ_CHARS,
   MAX_STEPS_PER_TURN,
   agentToolsFor,
+  storeSecretLabel,
   checkLocalCall,
   describeCall,
   isBrowserTool,
@@ -75,6 +76,8 @@ function proposalDetail(name: string, args: any): string {
   if (name === "run_command") return String(args?.cmd ?? "").slice(0, 2000);
   if (name === "deploy") return `Folder: ${String(args?.project ?? "")}${args?.folder ? "/" + String(args.folder) : ""}\nGoes live at ${args?.name ? String(args.name) : "its name"}.gysm.io. Anyone with the address can see it.`;
   if (name === "set_env") return String(args?.purpose ?? "").slice(0, 300);
+  if (name === "store_connect") return `${String(args?.purpose ?? "").slice(0, 300)}\nGYSM checks the key with the provider, then stores it encrypted for this store only. The agent never sees it.`;
+  if (name === "store_create") return `Creates a draft store "${String(args?.name ?? "").slice(0, 80)}". Nobody can see it until you connect Stripe and open it.`;
   return "";
 }
 
@@ -313,6 +316,7 @@ export async function runAgentTurn(opts: {
           detail: proposalDetail(name, args),
           risky: name === "run_command" ? isRiskyCommand(String(args?.cmd ?? ""), args?.risky === true) : true,
           ...(name === "set_env" ? { secretInput: { label: String(args?.key ?? "Value") } } : {}),
+          ...(name === "store_connect" ? { secretInput: { label: storeSecretLabel(args?.provider) } } : {}),
           ...(projectOf(name, args) ? { project: projectOf(name, args) as string } : {}),
         });
         break; // wait for the user's decision

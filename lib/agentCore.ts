@@ -1,4 +1,6 @@
 // Pure helpers for GYSM Agent (no I/O, so they can be unit tested).
+import { storesEnabled } from "@/lib/stores/core";
+import { PROVIDER_GUIDES, isKeyedProvider } from "@/lib/stores/integrations";
 
 export const WORKSPACE_SUBDIR = "workspace/agent";
 export const MAX_WRITE_BYTES = 200_000;
@@ -40,7 +42,12 @@ export type ToolName =
   | "local_list"
   | "local_read"
   | "local_write"
-  | "local_edit";
+  | "local_edit"
+  | "store_setup_guide"
+  | "store_status"
+  | "store_create"
+  | "store_add_product"
+  | "store_connect";
 
 // OpenAI-format tool definitions. Names and parameters match the spec the
 // product was designed around.
@@ -683,8 +690,99 @@ You are running inside the GYSM Chrome extension, in a side panel next to the us
 // there is no server that could use a secret.
 const OFFERED_TOOLS = AGENT_TOOLS.filter((t) => t.function.name !== "set_env");
 
+// GYSM Stores ("bring your own accounts"), offered only while STORES_ENABLED=true.
+// The agent advises the seller which accounts to create, creates the store and
+// its products, and connects the seller's own keys; the seller types every
+// secret in a private box (store_connect), so the agent never sees one.
+const STORE_PROVIDER_ENUM = ["neon", "supabase", "clerk", "shippo"];
+export const STORE_TOOL_DEFS = [
+  {
+    type: "function",
+    function: {
+      name: "store_setup_guide",
+      description:
+        "Read the step-by-step guide for the accounts a GYSM store uses: Stripe (payments, required), and optionally the seller's own Neon or Supabase (database), Clerk (customer sign-in) and Shippo (shipping). Read it before advising a seller, then tell them in plain words which accounts to create and what to copy.",
+      parameters: {
+        type: "object",
+        properties: { providers: { type: "array", items: { type: "string", enum: ["stripe", ...STORE_PROVIDER_ENUM] }, description: "Only these services (default: all)." } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_status",
+      description: "List the user's GYSM stores with their address, whether they are open, whether Stripe payments are ready, which database they use and which of their own accounts are connected. Never returns keys.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_create",
+      description: "Create a new GYSM online store (starts as a draft the public can't see). The user approves. Afterwards add products with store_add_product and tell the user to press Connect Stripe on the store's dashboard page.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Store name, up to 80 characters." },
+          slug: { type: "string", description: "Address: lowercase letters, numbers and hyphens (becomes <slug>.gysm.store). Optional." },
+          currency: { type: "string", enum: ["eur", "usd", "gbp"] },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_add_product",
+      description: "Add a product to one of the user's stores. Only use prices, names and details the user gave or approved.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string", description: "The store's slug." },
+          name: { type: "string" },
+          price: { type: "string", description: "Price in the store's currency, e.g. 12.50." },
+          description: { type: "string" },
+          stock: { type: "integer", description: "Units in stock; omit for unlimited." },
+          image_url: { type: "string", description: "https link to a product photo (optional)." },
+        },
+        required: ["store", "name", "price"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_connect",
+      description:
+        "Connect one of the seller's OWN accounts to their store: neon (their database: the store's products and orders move into it if the store is still empty), supabase, clerk or shippo. First make sure they created the account and project (store_setup_guide says how). The USER types the secret value in a private box; you never see it. Pass the public value (Supabase project URL or Clerk publishable key) yourself when the user gave it. GYSM checks the keys with the provider before saving them encrypted.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string", description: "The store's slug." },
+          provider: { type: "string", enum: STORE_PROVIDER_ENUM },
+          public_value: { type: "string", description: "Supabase project URL, or Clerk publishable key (pk_...). Leave empty for neon and shippo." },
+          purpose: { type: "string", description: "One short sentence telling the user which value to paste and where to find it." },
+        },
+        required: ["store", "provider", "purpose"],
+      },
+    },
+  },
+];
+
 export function agentToolsFor(hasLocalFolder: boolean, hasBrowser = false) {
-  return [...OFFERED_TOOLS, ...(hasLocalFolder ? LOCAL_TOOL_DEFS : []), ...(hasBrowser ? BROWSER_TOOL_DEFS : [])];
+  return [
+    ...OFFERED_TOOLS,
+    ...(storesEnabled() ? STORE_TOOL_DEFS : []),
+    ...(hasLocalFolder ? LOCAL_TOOL_DEFS : []),
+    ...(hasBrowser ? BROWSER_TOOL_DEFS : []),
+  ];
+}
+
+/** Label for the private box the user types a store secret into. */
+export function storeSecretLabel(provider: unknown): string {
+  return PROVIDER_GUIDES[isKeyedProvider(provider) ? provider : "neon"].secretField?.label ?? "Secret";
 }
 
 /** Display name of the connected folder: one short, printable line. */
@@ -738,7 +836,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -777,6 +875,7 @@ How you work:
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. To put a deployed site on the user's own domain, call connect_domain (the user approves) and then give them the exact DNS records it returns; after they say they added them, call domain_status and only say it is live when it is. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
+- Online stores (only when the store_* tools are offered): read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (they press Connect Stripe on the store's dashboard page, gysm.io/stores); their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional. Create the store with store_create, add the products they describe with store_add_product, connect each of their accounts with store_connect once they have it (they type the secret themselves; never ask them to paste a secret into the chat), and check with store_status. Never create accounts or enter passwords for them.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -1107,6 +1206,16 @@ export function describeCall(tool: string, args: any): string {
       return `List database tables`;
     case "set_env":
       return `Set ${String(args?.key ?? "?")} on "${String(args?.project ?? "?")}" (you type the value)`;
+    case "store_setup_guide":
+      return `Read the store setup guide`;
+    case "store_status":
+      return `Check your stores`;
+    case "store_create":
+      return `Create the store "${String(args?.name ?? "?").slice(0, 80)}"`;
+    case "store_add_product":
+      return `Add "${String(args?.name ?? "?").slice(0, 80)}" (${String(args?.price ?? "?").slice(0, 20)}) to ${String(args?.store ?? "?")}`;
+    case "store_connect":
+      return `Connect your own ${String(args?.provider ?? "?")} account to ${String(args?.store ?? "?")} (you type the key)`;
     case "web_search":
       return `Search the web: ${String(args?.query ?? "").slice(0, 100)}`;
     case "fetch_url":

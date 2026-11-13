@@ -6,9 +6,10 @@ import { routing } from './i18n/routing'
 import { checkRateLimit } from './lib/rateLimit'
 import { isUserContentHost } from './lib/userContent'
 import { slugFromHost } from './lib/previewSlug'
+import { storeSlugFromHost, storesEnabled } from './lib/stores/core'
 
 const isPublicRoute = createRouteMatcher(['/', '/(en|hr|de|fr|es|hi|ja|pt)', '/pricing(.*)', '/templates(.*)', '/auth(.*)', '/sign-in(.*)', '/sign-up(.*)', '/gang(.*)', '/publish(.*)', '/api/webhooks(.*)', '/api/billing/webhook(.*)'])
-const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/gysmlink(.*)', '/shield(.*)', '/admin(.*)', '/shell(.*)', '/agent(.*)'])
+const isBuilderRoute = createRouteMatcher(['/builder(.*)', '/builder-blocks(.*)', '/dashboard(.*)', '/voiie(.*)', '/gysmlink(.*)', '/shield(.*)', '/admin(.*)', '/shell(.*)', '/agent(.*)', '/stores(.*)'])
 
 // Item #9 of GYSM_IO_HANDOFF.md: "add rate limiting ... 100 req/min per
 // IP". Applied to every /api/* route EXCEPT inbound webhooks and Vercel
@@ -152,6 +153,20 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
         }
       )
     }
+  }
+
+  // GYSM Stores on their own address: <slug>.gysm.store (STORES_ROOT_DOMAIN).
+  // Pages are served from /shop/<slug>/..., straight past Clerk; the only API
+  // a storefront calls is checkout. Off unless STORES_ENABLED=true.
+  const storeSlug = storesEnabled() ? storeSlugFromHost(host, process.env.STORES_ROOT_DOMAIN) : null
+  if (storeSlug) {
+    const pathname = req.nextUrl.pathname
+    if (pathname === '/api/stores/checkout') return NextResponse.next()
+    if (pathname.startsWith('/_next/') || pathname.includes('.')) return NextResponse.next()
+    if (pathname.startsWith('/api/')) return new NextResponse('Not found', { status: 404 })
+    const url = req.nextUrl.clone()
+    url.pathname = `/shop/${storeSlug}${pathname === '/' ? '' : pathname}`
+    return NextResponse.rewrite(url)
   }
 
   if (sql && host && !isKnownHost(host)) {
