@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.michaelfuwobiri-creator/gysm",
+  "title": "GYSM App and Store Builder",
+  "description": "Plan and build apps, sites and online stores from plain English, and shop GYSM stores.",
+  "version": "1.1.0",
+  "websiteUrl": "https://www.gysm.io",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.gysm.io/api/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Optional. \"Bearer gysm_live_...\" with the user's own GYSM API key (gysm.io/settings/api-keys) to build apps, subscribe and run stores in their account. Planning, plans and shopping tools work without it.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
