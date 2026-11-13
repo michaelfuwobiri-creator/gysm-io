@@ -27,6 +27,7 @@ import {
   WORKSPACE_SUBDIR,
 } from "@/lib/agentCore";
 import { addMemory, forgetMemory } from "@/lib/agentMemory";
+import { executeStoreTool } from "@/lib/stores/agent";
 import type { CleanAttachment } from "@/lib/agentAttachCore";
 import { pdfToText } from "@/lib/agentPdf";
 import { MAX_GENERATED_BYTES, checkImageArgs, generateAgentImage } from "@/lib/agentImage";
@@ -818,6 +819,13 @@ export async function executeTool(userId: string, name: string, args: any, secre
         break;
       case "review_site":
         result = await toolReviewSite(userId, args);
+        break;
+      case "store_setup_guide":
+      case "store_status":
+      case "store_create":
+      case "store_add_product":
+      case "store_connect":
+        result = await executeStoreTool(userId, name, args, secret);
         break;
       default:
         result = { ok: false, output: `Unknown tool: ${name}` };
