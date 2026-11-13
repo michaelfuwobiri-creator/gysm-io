@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe, getPlanById, getPriceId, DEFAULT_LIVE_PRICE_IDS } from "@/lib/stripe";
+import { createPlanCheckout } from "@/lib/billing/checkout";
 import { getUser } from "@/lib/auth";
 
 // This route did not exist at all in the repo -- app/pricing/page.tsx was
@@ -23,80 +23,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const plan = getPlanById(planId);
-  if (!plan) {
-    return NextResponse.json({ error: `Unknown plan "${planId}".` }, { status: 400 });
-  }
-  // Retired plans (packs, Builder/Pro/Studio) are no longer sold; VOIIE plans
-  // have their own checkout in lib/voiie/billing.ts.
-  if (plan.hidden) {
-    return NextResponse.json({ error: "That plan is no longer available. Choose the GYSM monthly plan." }, { status: 400 });
-  }
-
-  const priceId = getPriceId(planId);
-  if (!priceId && !plan.inlineAmount) {
-    console.error(`[billing/checkout] missing env var ${plan.priceIdEnvVar} for plan ${planId}`);
-    return NextResponse.json(
-      { error: "This plan isn't configured yet. Try again shortly." },
-      { status: 500 }
-    );
-  }
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gysm.io";
-
-  function createSession(price: string | undefined) {
-    // No Price ID configured: create the price inline from the plan itself.
-    const lineItem: any = price
-      ? { price, quantity: 1 }
-      : {
-          quantity: 1,
-          price_data: {
-            currency: plan.currency,
-            unit_amount: plan.inlineAmount,
-            product_data: { name: plan.name },
-            ...(plan.interval === "month" ? { recurring: { interval: "month" } } : {}),
-          },
-        };
-    return getStripe().checkout.sessions.create({
-      mode: plan.interval === "month" ? "subscription" : "payment",
-      payment_method_types: ["card"],
-      line_items: [lineItem],
-      client_reference_id: user.id,
-      customer_email: user.email ?? undefined,
-      metadata: { userId: user.id, planId: plan.id },
-      success_url: `${siteUrl}/agent?subscribed=1`,
-      cancel_url: `${siteUrl}/pricing?canceled=true`,
-    });
-  }
-
-  try {
-    const session = await createSession(priceId);
-    return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    // A stale/deactivated Price in the STRIPE_*_PRICE_ID env var (see
-    // DEFAULT_LIVE_PRICE_IDS in lib/stripe.ts for the real incident this
-    // guards against) shouldn't take checkout down for that plan -- retry
-    // once against the known-good live Price ID before giving up, and log
-    // loudly so the actual env var mismatch gets fixed instead of masked
-    // forever.
-    const looksStale = /inactive|no such price|resource_missing/i.test(err?.message || err?.code || "");
-    const fallbackPriceId = DEFAULT_LIVE_PRICE_IDS[plan.id];
-    if (looksStale && fallbackPriceId && fallbackPriceId !== priceId) {
-      console.error(
-        `[billing/checkout] ${plan.priceIdEnvVar}="${priceId}" is rejected by Stripe (${err?.message || err}) -- ` +
-          `retrying with known-good price ${fallbackPriceId}. Fix ${plan.priceIdEnvVar} in Vercel to clear this warning.`
-      );
-      try {
-        const session = await createSession(fallbackPriceId);
-        return NextResponse.json({ url: session.url });
-      } catch (err2: any) {
-        console.error("[billing/checkout] Stripe error (fallback price also failed):", err2?.message || err2);
-        return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
-      }
-    }
-    console.error("[billing/checkout] Stripe error:", err?.message || err);
-    return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
-  }
+  const r = await createPlanCheckout({ id: user.id, email: user.email }, planId);
+  return "error" in r ? NextResponse.json({ error: r.error }, { status: r.status }) : NextResponse.json({ url: r.url });
 }
 
 export const dynamic = 'force-dynamic'

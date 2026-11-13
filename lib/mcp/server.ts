@@ -28,6 +28,7 @@ import {
   makeStoreBlueprint,
 } from "@/lib/blueprint";
 import { CHECKED_ON, GYSM_FACTS, RIVALS } from "@/lib/comparisons";
+import { STORE_TOOL_DEFS } from "@/lib/agentCore";
 
 export const SUPPORTED_PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
 const SERVER_VERSION = "1.0.0";
@@ -349,15 +350,112 @@ const STORE_TOOLS: Tool[] = [
   },
 ];
 
+// -- account tools: act for the GYSM user whose API key the caller sent -------
+
+const NEED_KEY =
+  `This needs the user's own GYSM API key. They create one at ${SITE_URL}/settings/api-keys and add it to this connector as "Authorization: Bearer gysm_live_...". Nothing was changed.`;
+
+async function withUser(ctx: McpContext): Promise<{ user: import("@/lib/mcp/account").KeyUser; mod: typeof import("@/lib/mcp/account") } | ToolResult> {
+  if (!ctx.apiKey) return fail(NEED_KEY);
+  const mod = await import("@/lib/mcp/account");
+  const user = await mod.userForKey(ctx.apiKey);
+  if (!user) return fail(`GYSM did not accept that API key. Create a new one at ${SITE_URL}/settings/api-keys.`);
+  return { user, mod };
+}
+
+const PUBLIC_ACCOUNT_TOOLS: Tool[] = [
+  {
+    name: "get_gysm_plans",
+    title: "See GYSM plans and prices",
+    description: "List the plans GYSM sells today with price, billing interval and what's included. Read-only; buying happens with subscribe_to_gysm, which returns a Stripe link the person pays on.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "See GYSM plans and prices", ...READ_ONLY },
+    run: async () => {
+      const { visiblePlans } = await import("@/lib/mcp/account");
+      const plans = visiblePlans();
+      return ok(plans.map((p) => `${p.name} (${p.id}): ${p.price} ${p.currency}${p.interval === "month" ? " a month" : " once"}. ${p.description}${p.tagline ? ` ${p.tagline}.` : ""}`).join("\n") + `\nDetails: ${SITE_URL}/pricing`, { plans });
+    },
+  },
+];
+
+const KEYED_ACCOUNT_TOOLS: Tool[] = [
+  {
+    name: "subscribe_to_gysm",
+    title: "Get a link to subscribe to GYSM",
+    description:
+      "Create a Stripe checkout link for a GYSM plan for the user who owns the connected API key. Only call it after the user has chosen to buy. The user opens the link and pays on Stripe's page; this tool charges nothing and never handles card details.",
+    inputSchema: {
+      type: "object",
+      properties: { plan: { type: "string", description: "Plan id from get_gysm_plans (default plan_monthly).", maxLength: 40 } },
+      additionalProperties: false,
+    },
+    annotations: { title: "Get a link to subscribe to GYSM", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    run: async (args, ctx) => {
+      const w = await withUser(ctx);
+      if ("content" in w) return w;
+      const plan = typeof args.plan === "string" && args.plan.trim() ? args.plan.trim() : "plan_monthly";
+      const r = await w.mod.planCheckout(w.user, plan);
+      if ("error" in r) return fail(r.error);
+      return ok(`Open this link to pay securely on Stripe: ${r.url}\nThe plan starts as soon as the payment goes through.`, { url: r.url, plan });
+    },
+  },
+  {
+    name: "my_gysm_account",
+    title: "Check my GYSM plan and usage",
+    description: "Show the connected user's GYSM plan and how much usage is left. Read-only.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { title: "Check my GYSM plan and usage", ...READ_ONLY },
+    run: async (_args, ctx) => {
+      const w = await withUser(ctx);
+      if ("content" in w) return w;
+      const u = await w.mod.usageFor(w.user);
+      return ok(`${u.title}: ${u.value}${u.cta ? ` (${SITE_URL}${u.cta.href})` : ""}`, u);
+    },
+  },
+];
+
+// Store management for the key's owner: the same tools the GYSM builder agent
+// uses (lib/agentCore.ts STORE_TOOL_DEFS), minus anything that takes a secret,
+// spends money or deletes (store_connect, store_buy_label, store_mark_shipped,
+// store_remove_*, store_cancel_booking): those stay in the GYSM builder,
+// where the user approves each one.
+const MCP_STORE_MANAGE = new Set([
+  "store_setup_guide", "store_status", "store_create", "store_add_product", "store_update_product", "store_add_service",
+  "store_update_service", "store_set_hours", "store_set_shipping", "store_update", "store_payments_link", "store_orders", "store_bookings",
+]);
+const MCP_STORE_READ_ONLY = new Set(["store_setup_guide", "store_status", "store_orders", "store_bookings"]);
+
+const STORE_MANAGE_TOOLS: Tool[] = (STORE_TOOL_DEFS as any[])
+  .filter((d) => MCP_STORE_MANAGE.has(d.function.name))
+  .map((d) => {
+    const name: string = d.function.name;
+    const title = name.replace(/^store_/, "Store: ").replace(/_/g, " ");
+    return {
+      name,
+      title,
+      description: `${d.function.description} Acts in the GYSM account of the connected API key.`,
+      inputSchema: d.function.parameters as Json,
+      annotations: MCP_STORE_READ_ONLY.has(name)
+        ? { title, ...READ_ONLY }
+        : { title, readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      run: async (args: Json, ctx: McpContext) => {
+        const w = await withUser(ctx);
+        if ("content" in w) return w;
+        const r = await w.mod.runStoreTool(w.user, name, args);
+        return r.ok ? ok(r.output) : fail(r.output);
+      },
+    } satisfies Tool;
+  });
+
 function storesOn(): boolean {
   return process.env.STORES_ENABLED === "true";
 }
 
 const STORE_INSTRUCTIONS =
-  " Shoppers can also buy from stores built on GYSM: find_stores and get_store to browse, then start_checkout (only after the shopper confirms the items) returns a Stripe link the shopper opens to pay. Never pay or enter card details for them.";
+  " Shoppers can also buy from stores built on GYSM: find_stores and get_store to browse, then start_checkout (only after the shopper confirms the items) returns a Stripe link the shopper opens to pay. Never pay or enter card details for them. With the user's own GYSM API key you can also create and run their online store (store_create, store_add_product, store_add_service, store_set_hours, store_payments_link, store_update with status live): they connect Stripe themselves through the link.";
 
 const INSTRUCTIONS =
-  "GYSM turns a plain-English description into a working single-page web app with a live preview. Use plan_app or plan_online_store first to shape the idea (free, instant, no sign-in). Use get_build_link to hand the user a link, or build_app only when the user asks to build now and has connected their own GYSM API key. GYSM builds one self-contained page per build with no managed database or sign-in: be upfront about that, and never promise results the plan does not state.";
+  "get_gysm_plans lists GYSM's plans; with the user's own GYSM API key, subscribe_to_gysm returns a Stripe link the user pays on (never pay for them) and my_gysm_account shows their usage. GYSM turns a plain-English description into a working single-page web app with a live preview. Use plan_app or plan_online_store first to shape the idea (free, instant, no sign-in). Use get_build_link to hand the user a link, or build_app only when the user asks to build now and has connected their own GYSM API key. GYSM builds one self-contained page per build with no managed database or sign-in: be upfront about that, and never promise results the plan does not state.";
 
 function rpcError(id: RpcResponse["id"], code: number, message: string): RpcResponse {
   return { jsonrpc: "2.0", id, error: { code, message } };
@@ -397,7 +495,13 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
         // free planning tools, all of which work without sign-in. A direct
         // tools/call to build_app without a key still returns the sign-in link.
         result: {
-          tools: [...TOOLS.filter((t) => t.name !== "build_app" || Boolean(ctx.apiKey)), ...(storesOn() ? STORE_TOOLS : [])].map((t) => ({
+          tools: [
+            ...TOOLS.filter((t) => t.name !== "build_app" || Boolean(ctx.apiKey)),
+            ...PUBLIC_ACCOUNT_TOOLS,
+            ...(ctx.apiKey ? KEYED_ACCOUNT_TOOLS : []),
+            ...(storesOn() ? STORE_TOOLS : []),
+            ...(storesOn() && ctx.apiKey ? STORE_MANAGE_TOOLS : []),
+          ].map((t) => ({
             name: t.name,
             title: t.title,
             description: t.description,
@@ -408,7 +512,11 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
       };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
-      const tool = TOOLS.find((t) => t.name === name) ?? (storesOn() ? STORE_TOOLS.find((t) => t.name === name) : undefined);
+      const tool =
+        TOOLS.find((t) => t.name === name) ??
+        PUBLIC_ACCOUNT_TOOLS.find((t) => t.name === name) ??
+        KEYED_ACCOUNT_TOOLS.find((t) => t.name === name) ??
+        (storesOn() ? [...STORE_TOOLS, ...STORE_MANAGE_TOOLS].find((t) => t.name === name) : undefined);
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${cleanText(name, 60)}`);
       const args = (params.arguments && typeof params.arguments === "object" && !Array.isArray(params.arguments) ? params.arguments : {}) as Json;
       try {
@@ -438,4 +546,6 @@ export async function handleMcpBody(body: unknown, ctx: McpContext = {}): Promis
 
 export const MCP_TOOL_NAMES = TOOLS.map((t) => t.name);
 export const MCP_STORE_TOOL_NAMES = STORE_TOOLS.map((t) => t.name);
+export const MCP_ACCOUNT_TOOL_NAMES = { public: PUBLIC_ACCOUNT_TOOLS.map((t) => t.name), keyed: KEYED_ACCOUNT_TOOLS.map((t) => t.name) };
+export const MCP_STORE_MANAGE_TOOL_NAMES = STORE_MANAGE_TOOLS.map((t) => t.name);
 export { LANDING_USE_CASES };
