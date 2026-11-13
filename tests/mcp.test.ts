@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MCP_TOOL_NAMES, handleMcpBody } from "@/lib/mcp/server";
+import { MCP_ACCOUNT_TOOL_NAMES, MCP_TOOL_NAMES, handleMcpBody } from "@/lib/mcp/server";
 
 const call = (method: string, params?: unknown, id: number | null = 1, ctx = {}) => handleMcpBody({ jsonrpc: "2.0", id, method, params }, ctx);
 
@@ -22,15 +22,15 @@ describe("MCP server", () => {
   it("hides build_app from a keyless tools/list but still answers it with a sign-in link", async () => {
     const r: any = await call("tools/list");
     const names = r.body.result.tools.map((t: any) => t.name);
-    expect(names).toEqual(MCP_TOOL_NAMES.filter((n: string) => n !== "build_app"));
+    expect(names).toEqual([...MCP_TOOL_NAMES.filter((n: string) => n !== "build_app"), ...MCP_ACCOUNT_TOOL_NAMES.public]);
     const c: any = await call("tools/call", { name: "build_app", arguments: { prompt: "a candle shop" } });
     expect(c.body.result.isError).toBeFalsy();
     expect(c.body.result.content[0].text).toContain("Nothing was built");
   });
-  it("lists tools with explicit annotation booleans (all six when a key is sent)", async () => {
+  it("lists tools with explicit annotation booleans (account tools too when a key is sent)", async () => {
     const r: any = await call("tools/list", undefined, 1, { apiKey: "gysm_live_abc" });
     const tools = r.body.result.tools;
-    expect(tools.map((t: any) => t.name)).toEqual(MCP_TOOL_NAMES);
+    expect(tools.map((t: any) => t.name)).toEqual([...MCP_TOOL_NAMES, ...MCP_ACCOUNT_TOOL_NAMES.public, ...MCP_ACCOUNT_TOOL_NAMES.keyed]);
     for (const t of tools) {
       for (const k of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"]) expect(typeof t.annotations[k]).toBe("boolean");
       expect(t.inputSchema.type).toBe("object");
@@ -109,6 +109,38 @@ describe("MCP store tools", () => {
       const t = r.body.result.tools.find((x: any) => x.name === "start_checkout");
       expect(t.annotations.readOnlyHint).toBe(false);
       expect(t.annotations.destructiveHint).toBe(false);
+    } finally {
+      delete process.env.STORES_ENABLED;
+    }
+  });
+});
+
+import { MCP_STORE_MANAGE_TOOL_NAMES } from "@/lib/mcp/server";
+
+describe("MCP account and store-management tools", () => {
+  it("keyed tools explain how to connect a key instead of acting without one", async () => {
+    for (const name of ["subscribe_to_gysm", "my_gysm_account"]) {
+      const r: any = await call("tools/call", { name, arguments: {} });
+      expect(r.body.result.isError).toBe(true);
+      expect(r.body.result.content[0].text).toContain("settings/api-keys");
+    }
+  });
+  it("offers store management only with a key and stores on, never secret, money or delete tools", async () => {
+    expect(MCP_STORE_MANAGE_TOOL_NAMES).toEqual(expect.arrayContaining(["store_create", "store_add_product", "store_payments_link", "store_update"]));
+    for (const banned of ["store_connect", "store_buy_label", "store_mark_shipped", "store_remove_product", "store_remove_service", "store_cancel_booking"]) {
+      expect(MCP_STORE_MANAGE_TOOL_NAMES).not.toContain(banned);
+    }
+    process.env.STORES_ENABLED = "true";
+    try {
+      const keyless: any = await call("tools/list");
+      expect(keyless.body.result.tools.map((t: any) => t.name)).not.toContain("store_create");
+      const keyed: any = await call("tools/list", undefined, 1, { apiKey: "gysm_live_abc" });
+      const names = keyed.body.result.tools.map((t: any) => t.name);
+      expect(names).toContain("store_create");
+      const status = keyed.body.result.tools.find((t: any) => t.name === "store_status");
+      expect(status.annotations.readOnlyHint).toBe(true);
+      const keylessCall: any = await call("tools/call", { name: "store_create", arguments: { name: "Mia" } });
+      expect(keylessCall.body.result.content[0].text).toContain("settings/api-keys");
     } finally {
       delete process.env.STORES_ENABLED;
     }
