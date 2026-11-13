@@ -7,7 +7,7 @@ accounts" for the database (Neon or Supabase), sign-in (Clerk) and shipping
 
 ## Turn it on
 
-1. Run `db/migrations/0039_stores.sql` and `0040_store_bookings.sql` on the production Neon database.
+1. Run `db/migrations/0039_stores.sql` and `0040_store_bookings.sql` and `0041_store_shipping.sql` on the production Neon database.
 2. In Stripe (live and test), enable **Connect** for the GYSM platform account.
 3. In Stripe, add a webhook endpoint for **events on connected accounts**:
    `https://www.gysm.io/api/webhooks/stripe-connect` with
@@ -57,8 +57,19 @@ service, day and time on the store page. Free bookings are confirmed at once;
 paid ones go through Stripe Checkout on the seller's account and hold the slot
 for 30 minutes. The seller and the customer both get an email.
 
+## Shipping
+
+`store_set_shipping` sets flat rates customers choose at checkout (Stripe adds
+them to the order total), the ship-from address and a default parcel. After an
+order is paid, `store_shipping_rates` quotes real carrier rates through the
+seller's own Shippo account, and `store_buy_label` buys the label (charged to
+their Shippo account, so the seller approves the exact price), saves the
+tracking number, marks the order shipped and emails the customer. Sellers
+without Shippo use `store_mark_shipped` with any carrier's tracking link.
+
 ## Not built yet
 
 Running a store's data on Supabase (keys are checked and saved), customer
-sign-in on the storefront with the seller's Clerk keys, Shippo rates and labels
-at checkout, booking pages, and refunds from the dashboard.
+sign-in on the storefront with the seller's Clerk keys, live carrier rates at
+checkout (checkout uses the seller's flat rates), and refunds (done in the
+seller's Stripe dashboard).

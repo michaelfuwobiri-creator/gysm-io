@@ -7,7 +7,12 @@ import {
   createProduct, createStore, deleteProduct, listConnections, listOrders, listProducts, listStoresForUser, updateProduct, updateStore,
   type ProductRow, type StoreRow,
 } from "./db";
-import { connectProvider, storeDb } from "./connections";
+import { connectProvider, providerSecret, storeDb } from "./connections";
+import { addressFromStripe, describeAddress, parseAddress, parseParcel, parseShippingRates, samePrice, type Address, type Parcel } from "./shipping";
+import { buyLabel, getRate, quoteRates } from "./shippo";
+import { getOrder, markOrderShipped } from "./db";
+import { sellerEmail } from "./notify";
+import { sendStoreShippedEmail } from "@/lib/email/send";
 import { describeHours, formatSlot, isValidTimeZone, parseHoursInput, parseServiceInput } from "./booking";
 import {
   cancelBooking, createService, deleteService, getHours, listServices, setHours, updateService, upcomingBookings, type ServiceRow,
@@ -121,7 +126,8 @@ export async function executeStoreTool(userId: string, name: string, args: any, 
           .map((o) => {
             const items = (o.items ?? []).map((i) => `${i.quantity}x ${i.name}`).join(", ");
             const ship = o.shipping?.address ? ` ship to ${[o.shipping.name, o.shipping.address.city, o.shipping.address.country].filter(Boolean).join(", ")}` : "";
-            return `- ${new Date(o.created_at).toISOString().slice(0, 16).replace("T", " ")} ${o.status} ${formatMoney(o.amount_total_cents, o.currency)} from ${o.customer_name || o.customer_email || "a customer"}: ${items}${ship}`;
+            const tracked = o.tracking_number ? ` shipped (${[o.carrier, o.tracking_number].filter(Boolean).join(" ")})` : "";
+            return `- ${new Date(o.created_at).toISOString().slice(0, 16).replace("T", " ")} ${o.status} ${formatMoney(o.amount_total_cents, o.currency)} from ${o.customer_name || o.customer_email || "a customer"}: ${items}${ship}${tracked} [order ${o.id}]`;
           })
           .join("\n"),
       };
@@ -245,6 +251,109 @@ export async function executeStoreTool(userId: string, name: string, args: any, 
         ok: true,
         output: `Cancelled ${booking.service_name} on ${formatSlot(booking.starts_at, store.timezone)} for ${booking.customer_name}. Let them know at ${booking.customer_email}.${booking.amount_cents ? " It was paid: refund it in the seller's Stripe dashboard (Payments)." : ""}`,
       };
+    }
+    case "store_set_shipping": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const patch: Parameters<typeof updateStore>[2] = {};
+      if (args?.rates !== undefined) {
+        const r = parseShippingRates(args.rates);
+        if ("error" in r) return { ok: false, output: r.error };
+        patch.shippingRates = r.rates;
+      }
+      if (args?.ship_from !== undefined) {
+        const a = parseAddress(args.ship_from);
+        if ("error" in a) return { ok: false, output: a.error };
+        patch.shipFrom = a.value;
+      }
+      if (args?.parcel !== undefined) {
+        const p = parseParcel(args.parcel);
+        if ("error" in p) return { ok: false, output: p.error };
+        patch.defaultParcel = p.value;
+      }
+      const updated = await updateStore(store.id, userId, patch);
+      if (!updated) return { ok: false, output: "The store could not be updated." };
+      const rates = (updated.shipping_rates ?? []).map((r) => `${r.name} ${r.amount_cents ? formatMoney(r.amount_cents, updated.currency) : "free"}`).join(", ");
+      return {
+        ok: true,
+        output: `Shipping for ${updated.name}: checkout rates ${rates || "none (customers aren't charged for shipping)"}; ships from ${describeAddress(updated.ship_from)}; default parcel ${updated.default_parcel ? `${updated.default_parcel.length_cm}x${updated.default_parcel.width_cm}x${updated.default_parcel.height_cm} cm, ${updated.default_parcel.weight_kg} kg` : "not set"}.`,
+      };
+    }
+    case "store_shipping_rates":
+    case "store_buy_label": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const token = await providerSecret(store.id, "shippo");
+      if (!token) return { ok: false, output: "This store has no working Shippo connection. Connect the seller's Shippo account with store_connect first, or use store_mark_shipped with a tracking link from any carrier." };
+      const db = await storeDb(store);
+      const order = await getOrder(db, store.id, String(args?.order ?? ""));
+      if (!order || (order.status !== "paid" && order.status !== "fulfilled")) return { ok: false, output: "No paid order with that id. Use store_orders to find it." };
+      if (name === "store_shipping_rates") {
+        const to = addressFromStripe(order.shipping, order.customer_email);
+        if (!to) return { ok: false, output: "This order has no shipping address (the store may not ask for one at checkout)." };
+        if (!store.ship_from) return { ok: false, output: "Set the store's ship-from address first with store_set_shipping." };
+        const p = args?.parcel !== undefined ? parseParcel(args.parcel) : store.default_parcel ? { ok: true as const, value: store.default_parcel } : null;
+        if (!p) return { ok: false, output: "Give the parcel size and weight, or set a default parcel with store_set_shipping." };
+        if ("error" in p) return { ok: false, output: p.error };
+        try {
+          const rates = (await quoteRates(token, store.ship_from as Address, to, p.value as Parcel)).slice(0, 8);
+          if (!rates.length) return { ok: false, output: "Shippo returned no rates for this parcel and route. Check the addresses and carriers enabled in Shippo." };
+          return {
+            ok: true,
+            output: `Rates to ${describeAddress(to)} (prices are what the seller's Shippo account pays):\n${rates
+              .map((r) => `- ${r.provider} ${r.servicelevel?.name ?? ""}: ${r.amount} ${r.currency}${r.estimated_days ? `, about ${r.estimated_days} days` : ""} [rate ${r.object_id}]`)
+              .join("\n")}\nTo buy one, call store_buy_label with the rate id and its exact price; the user approves the purchase.`,
+          };
+        } catch (e: any) {
+          return { ok: false, output: String(e?.message ?? "Shippo couldn't quote rates.").slice(0, 400) };
+        }
+      }
+      const rateId = String(args?.rate ?? "");
+      const rate = await getRate(token, rateId);
+      if (!rate) return { ok: false, output: "Shippo doesn't know that rate id. Get fresh rates with store_shipping_rates." };
+      if (!samePrice(args?.price, rate.amount)) return { ok: false, output: `That rate now costs ${rate.amount} ${rate.currency}, not ${args?.price}. Show the user the new price and ask again.` };
+      try {
+        const label = await buyLabel(token, rateId);
+        await markOrderShipped(db, store.id, order.id, { carrier: label.carrier || rate.provider, trackingNumber: label.trackingNumber || null, trackingUrl: label.trackingUrl, labelUrl: label.labelUrl });
+        if (order.customer_email) {
+          await sendStoreShippedEmail(order.customer_email, {
+            storeName: store.name,
+            lines: (order.items ?? []).map((i) => `${i.quantity} x ${i.name}`),
+            carrier: label.carrier || rate.provider,
+            trackingNumber: label.trackingNumber || null,
+            trackingUrl: label.trackingUrl,
+          }, await sellerEmail(store));
+        }
+        return { ok: true, output: `Label bought (${label.amount} ${label.currency}, ${label.carrier || rate.provider}). Print it: ${label.labelUrl}\nTracking ${label.trackingNumber}${label.trackingUrl ? `: ${label.trackingUrl}` : ""}. The customer was emailed the tracking details.` };
+      } catch (e: any) {
+        return { ok: false, output: String(e?.message ?? "Shippo couldn't buy the label.").slice(0, 400) };
+      }
+    }
+    case "store_mark_shipped": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const db = await storeDb(store);
+      const order = await getOrder(db, store.id, String(args?.order ?? ""));
+      if (!order || (order.status !== "paid" && order.status !== "fulfilled")) return { ok: false, output: "No paid order with that id. Use store_orders to find it." };
+      let trackingUrl: string | null = null;
+      if (typeof args?.tracking_url === "string" && args.tracking_url.trim()) {
+        try {
+          const u = new URL(args.tracking_url.trim());
+          if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("bad");
+          trackingUrl = u.toString();
+        } catch {
+          return { ok: false, output: "The tracking link must be a web address." };
+        }
+      }
+      const carrier = typeof args?.carrier === "string" ? args.carrier.trim().slice(0, 60) || null : null;
+      const trackingNumber = typeof args?.tracking_number === "string" ? args.tracking_number.trim().slice(0, 80) || null : null;
+      await markOrderShipped(db, store.id, order.id, { carrier, trackingNumber, trackingUrl, labelUrl: null });
+      if (order.customer_email) {
+        await sendStoreShippedEmail(order.customer_email, {
+          storeName: store.name, lines: (order.items ?? []).map((i) => `${i.quantity} x ${i.name}`), carrier, trackingNumber, trackingUrl,
+        }, await sellerEmail(store));
+      }
+      return { ok: true, output: `Marked the order as shipped${order.customer_email ? " and emailed the customer" : ""}.` };
     }
     case "store_connect": {
       const store = await findStore(userId, args?.store);

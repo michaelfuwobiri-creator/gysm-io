@@ -76,6 +76,7 @@ async function handlePaid(accountId: string | null, session: Stripe.Checkout.Ses
     email: details?.email ?? null,
     name: details?.name ?? null,
     shipping: shippingDetails,
+    shippingCents: session.shipping_cost?.amount_total ?? 0,
   });
   if (!order) return; // already handled (Stripe can deliver an event twice)
 

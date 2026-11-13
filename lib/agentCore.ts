@@ -58,6 +58,10 @@ export type ToolName =
   | "store_set_hours"
   | "store_bookings"
   | "store_cancel_booking"
+  | "store_set_shipping"
+  | "store_shipping_rates"
+  | "store_buy_label"
+  | "store_mark_shipped"
   | "store_connect";
 
 // OpenAI-format tool definitions. Names and parameters match the spec the
@@ -919,6 +923,66 @@ export const STORE_TOOL_DEFS = [
   {
     type: "function",
     function: {
+      name: "store_set_shipping",
+      description: "Set a store's shipping: the flat rates customers choose from at checkout (e.g. Standard 5, Express 12, or 0 for free), the ship-from address and the default parcel size used for Shippo labels. Send only what changes. The user approves.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          rates: { type: "array", items: { type: "object", properties: { name: { type: "string" }, price: { type: "string" } }, required: ["name", "price"] } },
+          ship_from: {
+            type: "object",
+            properties: { name: { type: "string" }, street1: { type: "string" }, street2: { type: "string" }, city: { type: "string" }, state: { type: "string" }, zip: { type: "string" }, country: { type: "string", description: "2-letter code, e.g. IT" }, phone: { type: "string" }, email: { type: "string" } },
+          },
+          parcel: { type: "object", properties: { length_cm: { type: "number" }, width_cm: { type: "number" }, height_cm: { type: "number" }, weight_kg: { type: "number" } } },
+        },
+        required: ["store"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_shipping_rates",
+      description: "Quote real carrier rates through the seller's own Shippo account for a paid order (uses its shipping address, the store's ship-from address and the default parcel unless a parcel is given). Free; nothing is bought.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          order: { type: "string", description: "Order id from store_orders." },
+          parcel: { type: "object", properties: { length_cm: { type: "number" }, width_cm: { type: "number" }, height_cm: { type: "number" }, weight_kg: { type: "number" } } },
+        },
+        required: ["store", "order"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_buy_label",
+      description: "Buy a shipping label for a paid order with a rate from store_shipping_rates. This CHARGES the seller's Shippo account, so the user approves; pass the rate's exact price. Saves the tracking number, marks the order shipped and emails the customer.",
+      parameters: {
+        type: "object",
+        properties: { store: { type: "string" }, order: { type: "string" }, rate: { type: "string", description: "Rate id." }, price: { type: "string", description: "The rate's price, e.g. 7.40 EUR." } },
+        required: ["store", "order", "rate", "price"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_mark_shipped",
+      description: "Mark a paid order as shipped without Shippo (any carrier) and email the customer the tracking details. The user approves.",
+      parameters: {
+        type: "object",
+        properties: { store: { type: "string" }, order: { type: "string" }, carrier: { type: "string" }, tracking_number: { type: "string" }, tracking_url: { type: "string" } },
+        required: ["store", "order"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "store_connect",
       description:
         "Connect one of the seller's OWN accounts to their store: neon (their database: the store's products and orders move into it if the store is still empty), supabase, clerk or shippo. First make sure they created the account and project (store_setup_guide says how). The USER types the secret value in a private box; you never see it. Pass the public value (Supabase project URL or Clerk publishable key) yourself when the user gave it. GYSM checks the keys with the provider before saving them encrypted.",
@@ -1001,7 +1065,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect", "store_payments_link", "store_update", "store_remove_product", "store_remove_service", "store_cancel_booking"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect", "store_payments_link", "store_update", "store_remove_product", "store_remove_service", "store_cancel_booking", "store_set_shipping", "store_buy_label", "store_mark_shipped"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -1040,7 +1104,7 @@ How you work:
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. To put a deployed site on the user's own domain, call connect_domain (the user approves) and then give them the exact DNS records it returns; after they say they added them, call domain_status and only say it is live when it is. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
-- Online stores (only when the store_* tools are offered): everything happens here in the chat, there is no separate store page. Read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (store_payments_link gives them a one-time link to connect their own account), their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional (store_connect; they type the secret in the private box, never in the chat). Create the store with store_create, manage products with store_add_product, store_update_product and store_remove_product, open or pause it and change settings with store_update, check orders with store_orders and the overall state with store_status. For appointments (salons, tutors, consultants, repairs), add bookable services with store_add_service, set the weekly opening hours with store_set_hours (and the time zone with store_update), and check or cancel bookings with store_bookings and store_cancel_booking; customers book on the store page and both sides get an email. Never create accounts or enter passwords for them.
+- Online stores (only when the store_* tools are offered): everything happens here in the chat, there is no separate store page. Read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (store_payments_link gives them a one-time link to connect their own account), their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional (store_connect; they type the secret in the private box, never in the chat). Create the store with store_create, manage products with store_add_product, store_update_product and store_remove_product, open or pause it and change settings with store_update, check orders with store_orders and the overall state with store_status. For appointments (salons, tutors, consultants, repairs), add bookable services with store_add_service, set the weekly opening hours with store_set_hours (and the time zone with store_update), and check or cancel bookings with store_bookings and store_cancel_booking; customers book on the store page and both sides get an email. For shipping, set checkout rates, the ship-from address and a default parcel with store_set_shipping; after an order is paid, quote real carrier rates with store_shipping_rates (needs the seller's own Shippo connected) and buy the label with store_buy_label (it charges their Shippo account, so state the price), or use store_mark_shipped with any carrier's tracking link. Never create accounts or enter passwords for them.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -1401,6 +1465,14 @@ export function describeCall(tool: string, args: any): string {
       return `Check bookings for ${String(args?.store ?? "?")}`;
     case "store_cancel_booking":
       return `Cancel booking ${String(args?.booking ?? "?").slice(0, 40)} in ${String(args?.store ?? "?")}`;
+    case "store_set_shipping":
+      return `Update shipping for ${String(args?.store ?? "?")}`;
+    case "store_shipping_rates":
+      return `Get shipping rates for order ${String(args?.order ?? "?").slice(0, 40)}`;
+    case "store_buy_label":
+      return `Buy a shipping label for ${String(args?.price ?? "?").slice(0, 30)} (charged to your Shippo account)`;
+    case "store_mark_shipped":
+      return `Mark order ${String(args?.order ?? "?").slice(0, 40)} as shipped and email the customer`;
     case "store_connect":
       return `Connect your own ${String(args?.provider ?? "?")} account to ${String(args?.store ?? "?")} (you type the key)`;
     case "web_search":

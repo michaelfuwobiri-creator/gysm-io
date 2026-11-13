@@ -77,6 +77,12 @@ export const BYO_SCHEMA: string[] = [
     confirmed_at timestamptz)`,
   `create index if not exists store_bookings_store_idx on store_bookings (store_id, starts_at)`,
   `create unique index if not exists store_bookings_active_start on store_bookings (store_id, starts_at) where status in ('pending', 'confirmed')`,
+  `alter table store_orders add column if not exists shipping_cents integer not null default 0`,
+  `alter table store_orders add column if not exists carrier text`,
+  `alter table store_orders add column if not exists tracking_number text`,
+  `alter table store_orders add column if not exists tracking_url text`,
+  `alter table store_orders add column if not exists label_url text`,
+  `alter table store_orders add column if not exists shipped_at timestamptz`,
 ];
 
 async function check(url: string, headers: Record<string, string>, what: string): Promise<string | null> {
@@ -185,4 +191,11 @@ export async function storeDb(store: Pick<StoreRow, "id" | "db_provider">): Prom
 export function publicConnection(c: { provider: string; public_config: Record<string, string>; status: string; error_message: string | null; verified_at: string | null }) {
   const config = { ...c.public_config };
   return { provider: c.provider, status: c.status, error: c.error_message, verifiedAt: c.verified_at, config };
+}
+
+/** The decrypted secret of a verified connection (e.g. the seller's Shippo token), or null. Server-side only. */
+export async function providerSecret(storeId: string, provider: KeyedProvider): Promise<string | null> {
+  const conn = await getConnection(storeId, provider);
+  if (!conn?.secret_enc || conn.status !== "verified") return null;
+  return decryptSecret(conn.secret_enc);
 }

@@ -835,6 +835,10 @@ export async function executeTool(userId: string, name: string, args: any, secre
       case "store_set_hours":
       case "store_bookings":
       case "store_cancel_booking":
+      case "store_set_shipping":
+      case "store_shipping_rates":
+      case "store_buy_label":
+      case "store_mark_shipped":
       case "store_connect":
         result = await executeStoreTool(userId, name, args, secret);
         break;

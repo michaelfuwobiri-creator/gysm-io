@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "@/lib/db";
 import type { CartLine, CatalogProduct, ProductInput } from "./core";
 import type { HoursRow, ServiceInput } from "./booking";
+import type { Address, Parcel, ShippingRate } from "./shipping";
 
 /** A Neon query function: GYSM's own database, or the seller's (see lib/stores/connections.ts). */
 export type Db = typeof sql;
@@ -23,6 +24,9 @@ export type StoreRow = {
   db_provider: "gysm" | "neon";
   collect_shipping: boolean;
   timezone: string;
+  shipping_rates: ShippingRate[];
+  ship_from: Address | null;
+  default_parcel: Parcel | null;
   created_at: string;
 };
 
@@ -40,6 +44,12 @@ export type OrderRow = {
   stripe_session_id: string | null;
   created_at: string;
   paid_at: string | null;
+  shipping_cents?: number;
+  carrier?: string | null;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  label_url?: string | null;
+  shipped_at?: string | null;
   items?: { name: string; quantity: number; unit_price_cents: number }[];
 };
 
@@ -87,7 +97,10 @@ export async function createStore(input: {
 export async function updateStore(
   id: string,
   userId: string,
-  patch: { name?: string; description?: string; notifyEmail?: string | null; status?: string; collectShipping?: boolean; timezone?: string },
+  patch: {
+    name?: string; description?: string; notifyEmail?: string | null; status?: string; collectShipping?: boolean; timezone?: string;
+    shippingRates?: ShippingRate[]; shipFrom?: Address; defaultParcel?: Parcel;
+  },
 ): Promise<StoreRow | null> {
   const rows = await sql`
     update stores set
@@ -97,6 +110,9 @@ export async function updateStore(
       status = coalesce(${patch.status ?? null}, status),
       collect_shipping = coalesce(${patch.collectShipping ?? null}, collect_shipping),
       timezone = coalesce(${patch.timezone ?? null}, timezone),
+      shipping_rates = coalesce(${patch.shippingRates ? JSON.stringify(patch.shippingRates) : null}::jsonb, shipping_rates),
+      ship_from = coalesce(${patch.shipFrom ? JSON.stringify(patch.shipFrom) : null}::jsonb, ship_from),
+      default_parcel = coalesce(${patch.defaultParcel ? JSON.stringify(patch.defaultParcel) : null}::jsonb, default_parcel),
       updated_at = now()
     where id = ${id} and user_id = ${userId}
     returning *`;
@@ -169,13 +185,13 @@ export async function markOrderPaid(
   db: Db,
   orderId: string,
   sessionId: string,
-  details: { amountTotalCents: number | null; email: string | null; name: string | null; shipping: unknown },
+  details: { amountTotalCents: number | null; email: string | null; name: string | null; shipping: unknown; shippingCents?: number | null },
 ): Promise<OrderRow | null> {
   if (!isUuid(orderId)) return null;
   const rows = await db`
     update store_orders set status = 'paid', paid_at = now(), stripe_session_id = ${sessionId},
       amount_total_cents = coalesce(${details.amountTotalCents}, amount_total_cents),
-      customer_email = ${details.email}, customer_name = ${details.name},
+      customer_email = ${details.email}, customer_name = ${details.name}, shipping_cents = ${details.shippingCents ?? 0},
       shipping = ${details.shipping ? JSON.stringify(details.shipping) : null}::jsonb
     where id = ${orderId} and status = 'pending'
     returning *`;
@@ -415,4 +431,29 @@ export async function upcomingBookings(db: Db, storeId: string, limit = 30): Pro
   return (await db`
     select * from store_bookings where store_id = ${storeId} and status = 'confirmed' and ends_at > now()
     order by starts_at limit ${limit}`) as BookingRow[];
+}
+
+export async function getOrder(db: Db, storeId: string, orderId: string): Promise<OrderRow | null> {
+  if (!isUuid(orderId)) return null;
+  const rows = await db`
+    select o.*, coalesce(json_agg(json_build_object('name', i.name, 'quantity', i.quantity, 'unit_price_cents', i.unit_price_cents))
+             filter (where i.id is not null), '[]') as items
+    from store_orders o left join store_order_items i on i.order_id = o.id
+    where o.id = ${orderId} and o.store_id = ${storeId} group by o.id`;
+  return (rows[0] as OrderRow) ?? null;
+}
+
+/** Records shipment details and marks a paid order fulfilled. */
+export async function markOrderShipped(
+  db: Db,
+  storeId: string,
+  orderId: string,
+  t: { carrier: string | null; trackingNumber: string | null; trackingUrl: string | null; labelUrl: string | null },
+): Promise<OrderRow | null> {
+  if (!isUuid(orderId)) return null;
+  const rows = await db`
+    update store_orders set status = 'fulfilled', shipped_at = now(), carrier = ${t.carrier}, tracking_number = ${t.trackingNumber},
+      tracking_url = ${t.trackingUrl}, label_url = ${t.labelUrl}
+    where id = ${orderId} and store_id = ${storeId} and status in ('paid', 'fulfilled') returning *`;
+  return (rows[0] as OrderRow) ?? null;
 }

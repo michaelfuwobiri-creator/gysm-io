@@ -78,6 +78,17 @@ export async function createStoreCheckout(store: StoreRow, orderId: string, line
       metadata,
       payment_intent_data: { metadata, ...(fee > 0 ? { application_fee_amount: fee } : {}) },
       ...(store.collect_shipping ? { shipping_address_collection: { allowed_countries: [...SHIPPING_COUNTRIES] } } : {}),
+      ...(store.collect_shipping && store.shipping_rates?.length
+        ? {
+            shipping_options: store.shipping_rates.map((r) => ({
+              shipping_rate_data: {
+                type: "fixed_amount" as const,
+                display_name: r.name,
+                fixed_amount: { amount: r.amount_cents, currency: store.currency },
+              },
+            })),
+          }
+        : {}),
       success_url: `${base}/thanks?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: base,
     },
