@@ -82,3 +82,35 @@ describe("MCP server", () => {
     expect((await handleMcpBody(Array.from({ length: 21 }, (_, i) => ({ jsonrpc: "2.0", id: i, method: "ping" })))).status).toBe(400);
   });
 });
+
+import { MCP_STORE_TOOL_NAMES } from "@/lib/mcp/server";
+
+describe("MCP store tools", () => {
+  it("are listed only while stores are enabled", async () => {
+    const names = async () => ((await call("tools/list")) as any).body.result.tools.map((t: any) => t.name);
+    expect((await names()).some((n: string) => MCP_STORE_TOOL_NAMES.includes(n))).toBe(false);
+    process.env.STORES_ENABLED = "true";
+    try {
+      expect(await names()).toEqual(expect.arrayContaining(["find_stores", "get_store", "start_checkout"]));
+      const init: any = await call("initialize", { protocolVersion: "2025-06-18" });
+      expect(init.body.result.instructions).toContain("start_checkout");
+    } finally {
+      delete process.env.STORES_ENABLED;
+    }
+  });
+  it("refuses store tools while stores are off", async () => {
+    const r: any = await call("tools/call", { name: "find_stores", arguments: {} });
+    expect(r.body.error.message).toContain("Unknown tool");
+  });
+  it("marks start_checkout as a non-read-only tool", async () => {
+    process.env.STORES_ENABLED = "true";
+    try {
+      const r: any = await call("tools/list");
+      const t = r.body.result.tools.find((x: any) => x.name === "start_checkout");
+      expect(t.annotations.readOnlyHint).toBe(false);
+      expect(t.annotations.destructiveHint).toBe(false);
+    } finally {
+      delete process.env.STORES_ENABLED;
+    }
+  });
+});

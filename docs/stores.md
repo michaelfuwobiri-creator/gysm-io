@@ -67,6 +67,16 @@ their Shippo account, so the seller approves the exact price), saves the
 tracking number, marks the order shipped and emails the customer. Sellers
 without Shippo use `store_mark_shipped` with any carrier's tracking link.
 
+## Selling through AI assistants
+
+GYSM's public MCP server (`/api/mcp`) offers shoppers three store tools while
+`STORES_ENABLED=true`: `find_stores` (search live stores, their products and
+services), `get_store` (one store's catalogue, prices, stock, appointments and
+shipping options) and `start_checkout` (a Stripe Checkout link for confirmed
+items; the shopper pays on Stripe's page into the seller's account). Any
+assistant connected to the GYSM connector can use them. Stripe's own Agentic
+Commerce Suite is US-only with a waitlist, so it is not used yet.
+
 ## Not built yet
 
 Running a store's data on Supabase (keys are checked and saved), customer
