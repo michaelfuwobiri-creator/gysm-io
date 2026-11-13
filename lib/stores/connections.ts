@@ -41,6 +41,42 @@ export const BYO_SCHEMA: string[] = [
     unit_price_cents integer not null,
     quantity integer not null check (quantity > 0))`,
   `create index if not exists store_order_items_order_idx on store_order_items (order_id)`,
+  `create table if not exists store_services (
+    id uuid primary key default gen_random_uuid(),
+    store_id uuid not null,
+    name text not null,
+    description text not null default '',
+    duration_min integer not null check (duration_min between 5 and 480),
+    price_cents integer not null default 0 check (price_cents = 0 or price_cents >= 50),
+    active boolean not null default true,
+    sort integer not null default 0,
+    created_at timestamptz not null default now())`,
+  `create index if not exists store_services_store_idx on store_services (store_id, sort)`,
+  `create table if not exists store_hours (
+    store_id uuid not null,
+    weekday smallint not null check (weekday between 0 and 6),
+    open_min smallint not null check (open_min between 0 and 1440),
+    close_min smallint not null check (close_min between 0 and 1440 and close_min > open_min),
+    primary key (store_id, weekday))`,
+  `create table if not exists store_bookings (
+    id uuid primary key default gen_random_uuid(),
+    store_id uuid not null,
+    service_id uuid references store_services (id) on delete set null,
+    service_name text not null,
+    starts_at timestamptz not null,
+    ends_at timestamptz not null,
+    status text not null default 'pending' check (status in ('pending', 'confirmed', 'cancelled', 'expired')),
+    amount_cents integer not null default 0,
+    currency text not null,
+    customer_name text not null,
+    customer_email text not null,
+    customer_phone text,
+    note text not null default '',
+    stripe_session_id text unique,
+    created_at timestamptz not null default now(),
+    confirmed_at timestamptz)`,
+  `create index if not exists store_bookings_store_idx on store_bookings (store_id, starts_at)`,
+  `create unique index if not exists store_bookings_active_start on store_bookings (store_id, starts_at) where status in ('pending', 'confirmed')`,
 ];
 
 async function check(url: string, headers: Record<string, string>, what: string): Promise<string | null> {
@@ -137,6 +173,9 @@ export async function storeDb(store: Pick<StoreRow, "id" | "db_provider">): Prom
     throw new Error("This store runs on its own Neon database, but the connection is missing. Reconnect Neon in the store dashboard.");
   }
   const db = neon(decryptSecret(conn.secret_enc)) as unknown as Db;
+  // Stores connected before a feature shipped may lack its tables: create any
+  // missing ones (all statements are "if not exists") once per server process.
+  for (const statement of BYO_SCHEMA) await db.query(statement);
   if (dbCache.size > 200) dbCache.clear();
   dbCache.set(store.id, { at: Date.now(), db });
   return db;

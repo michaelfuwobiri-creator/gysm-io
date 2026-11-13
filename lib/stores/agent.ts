@@ -8,6 +8,10 @@ import {
   type ProductRow, type StoreRow,
 } from "./db";
 import { connectProvider, storeDb } from "./connections";
+import { describeHours, formatSlot, isValidTimeZone, parseHoursInput, parseServiceInput } from "./booking";
+import {
+  cancelBooking, createService, deleteService, getHours, listServices, setHours, updateService, upcomingBookings, type ServiceRow,
+} from "./db";
 import { refreshStripeStatus, stripeOnboardingLink } from "./payments";
 
 type ToolResult = { ok: boolean; output: string };
@@ -18,15 +22,15 @@ async function findStore(userId: string, slug: unknown): Promise<StoreRow | null
   return stores.find((s) => s.slug === slug.trim().toLowerCase()) ?? null;
 }
 
-function findProduct(products: ProductRow[], ref: unknown): ProductRow | null | "ambiguous" {
+function findByName<T extends { id: string; name: string }>(items: T[], ref: unknown): T | null | "ambiguous" {
   if (typeof ref !== "string" || !ref.trim()) return null;
   const q = ref.trim().toLowerCase();
-  const byId = products.find((p) => p.id === q);
+  const byId = items.find((p) => p.id === q);
   if (byId) return byId;
-  const exact = products.filter((p) => p.name.toLowerCase() === q);
+  const exact = items.filter((p) => p.name.toLowerCase() === q);
   if (exact.length === 1) return exact[0];
   if (exact.length > 1) return "ambiguous";
-  const partial = products.filter((p) => p.name.toLowerCase().includes(q));
+  const partial = items.filter((p) => p.name.toLowerCase().includes(q));
   if (partial.length === 1) return partial[0];
   return partial.length > 1 ? "ambiguous" : null;
 }
@@ -86,7 +90,7 @@ export async function executeStoreTool(userId: string, name: string, args: any, 
       if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
       const db = await storeDb(store);
       const products = await listProducts(db, store.id);
-      const product = findProduct(products, args?.product);
+      const product = findByName<ProductRow>(products, args?.product);
       if (product === "ambiguous") return { ok: false, output: `Several products match "${args?.product}". Use the exact name: ${products.map((p) => p.name).join(", ")}.` };
       if (!product) return { ok: false, output: `No product matches "${args?.product}". Products: ${products.map((p) => p.name).join(", ") || "none"}.` };
       if (name === "store_remove_product") {
@@ -156,6 +160,10 @@ export async function executeStoreTool(userId: string, name: string, args: any, 
         patch.notifyEmail = e || null;
       }
       if (typeof args?.collect_shipping === "boolean") patch.collectShipping = args.collect_shipping;
+      if (args?.timezone !== undefined) {
+        if (!isValidTimeZone(args.timezone)) return { ok: false, output: "Use a time zone name like Europe/Rome or Africa/Lagos." };
+        patch.timezone = args.timezone;
+      }
       if (args?.status !== undefined) {
         if (!["draft", "live", "paused"].includes(args.status)) return { ok: false, output: "status must be draft, live or paused." };
         if (args.status === "live" && !storeCanSell({ status: "live", stripe_charges_enabled: store.stripe_charges_enabled })) {
@@ -166,6 +174,77 @@ export async function executeStoreTool(userId: string, name: string, args: any, 
       const updated = await updateStore(store.id, userId, patch);
       if (!updated) return { ok: false, output: "The store could not be updated." };
       return { ok: true, output: `Saved ${updated.name}: status ${updated.status}${updated.status === "live" ? `, open at ${storeUrl(updated.slug)}` : ""}.` };
+    }
+    case "store_add_service": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const parsed = parseServiceInput(args);
+      if ("error" in parsed) return { ok: false, output: parsed.error };
+      const db = await storeDb(store);
+      if ((await listServices(db, store.id)).length >= 50) return { ok: false, output: "A store can have up to 50 services." };
+      const service = await createService(db, store.id, parsed.value);
+      const hours = await getHours(db, store.id);
+      return {
+        ok: true,
+        output: `Added the service "${service.name}" (${service.duration_min} min, ${service.price_cents ? formatMoney(service.price_cents, store.currency) : "free"}). Customers book it on the store page.${hours.length ? "" : " No opening hours are set yet, so no times are bookable: set them with store_set_hours."}${service.price_cents && !store.stripe_charges_enabled ? " Paid bookings need Stripe: use store_payments_link." : ""}`,
+      };
+    }
+    case "store_update_service":
+    case "store_remove_service": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const db = await storeDb(store);
+      const services = await listServices(db, store.id);
+      const service = findByName<ServiceRow>(services, args?.service);
+      if (service === "ambiguous") return { ok: false, output: `Several services match "${args?.service}". Use the exact name: ${services.map((v) => v.name).join(", ")}.` };
+      if (!service) return { ok: false, output: `No service matches "${args?.service}". Services: ${services.map((v) => v.name).join(", ") || "none"}.` };
+      if (name === "store_remove_service") {
+        await deleteService(db, store.id, service.id);
+        return { ok: true, output: `Removed the service "${service.name}". Existing bookings stay.` };
+      }
+      const parsed = parseServiceInput({
+        name: args?.name ?? service.name,
+        description: args?.description ?? service.description,
+        duration_min: args?.duration_min ?? service.duration_min,
+        price: args?.price ?? (service.price_cents / 100).toFixed(2),
+        active: typeof args?.visible === "boolean" ? args.visible : service.active,
+      });
+      if ("error" in parsed) return { ok: false, output: parsed.error };
+      const updated = await updateService(db, store.id, service.id, parsed.value);
+      if (!updated) return { ok: false, output: "The service could not be updated." };
+      return { ok: true, output: `Updated "${updated.name}": ${updated.duration_min} min, ${updated.price_cents ? formatMoney(updated.price_cents, store.currency) : "free"}, ${updated.active ? "bookable" : "hidden"}.` };
+    }
+    case "store_set_hours": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const parsed = parseHoursInput(args?.hours);
+      if ("error" in parsed) return { ok: false, output: parsed.error };
+      await setHours(await storeDb(store), store.id, parsed.rows);
+      return { ok: true, output: `Opening hours for ${store.name} (${store.timezone}): ${describeHours(parsed.rows)}.` };
+    }
+    case "store_bookings": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const db = await storeDb(store);
+      const [bookings, hours, services] = await Promise.all([upcomingBookings(db, store.id), getHours(db, store.id), listServices(db, store.id)]);
+      const head = `Opening hours (${store.timezone}): ${describeHours(hours)}. Services: ${services.map((v) => `${v.name} ${v.duration_min} min ${v.price_cents ? formatMoney(v.price_cents, store.currency) : "free"}${v.active ? "" : " (hidden)"}`).join("; ") || "none"}.`;
+      if (!bookings.length) return { ok: true, output: `${head}\nNo upcoming bookings.` };
+      return {
+        ok: true,
+        output: `${head}\nUpcoming bookings:\n${bookings
+          .map((b) => `- ${formatSlot(b.starts_at, store.timezone)} ${b.service_name} for ${b.customer_name} (${b.customer_email}${b.customer_phone ? `, ${b.customer_phone}` : ""})${b.amount_cents ? `, paid ${formatMoney(b.amount_cents, b.currency)}` : ""}${b.note ? `, note: ${b.note}` : ""} [id ${b.id}]`)
+          .join("\n")}`,
+      };
+    }
+    case "store_cancel_booking": {
+      const store = await findStore(userId, args?.store);
+      if (!store) return { ok: false, output: "No store with that slug. Call store_status to see the user's stores." };
+      const booking = await cancelBooking(await storeDb(store), store.id, String(args?.booking ?? ""));
+      if (!booking) return { ok: false, output: "No upcoming booking with that id. Use store_bookings to find it." };
+      return {
+        ok: true,
+        output: `Cancelled ${booking.service_name} on ${formatSlot(booking.starts_at, store.timezone)} for ${booking.customer_name}. Let them know at ${booking.customer_email}.${booking.amount_cents ? " It was paid: refund it in the seller's Stripe dashboard (Payments)." : ""}`,
+      };
     }
     case "store_connect": {
       const store = await findStore(userId, args?.store);

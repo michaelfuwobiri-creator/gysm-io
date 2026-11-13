@@ -7,7 +7,7 @@ accounts" for the database (Neon or Supabase), sign-in (Clerk) and shipping
 
 ## Turn it on
 
-1. Run `db/migrations/0039_stores.sql` on the production Neon database.
+1. Run `db/migrations/0039_stores.sql` and `0040_store_bookings.sql` on the production Neon database.
 2. In Stripe (live and test), enable **Connect** for the GYSM platform account.
 3. In Stripe, add a webhook endpoint for **events on connected accounts**:
    `https://www.gysm.io/api/webhooks/stripe-connect` with
@@ -46,6 +46,16 @@ the builder agent at `/agent`.
    seller's own database.
 5. `store_update` with status `live` opens the store. The seller gets an email
    for every paid order and can ask the agent for `store_orders`.
+
+## Bookings
+
+Stores can also take appointments. The agent adds services (`store_add_service`,
+with a duration and a price, 0 for free), sets weekly opening hours
+(`store_set_hours`, in the store's time zone set with `store_update`), and shows
+or cancels bookings (`store_bookings`, `store_cancel_booking`). Customers pick a
+service, day and time on the store page. Free bookings are confirmed at once;
+paid ones go through Stripe Checkout on the seller's account and hold the slot
+for 30 minutes. The seller and the customer both get an email.
 
 ## Not built yet
 

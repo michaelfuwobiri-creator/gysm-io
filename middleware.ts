@@ -157,11 +157,11 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
 
   // GYSM Stores on their own address: <slug>.gysm.store (STORES_ROOT_DOMAIN).
   // Pages are served from /shop/<slug>/..., straight past Clerk; the only API
-  // a storefront calls is checkout. Off unless STORES_ENABLED=true.
+  // a storefront calls are checkout and bookings. Off unless STORES_ENABLED=true.
   const storeSlug = storesEnabled() ? storeSlugFromHost(host, process.env.STORES_ROOT_DOMAIN) : null
   if (storeSlug) {
     const pathname = req.nextUrl.pathname
-    if (pathname === '/api/stores/checkout') return NextResponse.next()
+    if (pathname === '/api/stores/checkout' || pathname === '/api/stores/slots' || pathname === '/api/stores/book') return NextResponse.next()
     if (pathname.startsWith('/_next/') || pathname.includes('.')) return NextResponse.next()
     if (pathname.startsWith('/api/')) return new NextResponse('Not found', { status: 404 })
     const url = req.nextUrl.clone()

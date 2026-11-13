@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "@/lib/db";
 import type { CartLine, CatalogProduct, ProductInput } from "./core";
+import type { HoursRow, ServiceInput } from "./booking";
 
 /** A Neon query function: GYSM's own database, or the seller's (see lib/stores/connections.ts). */
 export type Db = typeof sql;
@@ -21,6 +22,7 @@ export type StoreRow = {
   status: "draft" | "live" | "paused";
   db_provider: "gysm" | "neon";
   collect_shipping: boolean;
+  timezone: string;
   created_at: string;
 };
 
@@ -85,7 +87,7 @@ export async function createStore(input: {
 export async function updateStore(
   id: string,
   userId: string,
-  patch: { name?: string; description?: string; notifyEmail?: string | null; status?: string; collectShipping?: boolean },
+  patch: { name?: string; description?: string; notifyEmail?: string | null; status?: string; collectShipping?: boolean; timezone?: string },
 ): Promise<StoreRow | null> {
   const rows = await sql`
     update stores set
@@ -94,6 +96,7 @@ export async function updateStore(
       notify_email = case when ${patch.notifyEmail !== undefined} then ${patch.notifyEmail ?? null} else notify_email end,
       status = coalesce(${patch.status ?? null}, status),
       collect_shipping = coalesce(${patch.collectShipping ?? null}, collect_shipping),
+      timezone = coalesce(${patch.timezone ?? null}, timezone),
       updated_at = now()
     where id = ${id} and user_id = ${userId}
     returning *`;
@@ -259,4 +262,157 @@ export async function deleteConnection(storeId: string, provider: string): Promi
 
 export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+// -- bookings (in the store's own database, like products) --------------------
+
+export type ServiceRow = {
+  id: string;
+  store_id: string;
+  name: string;
+  description: string;
+  duration_min: number;
+  price_cents: number;
+  active: boolean;
+  sort: number;
+};
+
+export type BookingRow = {
+  id: string;
+  store_id: string;
+  service_id: string | null;
+  service_name: string;
+  starts_at: string;
+  ends_at: string;
+  status: "pending" | "confirmed" | "cancelled" | "expired";
+  amount_cents: number;
+  currency: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  note: string;
+  stripe_session_id: string | null;
+  created_at: string;
+};
+
+export async function listServices(db: Db, storeId: string, opts: { activeOnly?: boolean } = {}): Promise<ServiceRow[]> {
+  return (opts.activeOnly
+    ? await db`select * from store_services where store_id = ${storeId} and active order by sort, created_at`
+    : await db`select * from store_services where store_id = ${storeId} order by sort, created_at`) as ServiceRow[];
+}
+
+export async function createService(db: Db, storeId: string, v: ServiceInput): Promise<ServiceRow> {
+  const rows = await db`
+    insert into store_services (store_id, name, description, duration_min, price_cents, active, sort)
+    values (${storeId}, ${v.name}, ${v.description}, ${v.durationMin}, ${v.priceCents}, ${v.active},
+            (select coalesce(max(sort), 0) + 1 from store_services where store_id = ${storeId}))
+    returning *`;
+  return rows[0] as ServiceRow;
+}
+
+export async function updateService(db: Db, storeId: string, id: string, v: ServiceInput): Promise<ServiceRow | null> {
+  if (!isUuid(id)) return null;
+  const rows = await db`
+    update store_services set name = ${v.name}, description = ${v.description}, duration_min = ${v.durationMin},
+      price_cents = ${v.priceCents}, active = ${v.active}
+    where id = ${id} and store_id = ${storeId} returning *`;
+  return (rows[0] as ServiceRow) ?? null;
+}
+
+export async function deleteService(db: Db, storeId: string, id: string): Promise<boolean> {
+  if (!isUuid(id)) return false;
+  return (await db`delete from store_services where id = ${id} and store_id = ${storeId} returning id`).length > 0;
+}
+
+export async function getHours(db: Db, storeId: string): Promise<HoursRow[]> {
+  return (await db`select weekday, open_min, close_min from store_hours where store_id = ${storeId} order by weekday`) as HoursRow[];
+}
+
+export async function setHours(db: Db, storeId: string, rows: HoursRow[]): Promise<void> {
+  await db.transaction([
+    db`delete from store_hours where store_id = ${storeId}`,
+    ...rows.map((r) => db`insert into store_hours (store_id, weekday, open_min, close_min) values (${storeId}, ${r.weekday}, ${r.open_min}, ${r.close_min})`),
+  ]);
+}
+
+/** Bookings that block time between two instants: confirmed ones, and unpaid ones still on hold. */
+export async function busyBetween(db: Db, storeId: string, from: Date, to: Date, holdMinutes: number): Promise<{ start: Date; end: Date }[]> {
+  const rows = await db`
+    select starts_at, ends_at from store_bookings
+    where store_id = ${storeId} and starts_at < ${to.toISOString()}::timestamptz and ends_at > ${from.toISOString()}::timestamptz
+      and (status = 'confirmed' or (status = 'pending' and created_at > now() - make_interval(mins => ${holdMinutes}::int)))`;
+  return (rows as any[]).map((r) => ({ start: new Date(r.starts_at), end: new Date(r.ends_at) }));
+}
+
+/** Records a booking unless the time was taken meanwhile. Returns null when it clashes. */
+export async function createBooking(
+  db: Db,
+  b: {
+    storeId: string; service: ServiceRow; start: Date; currency: string; status: "pending" | "confirmed";
+    customer: { name: string; email: string; phone: string | null; note: string }; holdMinutes: number;
+  },
+): Promise<BookingRow | null> {
+  const end = new Date(b.start.getTime() + b.service.duration_min * 60000);
+  // Free the slot from expired unpaid holds first, so the unique index doesn't block a fresh booking.
+  await db`update store_bookings set status = 'expired'
+           where store_id = ${b.storeId} and status = 'pending' and created_at <= now() - make_interval(mins => ${b.holdMinutes}::int)`;
+  try {
+    const rows = await db`
+      insert into store_bookings (store_id, service_id, service_name, starts_at, ends_at, status, amount_cents, currency,
+                                  customer_name, customer_email, customer_phone, note, confirmed_at)
+      select ${b.storeId}::uuid, ${b.service.id}::uuid, ${b.service.name}::text, ${b.start.toISOString()}::timestamptz,
+             ${end.toISOString()}::timestamptz, ${b.status}::text, ${b.service.price_cents}::integer, ${b.currency}::text,
+             ${b.customer.name}::text, ${b.customer.email}::text, ${b.customer.phone}::text, ${b.customer.note}::text,
+             case when ${b.status}::text = 'confirmed' then now() else null end
+      where not exists (
+        select 1 from store_bookings
+        where store_id = ${b.storeId}::uuid and status in ('pending', 'confirmed')
+          and starts_at < ${end.toISOString()}::timestamptz and ends_at > ${b.start.toISOString()}::timestamptz)
+      returning *`;
+    return (rows[0] as BookingRow) ?? null;
+  } catch (error: any) {
+    if (error?.code === "23505") return null;
+    throw error;
+  }
+}
+
+export async function attachSessionToBooking(db: Db, bookingId: string, sessionId: string): Promise<void> {
+  await db`update store_bookings set stripe_session_id = ${sessionId} where id = ${bookingId}`;
+}
+
+/** Confirms a paid booking exactly once. */
+export async function confirmBooking(db: Db, bookingId: string, sessionId: string): Promise<BookingRow | null> {
+  if (!isUuid(bookingId)) return null;
+  try {
+    const rows = await db`
+      update store_bookings set status = 'confirmed', confirmed_at = now(), stripe_session_id = ${sessionId}
+      where id = ${bookingId} and status in ('pending', 'expired') returning *`;
+    return (rows[0] as BookingRow) ?? null;
+  } catch (error: any) {
+    // The slot went to someone else after this hold lapsed: leave it for the seller to sort out (refund).
+    if (error?.code === "23505") {
+      console.error("[stores] paid booking clashes with another booking", { bookingId, sessionId });
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function expireBooking(db: Db, bookingId: string): Promise<void> {
+  if (!isUuid(bookingId)) return;
+  await db`update store_bookings set status = 'expired' where id = ${bookingId} and status = 'pending'`;
+}
+
+export async function cancelBooking(db: Db, storeId: string, bookingId: string): Promise<BookingRow | null> {
+  if (!isUuid(bookingId)) return null;
+  const rows = await db`
+    update store_bookings set status = 'cancelled'
+    where id = ${bookingId} and store_id = ${storeId} and status in ('pending', 'confirmed') returning *`;
+  return (rows[0] as BookingRow) ?? null;
+}
+
+export async function upcomingBookings(db: Db, storeId: string, limit = 30): Promise<BookingRow[]> {
+  return (await db`
+    select * from store_bookings where store_id = ${storeId} and status = 'confirmed' and ends_at > now()
+    order by starts_at limit ${limit}`) as BookingRow[];
 }

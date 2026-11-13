@@ -52,6 +52,12 @@ export type ToolName =
   | "store_orders"
   | "store_payments_link"
   | "store_update"
+  | "store_add_service"
+  | "store_update_service"
+  | "store_remove_service"
+  | "store_set_hours"
+  | "store_bookings"
+  | "store_cancel_booking"
   | "store_connect";
 
 // OpenAI-format tool definitions. Names and parameters match the spec the
@@ -819,10 +825,95 @@ export const STORE_TOOL_DEFS = [
           description: { type: "string" },
           alert_email: { type: "string", description: "Where order alerts go; empty for the account email." },
           collect_shipping: { type: "boolean" },
+          timezone: { type: "string", description: "IANA time zone for bookings, e.g. Europe/Rome or Africa/Lagos." },
           status: { type: "string", enum: ["draft", "live", "paused"] },
         },
         required: ["store"],
       },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_add_service",
+      description: "Add a bookable service (appointment) to a store: a name, how long it takes and a price (0 for free). Customers pick a time on the store page; paid ones pay on Stripe. Needs opening hours (store_set_hours).",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          name: { type: "string" },
+          duration_min: { type: "integer", description: "Minutes, 5-480 in steps of 5." },
+          price: { type: "string", description: "e.g. 25 or 25.50; 0 for free." },
+          description: { type: "string" },
+        },
+        required: ["store", "name", "duration_min"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_update_service",
+      description: "Change a bookable service: name, duration, price, description, or hide/show it. Only send what changes.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          service: { type: "string", description: "The service's current name (or id)." },
+          name: { type: "string" },
+          duration_min: { type: "integer" },
+          price: { type: "string" },
+          description: { type: "string" },
+          visible: { type: "boolean" },
+        },
+        required: ["store", "service"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_remove_service",
+      description: "Delete a bookable service. The user approves. Existing bookings stay.",
+      parameters: { type: "object", properties: { store: { type: "string" }, service: { type: "string" } }, required: ["store", "service"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_set_hours",
+      description: "Set the store's weekly opening hours for bookings (in the store's time zone; change it with store_update). One window per day; days left out are closed. Replaces the previous hours.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          hours: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { day: { type: "string", description: "mon, tue, wed, thu, fri, sat or sun" }, open: { type: "string", description: "HH:MM" }, close: { type: "string", description: "HH:MM" } },
+              required: ["day", "open", "close"],
+            },
+          },
+        },
+        required: ["store", "hours"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_bookings",
+      description: "Show a store's opening hours, services and upcoming confirmed bookings (who, when, contact, note).",
+      parameters: { type: "object", properties: { store: { type: "string" } }, required: ["store"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_cancel_booking",
+      description: "Cancel an upcoming booking by its id (from store_bookings). The user approves. Paid bookings must be refunded in the seller's Stripe dashboard; tell the user.",
+      parameters: { type: "object", properties: { store: { type: "string" }, booking: { type: "string", description: "Booking id." } }, required: ["store", "booking"] },
     },
   },
   {
@@ -910,7 +1001,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect", "store_payments_link", "store_update", "store_remove_product"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect", "store_payments_link", "store_update", "store_remove_product", "store_remove_service", "store_cancel_booking"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -949,7 +1040,7 @@ How you work:
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. To put a deployed site on the user's own domain, call connect_domain (the user approves) and then give them the exact DNS records it returns; after they say they added them, call domain_status and only say it is live when it is. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
-- Online stores (only when the store_* tools are offered): everything happens here in the chat, there is no separate store page. Read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (store_payments_link gives them a one-time link to connect their own account), their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional (store_connect; they type the secret in the private box, never in the chat). Create the store with store_create, manage products with store_add_product, store_update_product and store_remove_product, open or pause it and change settings with store_update, check orders with store_orders and the overall state with store_status. Never create accounts or enter passwords for them.
+- Online stores (only when the store_* tools are offered): everything happens here in the chat, there is no separate store page. Read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (store_payments_link gives them a one-time link to connect their own account), their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional (store_connect; they type the secret in the private box, never in the chat). Create the store with store_create, manage products with store_add_product, store_update_product and store_remove_product, open or pause it and change settings with store_update, check orders with store_orders and the overall state with store_status. For appointments (salons, tutors, consultants, repairs), add bookable services with store_add_service, set the weekly opening hours with store_set_hours (and the time zone with store_update), and check or cancel bookings with store_bookings and store_cancel_booking; customers book on the store page and both sides get an email. Never create accounts or enter passwords for them.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -1298,6 +1389,18 @@ export function describeCall(tool: string, args: any): string {
       return `Get a link to connect your Stripe account to ${String(args?.store ?? "?")}`;
     case "store_update":
       return `Update store ${String(args?.store ?? "?")}${args?.status ? ` (status: ${String(args.status)})` : ""}`;
+    case "store_add_service":
+      return `Add the service "${String(args?.name ?? "?").slice(0, 80)}" to ${String(args?.store ?? "?")}`;
+    case "store_update_service":
+      return `Update the service "${String(args?.service ?? "?").slice(0, 80)}" in ${String(args?.store ?? "?")}`;
+    case "store_remove_service":
+      return `Remove the service "${String(args?.service ?? "?").slice(0, 80)}" from ${String(args?.store ?? "?")}`;
+    case "store_set_hours":
+      return `Set opening hours for ${String(args?.store ?? "?")}`;
+    case "store_bookings":
+      return `Check bookings for ${String(args?.store ?? "?")}`;
+    case "store_cancel_booking":
+      return `Cancel booking ${String(args?.booking ?? "?").slice(0, 40)} in ${String(args?.store ?? "?")}`;
     case "store_connect":
       return `Connect your own ${String(args?.provider ?? "?")} account to ${String(args?.store ?? "?")} (you type the key)`;
     case "web_search":

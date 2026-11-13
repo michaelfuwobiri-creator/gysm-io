@@ -139,6 +139,7 @@ describe("agent store tools", () => {
     expect(names()).toEqual(expect.arrayContaining([
       "store_setup_guide", "store_status", "store_create", "store_add_product", "store_update_product",
       "store_remove_product", "store_orders", "store_payments_link", "store_update", "store_connect",
+      "store_add_service", "store_update_service", "store_remove_service", "store_set_hours", "store_bookings", "store_cancel_booking",
     ]));
   });
   it("asks the user before creating a store or connecting keys", () => {
@@ -149,6 +150,9 @@ describe("agent store tools", () => {
     expect(needsApproval("store_remove_product", {})).toBe(true);
     expect(needsApproval("store_status", {})).toBe(false);
     expect(needsApproval("store_orders", {})).toBe(false);
+    expect(needsApproval("store_cancel_booking", {})).toBe(true);
+    expect(needsApproval("store_remove_service", {})).toBe(true);
+    expect(needsApproval("store_set_hours", {})).toBe(false);
   });
   it("labels the private box with the right key name", () => {
     expect(storeSecretLabel("clerk")).toBe("Clerk secret key");
