@@ -31,7 +31,7 @@ import { CHECKED_ON, GYSM_FACTS, RIVALS } from "@/lib/comparisons";
 import { STORE_TOOL_DEFS } from "@/lib/agentCore";
 
 export const SUPPORTED_PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
-const SERVER_VERSION = "1.0.0";
+const SERVER_VERSION = "1.1.0";
 
 type Json = Record<string, unknown>;
 type RpcRequest = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Json };
