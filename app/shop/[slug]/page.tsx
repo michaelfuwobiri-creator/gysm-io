@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getUser } from "@/lib/auth";
 import { storeCanSell, storesEnabled } from "@/lib/stores/core";
-import { getStoreBySlug, listProducts } from "@/lib/stores/db";
+import { getStoreBySlug, listProducts, listServices } from "@/lib/stores/db";
 import { storeDb } from "@/lib/stores/connections";
 import Storefront from "./Storefront";
 
@@ -30,12 +30,15 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function ShopPage({ params }: { params: { slug: string } }) {
   const store = await loadStore(params.slug);
   if (!store) notFound();
-  const products = await listProducts(await storeDb(store), store.id, { activeOnly: true });
+  const db = await storeDb(store);
+  const [products, services] = await Promise.all([listProducts(db, store.id, { activeOnly: true }), listServices(db, store.id, { activeOnly: true })]);
   return (
     <Storefront
       store={{ slug: store.slug, name: store.name, description: store.description, currency: store.currency, status: store.status }}
       canSell={storeCanSell(store)}
       products={products.map((p) => ({ id: p.id, name: p.name, description: p.description, price_cents: p.price_cents, image_url: p.image_url, stock: p.stock }))}
+      services={services.map((v) => ({ id: v.id, name: v.name, description: v.description, duration_min: v.duration_min, price_cents: v.price_cents }))}
+      canBook={store.status === "live"}
     />
   );
 }

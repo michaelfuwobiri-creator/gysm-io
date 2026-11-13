@@ -79,6 +79,11 @@ function proposalDetail(name: string, args: any): string {
   if (name === "store_connect") return `${String(args?.purpose ?? "").slice(0, 300)}\nGYSM checks the key with the provider, then stores it encrypted for this store only. The agent never sees it.`;
   if (name === "store_payments_link") return "Creates your store's Stripe account on first use and gives you a link to finish setup on Stripe's own page. Customers will pay into that account.";
   if (name === "store_remove_product") return "Deletes the product from the store. Past orders keep their record.";
+  if (name === "store_buy_label") return `Buys a shipping label at ${String(args?.price ?? "?").slice(0, 30)}, charged to your own Shippo account. The customer gets an email with the tracking details.`;
+  if (name === "store_mark_shipped") return "Marks the order as shipped and emails the customer the tracking details you gave.";
+  if (name === "store_set_shipping") return `Changes: ${Object.keys(args ?? {}).filter((k) => k !== "store").join(", ") || "nothing"}. Checkout shipping prices apply to new orders.`;
+  if (name === "store_remove_service") return "Deletes the bookable service. Existing bookings stay.";
+  if (name === "store_cancel_booking") return "Cancels the booking. A paid booking is not refunded automatically: refund it in your Stripe dashboard.";
   if (name === "store_update") return `Changes: ${Object.entries(args ?? {}).filter(([k]) => k !== "store").map(([k, v]) => `${k} = ${String(v).slice(0, 80)}`).join(", ") || "nothing"}`;
   if (name === "store_create") return `Creates a draft store "${String(args?.name ?? "").slice(0, 80)}". Nobody can see it until you connect Stripe and open it.`;
   return "";

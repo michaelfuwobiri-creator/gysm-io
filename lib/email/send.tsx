@@ -4,6 +4,8 @@ import BuildFailedEmail from "./templates/BuildFailedEmail";
 import PaymentFailedEmail from "./templates/PaymentFailedEmail";
 import WeeklySummaryEmail from "./templates/WeeklySummaryEmail";
 import StoreOrderEmail, { type StoreOrderEmailProps } from "./templates/StoreOrderEmail";
+import StoreBookingEmail, { type StoreBookingEmailProps } from "./templates/StoreBookingEmail";
+import StoreShippedEmail, { type StoreShippedEmailProps } from "./templates/StoreShippedEmail";
 
 const FROM = "GYSM <hello@gysm.io>";
 
@@ -88,5 +90,39 @@ export async function sendStoreOrderEmail(to: string, props: StoreOrderEmailProp
     });
   } catch (error: any) {
     console.error("[email] failed to send store order email:", error.message);
+  }
+}
+
+/** GYSM Stores: booking alert to the seller, or confirmation to the customer. Never throws. */
+export async function sendStoreBookingEmail(to: string, props: StoreBookingEmailProps, replyTo?: string | null): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    const resend = await getResend();
+    await resend.emails.send({
+      from: FROM,
+      to,
+      ...(replyTo ? { replyTo } : {}),
+      subject: props.audience === "seller" ? `New booking: ${props.serviceName}, ${props.when}` : `Booked: ${props.serviceName} with ${props.storeName}`,
+      react: <StoreBookingEmail {...props} />,
+    });
+  } catch (error: any) {
+    console.error("[email] failed to send store booking email:", error.message);
+  }
+}
+
+/** GYSM Stores: tells the customer their order shipped (replies go to the seller). Never throws. */
+export async function sendStoreShippedEmail(to: string, props: StoreShippedEmailProps, replyTo?: string | null): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    const resend = await getResend();
+    await resend.emails.send({
+      from: FROM,
+      to,
+      ...(replyTo ? { replyTo } : {}),
+      subject: `Your order from ${props.storeName} has shipped`,
+      react: <StoreShippedEmail {...props} />,
+    });
+  } catch (error: any) {
+    console.error("[email] failed to send store shipped email:", error.message);
   }
 }

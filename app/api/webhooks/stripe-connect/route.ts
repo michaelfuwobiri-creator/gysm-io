@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { sql } from "@/lib/db";
 import { formatMoney } from "@/lib/stores/core";
-import { getStoreById, markOrderExpired, markOrderPaid, setChargesEnabled } from "@/lib/stores/db";
+import { confirmBooking, expireBooking, getStoreById, markOrderExpired, markOrderPaid, setChargesEnabled } from "@/lib/stores/db";
+import { notifyBooking, sellerEmail } from "@/lib/stores/notify";
 import { storeDb } from "@/lib/stores/connections";
 import { sendStoreOrderEmail } from "@/lib/email/send";
 
@@ -37,16 +37,20 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.metadata?.source !== "gysm_store" || session.payment_status !== "paid") break;
-        await handlePaid(event.account ?? null, session);
+        if (session.payment_status !== "paid") break;
+        if (session.metadata?.source === "gysm_store") await handlePaid(event.account ?? null, session);
+        else if (session.metadata?.source === "gysm_booking") await handleBookingPaid(event.account ?? null, session);
         break;
       }
       case "checkout.session.expired": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.metadata?.source !== "gysm_store") break;
-        const store = await getStoreById(session.metadata.storeId ?? "");
+        const source = session.metadata?.source;
+        if (source !== "gysm_store" && source !== "gysm_booking") break;
+        const store = await getStoreById(session.metadata?.storeId ?? "");
         if (!store || store.stripe_account_id !== event.account) break;
-        await markOrderExpired(await storeDb(store), session.metadata.orderId ?? "");
+        const db = await storeDb(store);
+        if (source === "gysm_store") await markOrderExpired(db, session.metadata?.orderId ?? "");
+        else await expireBooking(db, session.metadata?.bookingId ?? "");
         break;
       }
     }
@@ -72,10 +76,11 @@ async function handlePaid(accountId: string | null, session: Stripe.Checkout.Ses
     email: details?.email ?? null,
     name: details?.name ?? null,
     shipping: shippingDetails,
+    shippingCents: session.shipping_cost?.amount_total ?? 0,
   });
   if (!order) return; // already handled (Stripe can deliver an event twice)
 
-  const to = store.notify_email || (await ownerEmail(store.user_id));
+  const to = await sellerEmail(store);
   if (!to) return;
   const addr = shippingDetails?.address;
   const shipping = addr
@@ -92,11 +97,12 @@ async function handlePaid(accountId: string | null, session: Stripe.Checkout.Ses
   });
 }
 
-async function ownerEmail(userId: string): Promise<string | null> {
-  try {
-    const rows = await sql`select email from users where clerk_id = ${userId} limit 1`;
-    return ((rows[0] as any)?.email as string) ?? null;
-  } catch {
-    return null;
+async function handleBookingPaid(accountId: string | null, session: Stripe.Checkout.Session) {
+  const store = await getStoreById(session.metadata?.storeId ?? "");
+  if (!store || !accountId || store.stripe_account_id !== accountId) {
+    console.error("[stripe-connect] paid booking for unknown store/account", { storeId: session.metadata?.storeId, accountId });
+    return;
   }
+  const booking = await confirmBooking(await storeDb(store), session.metadata?.bookingId ?? "", session.id);
+  if (booking) await notifyBooking(store, booking); // null = already confirmed (duplicate event)
 }

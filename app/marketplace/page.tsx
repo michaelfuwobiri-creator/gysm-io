@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import MarketplaceClient from "./MarketplaceClient";
 
 export const metadata: Metadata = {
-  title: "GYSM Marketplace – Curated .io Domains (Coming Soon)",
+  title: "GYSM Domains – Find a Domain for Your App (Coming Soon)",
   description:
-    "A hand-picked marketplace of short, brandable .io domain names. Browsing is open now -- join the waitlist to be notified when buying opens.",
+    "Domain search and purchase are coming to GYSM. Browse name ideas and join the waitlist to hear when it opens.",
   alternates: { canonical: "/marketplace" },
   openGraph: {
-    title: "GYSM Marketplace – Curated .io Domains (Coming Soon)",
-    description: "A hand-picked marketplace of short, brandable .io domain names. Join the waitlist for launch.",
+    title: "GYSM Domains – Find a Domain for Your App (Coming Soon)",
+    description: "Domain search and purchase are coming to GYSM. Join the waitlist.",
     url: "/marketplace",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "GYSM Marketplace – Curated .io Domains (Coming Soon)",
-    description: "A hand-picked marketplace of short, brandable .io domain names. Join the waitlist for launch.",
+    title: "GYSM Domains – Find a Domain for Your App (Coming Soon)",
+    description: "Domain search and purchase are coming to GYSM. Join the waitlist.",
   },
 };
 

@@ -5,33 +5,32 @@ import { useMemo, useState } from "react";
 type Domain = {
   name: string;
   tags: string[];
-  price: number;
   blurb: string;
 };
 
+// Name IDEAS, not listings: GYSM does not own these domains and their
+// availability is not checked here. No prices or "available" claims, so the
+// page can't be read as an offer to sell something GYSM doesn't have.
+
 const DOMAINS: Domain[] = [
-  { name: "soulmatch.io", tags: ["Dating", "Social"], price: 4800, blurb: "Two clean words, obvious meaning -- built for a matchmaking or relationship app." },
-  { name: "vybe.io", tags: ["Brandable", "Lifestyle"], price: 6200, blurb: "Short, phonetic, and instantly readable -- fits music, events, or social." },
-  { name: "paird.io", tags: ["Brandable", "Dating"], price: 3900, blurb: "A playful misspelling that still reads clean -- pairing, matching, marketplaces." },
-  { name: "loopwave.io", tags: ["SaaS", "Tech"], price: 3200, blurb: "Two-word compound with rhythm -- reads like a real product, not a placeholder." },
-  { name: "driftly.io", tags: ["Brandable", "SaaS"], price: 2800, blurb: "The '-ly' pattern startups love, still unclaimed on .io." },
-  { name: "coreflux.io", tags: ["Tech", "Infra"], price: 5400, blurb: "Sounds engineered -- strong fit for a dev tool, infra, or platform brand." },
-  { name: "nestly.io", tags: ["Brandable", "Home"], price: 3100, blurb: "Warm, short, and available across most social handles too." },
-  { name: "ember.io", tags: ["Brandable", "Consumer"], price: 8900, blurb: "One word, evocative, zero explanation needed. Rare at this length." },
-  { name: "gridlane.io", tags: ["Tech", "Logistics"], price: 4100, blurb: "Structured and confident -- reads well for mapping, logistics, or infra." },
-  { name: "havenly.io", tags: ["Brandable", "Home"], price: 2600, blurb: "Soft, trustworthy tone -- suits wellness, real estate, or community apps." },
-  { name: "pulsedeck.io", tags: ["SaaS", "Analytics"], price: 3700, blurb: "Sounds like a dashboard product on day one -- analytics, monitoring, ops." },
-  { name: "quirkly.io", tags: ["Brandable", "Consumer"], price: 2400, blurb: "Distinctive and memorable -- good fit for a quirky consumer brand." },
-  { name: "fablehouse.io", tags: ["Brandable", "Media"], price: 3300, blurb: "Storytelling built into the name -- content, media, or creative studios." },
-  { name: "northbeam.io", tags: ["Brandable", "B2B"], price: 5900, blurb: "Reads established and trustworthy -- strong for a B2B or fintech brand." },
-  { name: "verselane.io", tags: ["Brandable", "Media"], price: 2900, blurb: "Distinctive two-word combo, still fully available across major platforms." },
+  { name: "soulmatch.io", tags: ["Dating", "Social"], blurb: "Two clean words, obvious meaning -- built for a matchmaking or relationship app." },
+  { name: "vybe.io", tags: ["Brandable", "Lifestyle"], blurb: "Short, phonetic, and instantly readable -- fits music, events, or social." },
+  { name: "paird.io", tags: ["Brandable", "Dating"], blurb: "A playful misspelling that still reads clean -- pairing, matching, marketplaces." },
+  { name: "loopwave.io", tags: ["SaaS", "Tech"], blurb: "Two-word compound with rhythm -- reads like a real product, not a placeholder." },
+  { name: "driftly.io", tags: ["Brandable", "SaaS"], blurb: "The '-ly' pattern startups love -- light, friendly and easy to say." },
+  { name: "coreflux.io", tags: ["Tech", "Infra"], blurb: "Sounds engineered -- strong fit for a dev tool, infra, or platform brand." },
+  { name: "nestly.io", tags: ["Brandable", "Home"], blurb: "Warm and short -- suits home, family or community products." },
+  { name: "ember.io", tags: ["Brandable", "Consumer"], blurb: "One word, evocative, zero explanation needed." },
+  { name: "gridlane.io", tags: ["Tech", "Logistics"], blurb: "Structured and confident -- reads well for mapping, logistics, or infra." },
+  { name: "havenly.io", tags: ["Brandable", "Home"], blurb: "Soft, trustworthy tone -- suits wellness, real estate, or community apps." },
+  { name: "pulsedeck.io", tags: ["SaaS", "Analytics"], blurb: "Sounds like a dashboard product on day one -- analytics, monitoring, ops." },
+  { name: "quirkly.io", tags: ["Brandable", "Consumer"], blurb: "Distinctive and memorable -- good fit for a quirky consumer brand." },
+  { name: "fablehouse.io", tags: ["Brandable", "Media"], blurb: "Storytelling built into the name -- content, media, or creative studios." },
+  { name: "northbeam.io", tags: ["Brandable", "B2B"], blurb: "Reads established and trustworthy -- strong for a B2B or fintech brand." },
+  { name: "verselane.io", tags: ["Brandable", "Media"], blurb: "Distinctive two-word combo -- poetry, lyrics, writing or media apps." },
 ];
 
 const ALL_TAGS = Array.from(new Set(DOMAINS.flatMap((d) => d.tags))).sort();
-
-function formatPrice(n: number) {
-  return `$${n.toLocaleString("en-US")}`;
-}
 
 export default function MarketplaceClient() {
   const [query, setQuery] = useState("");
@@ -193,11 +192,12 @@ export default function MarketplaceClient() {
 
       <section className="mp-hero">
         <span className="mp-badge"><span className="mp-dot" /> Coming Soon</span>
-        <h1 className="mp-serif">A curated marketplace for great .io domains.</h1>
+        <h1 className="mp-serif">Find the right domain for your app.</h1>
         <p>
-          GYSM Marketplace is a hand-picked collection of short, brandable .io names --
-          the kind you'd want to build your next app on. Browsing is open now; buying
-          isn't yet. Join the waitlist and we'll email you the moment it launches.
+          Soon you&apos;ll be able to search, buy and connect a domain right inside GYSM.
+          Until then, here are some name ideas to get you thinking. They are examples only:
+          GYSM doesn&apos;t own them and hasn&apos;t checked whether they&apos;re available.
+          Join the waitlist and we&apos;ll email you when domain search opens.
         </p>
 
         <div className="mp-search-row">
@@ -231,7 +231,7 @@ export default function MarketplaceClient() {
           <div className="mp-card" key={d.name}>
             <div className="mp-card-top">
               <span className="mp-card-name">{d.name}</span>
-              <span className="mp-card-price">{formatPrice(d.price)}</span>
+              <span className="mp-card-price">Name idea</span>
             </div>
             <p className="mp-card-blurb">{d.blurb}</p>
             <div className="mp-card-tags">
@@ -247,7 +247,7 @@ export default function MarketplaceClient() {
                 (document.getElementById("mp-waitlist-email") as HTMLInputElement | null)?.focus();
               }}
             >
-              Coming soon -- notify me
+              Notify me when domain search opens
             </div>
           </div>
         ))}
@@ -257,8 +257,8 @@ export default function MarketplaceClient() {
         <h2 className="mp-serif">Get notified at launch</h2>
         <p>
           {interestDomain
-            ? `We'll let you know the moment ${interestDomain} (and the rest of the marketplace) is ready to buy.`
-            : "Leave your email and we'll reach out the moment domains go live for purchase."}
+            ? `We'll email you when domain search opens, so you can check whether ${interestDomain} is available.`
+            : "Leave your email and we'll reach out when domain search and purchase open on GYSM."}
         </p>
         <form className="mp-form-row" onSubmit={joinWaitlist}>
           {/* Honeypot field -- invisible and unreachable for a real
@@ -291,12 +291,12 @@ export default function MarketplaceClient() {
             {status === "done" ? "You're on the list" : status === "loading" ? "Joining..." : "Notify me"}
           </button>
         </form>
-        {status === "done" && <p className="mp-status-ok">Thanks -- we'll email you when the marketplace opens.</p>}
+        {status === "done" && <p className="mp-status-ok">Thanks -- we'll email you when domain search opens.</p>}
         {status === "error" && <p className="mp-status-err">{errorMsg}</p>}
         <p className="mp-note">No purchases happen today. This just adds you to the launch list.</p>
       </section>
 
-      <footer className="mp-footer">GYSM Marketplace is a preview from the team behind GYSM. Not yet open for purchases.</footer>
+      <footer className="mp-footer">Domain search on GYSM is coming soon. The names above are ideas, not domains for sale.</footer>
     </div>
   );
 }

@@ -5,7 +5,7 @@
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { storeUrl, type CartLine } from "./core";
-import { setChargesEnabled, setStoreStripeAccount, type StoreRow } from "./db";
+import { setChargesEnabled, setStoreStripeAccount, type BookingRow, type StoreRow } from "./db";
 
 /** Countries a store can ship to at checkout (Stripe needs an explicit list). */
 export const SHIPPING_COUNTRIES = [
@@ -78,7 +78,45 @@ export async function createStoreCheckout(store: StoreRow, orderId: string, line
       metadata,
       payment_intent_data: { metadata, ...(fee > 0 ? { application_fee_amount: fee } : {}) },
       ...(store.collect_shipping ? { shipping_address_collection: { allowed_countries: [...SHIPPING_COUNTRIES] } } : {}),
+      ...(store.collect_shipping && store.shipping_rates?.length
+        ? {
+            shipping_options: store.shipping_rates.map((r) => ({
+              shipping_rate_data: {
+                type: "fixed_amount" as const,
+                display_name: r.name,
+                fixed_amount: { amount: r.amount_cents, currency: store.currency },
+              },
+            })),
+          }
+        : {}),
       success_url: `${base}/thanks?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: base,
+    },
+    { stripeAccount: store.stripe_account_id },
+  );
+}
+
+/** A Checkout Session on the seller's own Stripe account for a paid booking (held for 30 minutes). */
+export async function createBookingCheckout(store: StoreRow, booking: BookingRow, when: string): Promise<Stripe.Checkout.Session> {
+  if (!store.stripe_account_id) throw new Error("Store has no Stripe account");
+  const base = storeUrl(store.slug);
+  const fee = applicationFeeCents(booking.amount_cents);
+  const metadata = { source: "gysm_booking", storeId: store.id, bookingId: booking.id };
+  return getStripe().checkout.sessions.create(
+    {
+      mode: "payment",
+      customer_email: booking.customer_email,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: { currency: store.currency, unit_amount: booking.amount_cents, product_data: { name: `${booking.service_name} (${when})` } },
+        },
+      ],
+      client_reference_id: booking.id,
+      metadata,
+      payment_intent_data: { metadata, ...(fee > 0 ? { application_fee_amount: fee } : {}) },
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      success_url: `${base}/thanks?booked=1`,
       cancel_url: base,
     },
     { stripeAccount: store.stripe_account_id },

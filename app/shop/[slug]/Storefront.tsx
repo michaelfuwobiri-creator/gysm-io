@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { formatMoney, MAX_QUANTITY } from "@/lib/stores/core";
+import BookingPanel, { type Service } from "./BookingPanel";
 
 type Product = { id: string; name: string; description: string; price_cents: number; image_url: string | null; stock: number | null };
 type StoreInfo = { slug: string; name: string; description: string; currency: string; status: string };
 
-export default function Storefront({ store, products, canSell }: { store: StoreInfo; products: Product[]; canSell: boolean }) {
+export default function Storefront({
+  store, products, canSell, services = [], canBook = false,
+}: { store: StoreInfo; products: Product[]; canSell: boolean; services?: Service[]; canBook?: boolean }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +57,13 @@ export default function Storefront({ store, products, canSell }: { store: StoreI
         </div>
       </header>
 
+      {services.length > 0 && (
+        <div className="mx-auto max-w-5xl px-4 pt-8">
+          <BookingPanel slug={store.slug} services={services} currency={store.currency} canBook={canBook} />
+        </div>
+      )}
+
+      {(products.length > 0 || services.length === 0) && (
       <div className="mx-auto grid max-w-5xl gap-8 px-4 py-8 lg:grid-cols-[1fr_300px]">
         <section className="grid gap-5 sm:grid-cols-2">
           {products.length === 0 && <p className="text-neutral-500">No products yet.</p>}
@@ -116,6 +126,7 @@ export default function Storefront({ store, products, canSell }: { store: StoreI
           <p className="mt-3 text-center text-xs text-neutral-400">Secure payment by Stripe · Built with GYSM</p>
         </aside>
       </div>
+      )}
     </main>
   );
 }
