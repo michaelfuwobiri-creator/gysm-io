@@ -271,6 +271,91 @@ const TOOLS: Tool[] = [
   },
 ];
 
+// GYSM Stores for shoppers: only offered while STORES_ENABLED=true. They load
+// the store modules lazily so this file stays importable (and testable)
+// without a database.
+const STORE_TOOLS: Tool[] = [
+  {
+    name: "find_stores",
+    title: "Find shops built on GYSM",
+    description:
+      "Search the online shops and businesses built on GYSM (products, appointments, services). Returns each live store's name, description and address. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: { query: { type: "string", description: "What the shopper wants, e.g. 'candles', 'haircut in Rome' (max 80 characters). Empty lists recent stores.", maxLength: 80 } },
+      additionalProperties: false,
+    },
+    annotations: { title: "Find shops built on GYSM", ...READ_ONLY, openWorldHint: true },
+    run: async (args) => {
+      const { findStores } = await import("@/lib/stores/mcp");
+      const stores = await findStores(args.query);
+      if (!stores.length) return ok("No live GYSM stores match that yet.", { stores: [] });
+      return ok(stores.map((s) => `${s.name} (store: ${s.slug}) ${s.url}${s.description ? `\n  ${s.description}` : ""}`).join("\n"), { stores });
+    },
+  },
+  {
+    name: "get_store",
+    title: "See a GYSM shop's products and services",
+    description:
+      "Read one GYSM store's catalogue: products with prices and stock, bookable services, shipping options and whether it is taking orders. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: { store: { type: "string", description: "The store's slug from find_stores.", maxLength: 40 } },
+      required: ["store"],
+      additionalProperties: false,
+    },
+    annotations: { title: "See a GYSM shop's products and services", ...READ_ONLY, openWorldHint: true },
+    run: async (args) => {
+      const { storeCatalog } = await import("@/lib/stores/mcp");
+      const c = await storeCatalog(args.store);
+      if (!c) return fail("That store doesn't exist or isn't open.");
+      const lines = [
+        `${c.name}: ${c.url}${c.takingOrders ? "" : " (not taking orders right now)"}`,
+        ...(c.description ? [c.description] : []),
+        ...(c.products.length ? ["", "Products:", ...c.products.map((p) => `- ${p.name}: ${p.price}${p.inStock ? "" : " (sold out)"} [product ${p.id}]`)] : []),
+        ...(c.services.length ? ["", "Appointments (booked on the store page):", ...c.services.map((v) => `- ${v.name}: ${v.durationMinutes} min, ${v.price}`)] : []),
+        ...(c.shippingOptions.length ? ["", `Shipping: ${c.shippingOptions.map((r) => `${r.name} ${r.price}`).join(", ")}`] : []),
+      ];
+      return ok(lines.join("\n"), c);
+    },
+  },
+  {
+    name: "start_checkout",
+    title: "Start checkout at a GYSM shop",
+    description:
+      "Create a secure Stripe checkout link for products from one GYSM store. Only call it after the shopper has confirmed the items and quantities. The shopper opens the link and pays on Stripe's page; nothing is charged by this tool. Prices come from the store, not from the request.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        store: { type: "string", description: "The store's slug.", maxLength: 40 },
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 50,
+          items: { type: "object", properties: { productId: { type: "string" }, quantity: { type: "integer", minimum: 1, maximum: 99 } }, required: ["productId", "quantity"], additionalProperties: false },
+        },
+      },
+      required: ["store", "items"],
+      additionalProperties: false,
+    },
+    annotations: { title: "Start checkout at a GYSM shop", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    run: async (args) => {
+      const { startStoreCheckout } = await import("@/lib/stores/mcp");
+      const { formatMoney } = await import("@/lib/stores/core");
+      const r = await startStoreCheckout(args.store, args.items);
+      if ("error" in r) return fail(r.error);
+      return ok(`Checkout is ready. Subtotal ${formatMoney(r.totalCents, r.currency)} before shipping and tax. Open this link to pay securely on Stripe: ${r.url}`, { url: r.url, subtotalCents: r.totalCents, currency: r.currency });
+    },
+  },
+];
+
+function storesOn(): boolean {
+  return process.env.STORES_ENABLED === "true";
+}
+
+const STORE_INSTRUCTIONS =
+  " Shoppers can also buy from stores built on GYSM: find_stores and get_store to browse, then start_checkout (only after the shopper confirms the items) returns a Stripe link the shopper opens to pay. Never pay or enter card details for them.";
+
 const INSTRUCTIONS =
   "GYSM turns a plain-English description into a working single-page web app with a live preview. Use plan_app or plan_online_store first to shape the idea (free, instant, no sign-in). Use get_build_link to hand the user a link, or build_app only when the user asks to build now and has connected their own GYSM API key. GYSM builds one self-contained page per build with no managed database or sign-in: be upfront about that, and never promise results the plan does not state.";
 
@@ -297,7 +382,7 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
           protocolVersion,
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: "gysm", title: "GYSM App and Store Builder", version: SERVER_VERSION },
-          instructions: INSTRUCTIONS,
+          instructions: INSTRUCTIONS + (storesOn() ? STORE_INSTRUCTIONS : ""),
         },
       };
     }
@@ -312,7 +397,7 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
         // free planning tools, all of which work without sign-in. A direct
         // tools/call to build_app without a key still returns the sign-in link.
         result: {
-          tools: TOOLS.filter((t) => t.name !== "build_app" || Boolean(ctx.apiKey)).map((t) => ({
+          tools: [...TOOLS.filter((t) => t.name !== "build_app" || Boolean(ctx.apiKey)), ...(storesOn() ? STORE_TOOLS : [])].map((t) => ({
             name: t.name,
             title: t.title,
             description: t.description,
@@ -323,7 +408,7 @@ async function handleOne(msg: RpcRequest, ctx: McpContext): Promise<RpcResponse 
       };
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
-      const tool = TOOLS.find((t) => t.name === name);
+      const tool = TOOLS.find((t) => t.name === name) ?? (storesOn() ? STORE_TOOLS.find((t) => t.name === name) : undefined);
       if (!tool) return rpcError(id, -32602, `Unknown tool: ${cleanText(name, 60)}`);
       const args = (params.arguments && typeof params.arguments === "object" && !Array.isArray(params.arguments) ? params.arguments : {}) as Json;
       try {
@@ -352,4 +437,5 @@ export async function handleMcpBody(body: unknown, ctx: McpContext = {}): Promis
 }
 
 export const MCP_TOOL_NAMES = TOOLS.map((t) => t.name);
+export const MCP_STORE_TOOL_NAMES = STORE_TOOLS.map((t) => t.name);
 export { LANDING_USE_CASES };
