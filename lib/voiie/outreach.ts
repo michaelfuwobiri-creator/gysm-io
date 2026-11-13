@@ -7,7 +7,7 @@ import { sendWhatsAppText } from "@/lib/voiie/whatsapp";
 import { sendTwitterDM, lookupUserIdByHandle } from "@/lib/voiie/twitter";
 import { DEFAULT_OUTREACH_TEMPLATE } from "@/lib/voiie/constants";
 import { pickOutreachTemplate, pickPlacesTemplate, pickWeakSiteTemplate } from "@/lib/voiie/spintax";
-import { postalAddressConfigured } from "@/lib/voiie/compliance";
+import { isAgencyLead, postalAddressConfigured } from "@/lib/voiie/compliance";
 import { sendVoiieEmail } from "@/lib/voiie/email";
 import { intakeUrl } from "@/lib/voiie/links";
 import type { OutreachChannel, VoiieLead } from "@/types/voiie";
@@ -55,7 +55,12 @@ export function renderTemplate(
  * spintax-varied message is used when spintax is enabled (the default)
  * instead of always sending the exact same sentence.
  */
-export async function sendOutreach(leadId: string, channel: OutreachChannel, template?: string): Promise<void> {
+export async function sendOutreach(
+  leadId: string,
+  channel: OutreachChannel,
+  template?: string,
+  opts: { subject?: string } = {}
+): Promise<void> {
   const lead = await getLeadUnscoped(leadId);
   if (!lead) throw new Error("Lead not found.");
   if (lead.do_not_contact) throw new Error("This lead is marked do-not-contact.");
@@ -72,7 +77,9 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
       : settings.spintax_enabled
         ? pickOutreachTemplate()
         : DEFAULT_TEMPLATE);
-  const message = renderTemplate(effectiveTemplate, lead, intakeUrl(lead.id));
+  // Agency partner leads get a partnership note, not the small-business
+  // "free demo site" intake link.
+  const message = renderTemplate(effectiveTemplate, lead, isAgencyLead(lead) ? undefined : intakeUrl(lead.id));
 
   if (channel === "whatsapp") {
     // Meta's WhatsApp Business policy requires opt-in before any
@@ -94,7 +101,7 @@ export async function sendOutreach(leadId: string, channel: OutreachChannel, tem
     // address, unsubscribe link + List-Unsubscribe headers) and logs the
     // message itself, so return early instead of double-logging below.
     await sendVoiieEmail(lead, {
-      subject: firstTouchSubject(lead),
+      subject: opts.subject?.trim() || firstTouchSubject(lead),
       body: message,
       kind: "first_touch",
     });

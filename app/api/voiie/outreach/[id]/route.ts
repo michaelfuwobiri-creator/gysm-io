@@ -21,7 +21,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // send "saw you need <internal tag>" to every dashboard-triggered email.
     const template = typeof body?.template === "string" && body.template.trim() ? body.template : undefined;
 
-    await sendOutreach(lead.id, channel, template);
+    const subject = typeof body?.subject === "string" ? body.subject.trim().slice(0, 140) : undefined;
+
+    await sendOutreach(lead.id, channel, template, { subject });
     return Response.json({ ok: true });
   } catch (error: any) {
     console.error("[voiie/outreach] failed:", error.message);
