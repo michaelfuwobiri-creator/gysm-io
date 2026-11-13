@@ -31,12 +31,13 @@ export async function stripeOnboardingLink(store: StoreRow, email: string | null
     accountId = account.id;
     await setStoreStripeAccount(store.id, store.user_id, accountId);
   }
-  const back = `${siteUrl()}/stores/${store.id}`;
+  // Stripe sends the seller back here; both routes land them in the builder agent.
+  const back = `${siteUrl()}/api/stores/${store.id}/stripe`;
   const link = await stripe.accountLinks.create({
     account: accountId,
     type: "account_onboarding",
-    refresh_url: `${back}?stripe=refresh`,
-    return_url: `${back}?stripe=return`,
+    refresh_url: `${back}/refresh`,
+    return_url: `${back}/return`,
   });
   return link.url;
 }

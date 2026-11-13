@@ -25,7 +25,7 @@ export default function StoreOrderEmail({ storeName, total, lines, customer, shi
       ))}
       {shipping ? <Text style={{ ...textStyle, marginTop: 16 }}>Ship to: {shipping}</Text> : null}
       <Button href={dashboardUrl} style={buttonStyle}>
-        Open the order
+        Open GYSM
       </Button>
       <Text style={{ ...textStyle, marginTop: 24, fontSize: 12, color: "#999" }}>
         The payment went to your own Stripe account. GYSM sends this alert for every paid order.

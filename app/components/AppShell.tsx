@@ -1,5 +1,4 @@
 import { UserButton, OrganizationSwitcher } from "@clerk/nextjs";
-import { storesEnabled } from "@/lib/stores/core";
 import { getUser } from "@/lib/auth";
 import { getUsageSummary, type UsageSummary } from "@/lib/planUsage";
 import CommandPalette, { CommandPaletteTrigger } from "./CommandPalette";
@@ -35,8 +34,6 @@ const NAV_GROUPS: {
       { key: "agent", label: "Builder", href: "/agent", icon: "terminal" },
       { key: "templates", label: "Templates", href: "/templates", icon: "layout" },
       { key: "connectors", label: "Connectors", href: "/connectors", icon: "plug" },
-      // GYSM Stores (online store + checkout), only while STORES_ENABLED=true.
-      { key: "stores", label: "Stores (beta)", href: "/stores", icon: "card" },
       { key: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: "chart" },
       // Drag-and-drop block builder -- a separate, parallel surface from
       // the prompt-driven AI builder above (see /builder-blocks route
@@ -231,9 +228,7 @@ export default async function AppShell({
 
   const mobileGroups = NAV_GROUPS.map((group) => ({
     title: group.title,
-    items: group.items
-      .filter((item) => item.key !== "stores" || storesEnabled())
-      .map((item) => ({ ...item, active: active === item.key })),
+    items: group.items.map((item) => ({ ...item, active: active === item.key })),
   }));
 
   return (

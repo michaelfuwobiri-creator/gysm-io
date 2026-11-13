@@ -88,7 +88,7 @@ async function handlePaid(accountId: string | null, session: Stripe.Checkout.Ses
     lines: (order.items ?? []).map((i) => `${i.quantity} x ${i.name} (${formatMoney(i.unit_price_cents, order.currency)})`),
     customer: order.customer_name || order.customer_email || "A customer",
     shipping,
-    dashboardUrl: `${site}/stores/${store.id}`,
+    dashboardUrl: `${site}/agent`,
   });
 }
 

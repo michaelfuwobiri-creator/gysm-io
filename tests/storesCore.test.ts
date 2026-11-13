@@ -136,12 +136,19 @@ describe("agent store tools", () => {
   it("are offered only while stores are enabled", () => {
     expect(names().some((n: string) => n.startsWith("store_"))).toBe(false);
     process.env.STORES_ENABLED = "true";
-    expect(names()).toEqual(expect.arrayContaining(["store_setup_guide", "store_status", "store_create", "store_add_product", "store_connect"]));
+    expect(names()).toEqual(expect.arrayContaining([
+      "store_setup_guide", "store_status", "store_create", "store_add_product", "store_update_product",
+      "store_remove_product", "store_orders", "store_payments_link", "store_update", "store_connect",
+    ]));
   });
   it("asks the user before creating a store or connecting keys", () => {
     expect(needsApproval("store_create", {})).toBe(true);
     expect(needsApproval("store_connect", {})).toBe(true);
+    expect(needsApproval("store_payments_link", {})).toBe(true);
+    expect(needsApproval("store_update", {})).toBe(true);
+    expect(needsApproval("store_remove_product", {})).toBe(true);
     expect(needsApproval("store_status", {})).toBe(false);
+    expect(needsApproval("store_orders", {})).toBe(false);
   });
   it("labels the private box with the right key name", () => {
     expect(storeSecretLabel("clerk")).toBe("Clerk secret key");
