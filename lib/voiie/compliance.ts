@@ -59,13 +59,23 @@ export function regionAllowsColdEmail(region: string | null): boolean {
   return !!region && coldEmailRegions().includes(region);
 }
 
+/** Tag for agency partner leads: Mike approves each of their emails by hand,
+ *  so the autopilot, autosend and bulk queue never write to them (no first
+ *  touch, no "free demo" follow-ups). */
+export const AGENCY_TAG = "agency";
+
+export function isAgencyLead(lead: { tags?: string[] | null }): boolean {
+  return (lead.tags ?? []).includes(AGENCY_TAG);
+}
+
 /** Gate for the unattended autopilot. Manual leads (Mike's own test
  *  addresses, or contacts who asked to be reached) are not region-gated. */
-export function coldEmailAllowed(lead: Pick<VoiieLead, "platform" | "bio" | "contact_phone" | "contact_email" | "do_not_contact">): {
+export function coldEmailAllowed(lead: Pick<VoiieLead, "platform" | "bio" | "contact_phone" | "contact_email" | "do_not_contact"> & { tags?: string[] | null }): {
   ok: boolean;
   reason?: string;
 } {
   if ((lead as any).do_not_contact) return { ok: false, reason: "do-not-contact" };
+  if (isAgencyLead(lead)) return { ok: false, reason: "agency partner lead: emailed by hand only" };
   if (!lead.contact_email) return { ok: false, reason: "no email" };
   if (lead.platform === "manual") return { ok: true };
   const region = detectRegion(lead);
