@@ -28,19 +28,24 @@ A wildcard domain on Vercel needs the domain's nameservers on Vercel.
 
 ## How a seller gets selling
 
-1. `/stores` → create a store (draft).
-2. Add products.
-3. **Connect Stripe**: the seller signs up or in on Stripe's own page. Money goes
-   to their account; GYSM never holds it.
-4. Optional: under **Your accounts**, paste keys for their own Neon, Supabase,
-   Clerk or Shippo. GYSM checks each key with the provider and stores it
-   encrypted. A verified Neon connection on an empty store moves its products
-   and orders into the seller's own database.
-5. **Open store**.
+There is no separate store page: the seller does everything by chatting with
+the builder agent at `/agent`.
 
-The GYSM agent can do steps 1, 2 and 4 for the seller (`store_setup_guide`,
-`store_create`, `store_add_product`, `store_connect`, `store_status`); the
-seller always types secrets themselves and approves each step.
+1. "Make me a store for my bakery" -> the agent reads `store_setup_guide`,
+   explains which accounts the seller needs, and creates a draft store
+   (`store_create`, approved by the seller).
+2. The agent adds and edits products (`store_add_product`,
+   `store_update_product`, `store_remove_product`).
+3. `store_payments_link` gives a one-time link to connect the seller's own
+   Stripe account on Stripe's page. Stripe sends them back to the builder.
+   Money goes to their account; GYSM never holds it.
+4. Optional: `store_connect` connects their own Neon, Supabase, Clerk or
+   Shippo account. The seller types the secret in the private approval box,
+   GYSM checks it with the provider and stores it encrypted. A verified Neon
+   connection on an empty store moves its products and orders into the
+   seller's own database.
+5. `store_update` with status `live` opens the store. The seller gets an email
+   for every paid order and can ask the agent for `store_orders`.
 
 ## Not built yet
 

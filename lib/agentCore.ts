@@ -47,6 +47,11 @@ export type ToolName =
   | "store_status"
   | "store_create"
   | "store_add_product"
+  | "store_update_product"
+  | "store_remove_product"
+  | "store_orders"
+  | "store_payments_link"
+  | "store_update"
   | "store_connect";
 
 // OpenAI-format tool definitions. Names and parameters match the spec the
@@ -720,7 +725,7 @@ export const STORE_TOOL_DEFS = [
     type: "function",
     function: {
       name: "store_create",
-      description: "Create a new GYSM online store (starts as a draft the public can't see). The user approves. Afterwards add products with store_add_product and tell the user to press Connect Stripe on the store's dashboard page.",
+      description: "Create a new GYSM online store (starts as a draft only the owner can preview). The user approves. Afterwards add products with store_add_product, connect payments with store_payments_link, then open it with store_update status \"live\".",
       parameters: {
         type: "object",
         properties: {
@@ -748,6 +753,75 @@ export const STORE_TOOL_DEFS = [
           image_url: { type: "string", description: "https link to a product photo (optional)." },
         },
         required: ["store", "name", "price"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_update_product",
+      description: "Change a product in one of the user's stores: name, price, stock, description, photo, or hide/show it. Only send the fields that change.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string", description: "The store's slug." },
+          product: { type: "string", description: "The product's current name (or id)." },
+          name: { type: "string" },
+          price: { type: "string", description: "New price, e.g. 12.50." },
+          description: { type: "string" },
+          stock: { type: "integer" },
+          unlimited_stock: { type: "boolean", description: "true to stop tracking stock." },
+          image_url: { type: "string" },
+          visible: { type: "boolean", description: "false hides it from the store, true shows it." },
+        },
+        required: ["store", "product"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_remove_product",
+      description: "Delete a product from one of the user's stores. The user approves. Past orders keep their record.",
+      parameters: {
+        type: "object",
+        properties: { store: { type: "string" }, product: { type: "string", description: "The product's name (or id)." } },
+        required: ["store", "product"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_orders",
+      description: "List the latest paid orders of one of the user's stores: when, total, customer, items and where to ship.",
+      parameters: { type: "object", properties: { store: { type: "string" } }, required: ["store"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_payments_link",
+      description: "Get a one-time link where the user connects their OWN Stripe account to a store (sign up or sign in on Stripe's page). The user approves. Give them the link; they come back to the builder when done. Says so if payments are already ready.",
+      parameters: { type: "object", properties: { store: { type: "string" } }, required: ["store"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "store_update",
+      description: "Change a store's settings: name, description, the email that gets order alerts, whether checkout asks for a shipping address, and its status (live opens it to the public once Stripe is ready; paused closes it). The user approves.",
+      parameters: {
+        type: "object",
+        properties: {
+          store: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string" },
+          alert_email: { type: "string", description: "Where order alerts go; empty for the account email." },
+          collect_shipping: { type: "boolean" },
+          status: { type: "string", enum: ["draft", "live", "paused"] },
+        },
+        required: ["store"],
       },
     },
   },
@@ -836,7 +910,7 @@ export function checkLocalCall(name: string, args: any): string | null {
   return null;
 }
 
-export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect"];
+export const APPROVAL_TOOLS: ToolName[] = ["deploy", "create_db_table", "setup_user_profiles", "connect_domain", "set_env", "store_create", "store_connect", "store_payments_link", "store_update", "store_remove_product"];
 
 export function systemPrompt(localFolder?: string | null, memory?: string, browser = false, autonomous = false): string {
   return systemPromptBase() + (memory || "") + (localFolder ? localFolderPrompt(localFolder) : "") + (browser ? browserPrompt() : "") + (autonomous ? autonomousPrompt() : "");
@@ -875,7 +949,7 @@ How you work:
 - When the user wants a file (PDF, spreadsheet, CSV, ZIP, a document), make it in the workspace with write_file or run_command, then hand it over with send_file.
 - Use remember to save a lasting preference or fact the user tells you (brand, audience, style); use forget to remove one that is outdated or that they ask you to drop.
 - If a goal needs a real database or sign-in (accounts, profiles, saved data), call database_status for the project; if nothing is connected, call connect_service (the user approves on Supabase themselves), then for sign-up and profiles call setup_user_profiles (a fixed, safe setup: profiles table, row level security, and a profile created automatically on sign-up), and for other tables use list_tables, create_db_table (with row level security so users can only touch their own rows) and the project's public URL and anon key. The anon key and URL are public and may go in site files; any other key must never be written into a file. To put a deployed site on the user's own domain, call connect_domain (the user approves) and then give them the exact DNS records it returns; after they say they added them, call domain_status and only say it is live when it is. For a big job that needs several approvals, call request_autonomy once up front instead of asking at every step.
-- Online stores (only when the store_* tools are offered): read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (they press Connect Stripe on the store's dashboard page, gysm.io/stores); their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional. Create the store with store_create, add the products they describe with store_add_product, connect each of their accounts with store_connect once they have it (they type the secret themselves; never ask them to paste a secret into the chat), and check with store_status. Never create accounts or enter passwords for them.
+- Online stores (only when the store_* tools are offered): everything happens here in the chat, there is no separate store page. Read store_setup_guide, then tell the seller in plain words which accounts to create themselves and which values to copy: Stripe is required (store_payments_link gives them a one-time link to connect their own account), their own Neon or Supabase database, Clerk sign-in and Shippo shipping are optional (store_connect; they type the secret in the private box, never in the chat). Create the store with store_create, manage products with store_add_product, store_update_product and store_remove_product, open or pause it and change settings with store_update, check orders with store_orders and the overall state with store_status. Never create accounts or enter passwords for them.
 - Use ask_user only when a choice is essential and you cannot reasonably pick for the user; otherwise decide, say what you chose, and carry on.
 - Building a site end to end: clarify only if essential, build it in its own folder, check the files, deploy (the user approves) to put it live at <name>.gysm.io, then call review_site on the live URL and fix real problems you find before reporting back. Give the user the gysm.io address.
 - review_site audits a public URL. When asked to review a site, run it, explain the findings in plain language grouped by importance, and offer fixes; never change anything the user did not ask you to.
@@ -1214,6 +1288,16 @@ export function describeCall(tool: string, args: any): string {
       return `Create the store "${String(args?.name ?? "?").slice(0, 80)}"`;
     case "store_add_product":
       return `Add "${String(args?.name ?? "?").slice(0, 80)}" (${String(args?.price ?? "?").slice(0, 20)}) to ${String(args?.store ?? "?")}`;
+    case "store_update_product":
+      return `Update "${String(args?.product ?? "?").slice(0, 80)}" in ${String(args?.store ?? "?")}`;
+    case "store_remove_product":
+      return `Remove "${String(args?.product ?? "?").slice(0, 80)}" from ${String(args?.store ?? "?")}`;
+    case "store_orders":
+      return `Check orders for ${String(args?.store ?? "?")}`;
+    case "store_payments_link":
+      return `Get a link to connect your Stripe account to ${String(args?.store ?? "?")}`;
+    case "store_update":
+      return `Update store ${String(args?.store ?? "?")}${args?.status ? ` (status: ${String(args.status)})` : ""}`;
     case "store_connect":
       return `Connect your own ${String(args?.provider ?? "?")} account to ${String(args?.store ?? "?")} (you type the key)`;
     case "web_search":

@@ -824,6 +824,11 @@ export async function executeTool(userId: string, name: string, args: any, secre
       case "store_status":
       case "store_create":
       case "store_add_product":
+      case "store_update_product":
+      case "store_remove_product":
+      case "store_orders":
+      case "store_payments_link":
+      case "store_update":
       case "store_connect":
         result = await executeStoreTool(userId, name, args, secret);
         break;
