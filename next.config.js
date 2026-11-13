@@ -15,6 +15,15 @@ const nextConfig = {
     // based on the request's Accept header -- no per-image code needed.
     formats: ["image/avif", "image/webp"],
   },
+  async rewrites() {
+    return {
+      // Runs before the /api/mcp route so Glama can verify GYSM owns the
+      // connector (see app/api/glama-claim/route.ts).
+      beforeFiles: [
+        { source: "/api/mcp/.well-known/glama.json", destination: "/api/glama-claim" },
+      ],
+    };
+  },
   async headers() {
     return [
       {
